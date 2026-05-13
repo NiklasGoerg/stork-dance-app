@@ -73,3 +73,57 @@ bun run preview
 ```
 
 Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+
+## UI Style Baseline
+
+The app now uses a small global style system loaded via `nuxt.config.ts` from `src/assets/styles/styles.scss`.
+
+### Design Tokens
+
+Defined as CSS variables in `:root`:
+
+- `--color-primary`, `--color-primary-hover`, `--color-primary-strong`
+- `--color-bg`, `--color-surface`
+- `--color-text`, `--color-text-muted`
+- `--color-border`, `--color-chip-bg`
+- `--space-1` to `--space-7`
+- `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-xl`
+- `--shadow-soft`, `--shadow-panel`, `--shadow-card`
+
+### Reusable Global Classes
+
+Use these classes for new UI components:
+
+- Panels/Cards: `.panel-shell`, `.card-panel`, `.panel-title`
+- Inputs: `.field`, `.input-modern`
+- Buttons: `.btn`, `.btn--primary`, `.icon-btn`, `.buttons`
+- Control layout: `.control-layout`, `.control-main`, `.control-meta`, `.control-inline-note`
+- Tabs: `.tabs`, `.tab-btn`, `.tab-btn.active`
+- Chips/Status: `.chip`, `.status-chip` + state modifiers (`.active`, `.playing`, `.paused`, `.stopped`, `.loaded`)
+- Small utilities: `.row`, `.stack`, `.muted`
+
+### Control Pattern
+
+Record/Playback controls follow a reduced action model:
+
+- Record: one primary toggle (`Start` / `Stop`) + secondary export icon action
+- Playback: one primary toggle (`Start` / `Pause`) + secondary stop icon action
+
+Panel content order is always:
+
+1. Header
+2. Input field
+3. Primary action row
+4. Status row
+
+### Icon System
+
+Material Design Icons are used via `@mdi/js` and `src/components/ui/BaseIcon.vue`.
+
+Example:
+
+```vue
+<BaseIcon :path="mdiPlay" />
+```
+
+This keeps icon usage lightweight without introducing a full UI framework.

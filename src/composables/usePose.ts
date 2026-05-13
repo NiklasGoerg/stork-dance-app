@@ -1,8 +1,4 @@
-import {
-  PoseLandmarker,
-  FilesetResolver,
-  type NormalizedLandmark,
-} from "@mediapipe/tasks-vision";
+import { PoseLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 
 let poseLandmarker: PoseLandmarker | null = null;
 
@@ -20,6 +16,9 @@ export async function usePose() {
     },
     runningMode: "VIDEO",
     numPoses: 1,
+    minPoseDetectionConfidence: 0.6,
+    minPosePresenceConfidence: 0.6,
+    minTrackingConfidence: 0.7,
   });
 
   return poseLandmarker;

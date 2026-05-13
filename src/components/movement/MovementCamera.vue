@@ -20,9 +20,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
 import type { ViewMode } from "~/types/view";
 import { usePose } from "~/composables/usePose";
 import { useHands } from "~/composables/useHands";
+import { useMovementRecorder } from "~/composables/useMovementRecorder";
+import { useLandmarkSmoothing } from "~/composables/useLandmarkSmoothing";
 
 const props = defineProps<{
   mode: ViewMode;
@@ -31,10 +34,13 @@ const props = defineProps<{
 
 const video = ref<HTMLVideoElement | null>(null);
 const canvas = ref<HTMLCanvasElement | null>(null);
+const { recordFrame } = useMovementRecorder();
+const { smoothLandmarks, reset: resetLandmarkSmoothing } =
+  useLandmarkSmoothing();
 
 let ctx: CanvasRenderingContext2D | null = null;
-let pose: any = null;
-let hands: any = null;
+let pose: Awaited<ReturnType<typeof usePose>> | null = null;
+let hands: Awaited<ReturnType<typeof useHands>> | null = null;
 
 let running = false;
 
@@ -45,7 +51,7 @@ const HEIGHT = 360;
 // 👉 Hand throttling
 let lastHandDetection = 0;
 const HAND_INTERVAL = 100;
-let lastHandResult: any = null;
+let lastHandResult: { landmarks: NormalizedLandmark[][] } | null = null;
 
 // ==============================
 // INIT
@@ -72,6 +78,7 @@ onMounted(async () => {
     pose = await usePose();
     hands = await useHands();
 
+    resetLandmarkSmoothing();
     running = true;
     detectFrame();
   };
@@ -99,13 +106,20 @@ const detectFrame = () => {
 
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-  if (poseResult?.landmarks?.length > 0) {
-    drawBody(poseResult.landmarks[0]);
-    drawHead(poseResult.landmarks[0]);
+  const smoothedPoseLandmarks = smoothLandmarks(
+    poseResult?.landmarks?.[0] as NormalizedLandmark[] | undefined,
+  );
+
+  if (smoothedPoseLandmarks) {
+    drawBody(smoothedPoseLandmarks);
+    drawHead(smoothedPoseLandmarks);
+    recordFrame(smoothedPoseLandmarks);
   }
 
-  if (props.showHands && lastHandResult?.landmarks?.length > 0) {
-    drawHands(lastHandResult.landmarks);
+  const handLandmarks = lastHandResult?.landmarks;
+
+  if (props.showHands && handLandmarks && handLandmarks.length > 0) {
+    drawHands(handLandmarks);
   }
 };
 
@@ -113,49 +127,51 @@ const detectFrame = () => {
 // DRAW HELPERS
 // ==============================
 
-const getPoint = (landmarks: any[], i: number) => ({
-  x: landmarks[i].x * WIDTH,
-  y: landmarks[i].y * HEIGHT,
+const getPoint = (landmarks: NormalizedLandmark[], i: number) => ({
+  x: (landmarks[i]?.x ?? 0) * WIDTH,
+  y: (landmarks[i]?.y ?? 0) * HEIGHT,
 });
 
 // ==============================
 // BODY
 // ==============================
 
-const drawBody = (landmarks: any[]) => {
+const drawBody = (landmarks: NormalizedLandmark[]) => {
   if (!ctx) return;
 
-  ctx.save();
-  ctx.scale(-1, 1);
-  ctx.translate(-WIDTH, 0);
+  const context = ctx;
+
+  context.save();
+  context.scale(-1, 1);
+  context.translate(-WIDTH, 0);
 
   const isSkeleton = props.mode === "skeleton" || props.mode === "camera";
   const isSilhouette = props.mode === "silhouette";
 
-  ctx.lineCap = "round";
+  context.lineCap = "round";
 
   // ==============================
   // STYLE
   // ==============================
 
   if (isSkeleton) {
-    ctx.strokeStyle = "lime";
-    ctx.lineWidth = 6;
+    context.strokeStyle = "lime";
+    context.lineWidth = 6;
   }
 
   if (isSilhouette) {
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 18;
+    context.strokeStyle = "white";
+    context.lineWidth = 18;
   }
 
   const line = (a: number, b: number) => {
     const p1 = getPoint(landmarks, a);
     const p2 = getPoint(landmarks, b);
 
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
+    context.beginPath();
+    context.moveTo(p1.x, p1.y);
+    context.lineTo(p2.x, p2.y);
+    context.stroke();
   };
 
   // ==============================
@@ -184,19 +200,21 @@ const drawBody = (landmarks: any[]) => {
   line(24, 26);
   line(26, 28);
 
-  ctx.restore();
+  context.restore();
 };
 
 // ==============================
 // HEAD (NEU + verbessert)
 // ==============================
 
-const drawHead = (landmarks: any[]) => {
+const drawHead = (landmarks: NormalizedLandmark[]) => {
   if (!ctx) return;
 
-  ctx.save();
-  ctx.scale(-1, 1);
-  ctx.translate(-WIDTH, 0);
+  const context = ctx;
+
+  context.save();
+  context.scale(-1, 1);
+  context.translate(-WIDTH, 0);
 
   const nose = getPoint(landmarks, 0);
   const leftEar = getPoint(landmarks, 7);
@@ -211,46 +229,48 @@ const drawHead = (landmarks: any[]) => {
   const isSilhouette = props.mode === "silhouette";
 
   if (isSkeleton) {
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 3;
+    context.strokeStyle = "white";
+    context.lineWidth = 3;
   }
 
   if (isSilhouette) {
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 10;
+    context.strokeStyle = "white";
+    context.lineWidth = 10;
   }
 
   // Kopf
-  ctx.beginPath();
-  ctx.arc(nose.x, nose.y, radius, 0, Math.PI * 2);
-  ctx.stroke();
+  context.beginPath();
+  context.arc(nose.x, nose.y, radius, 0, Math.PI * 2);
+  context.stroke();
 
   // Orientierung (Tilt)
-  ctx.beginPath();
-  ctx.moveTo(leftEar.x, leftEar.y);
-  ctx.lineTo(rightEar.x, rightEar.y);
-  ctx.stroke();
+  context.beginPath();
+  context.moveTo(leftEar.x, leftEar.y);
+  context.lineTo(rightEar.x, rightEar.y);
+  context.stroke();
 
-  ctx.restore();
+  context.restore();
 };
 
 // ==============================
 // HANDS
 // ==============================
 
-const drawHands = (handsLandmarks: any[]) => {
+const drawHands = (handsLandmarks: NormalizedLandmark[][]) => {
   if (!ctx) return;
 
-  ctx.save();
-  ctx.scale(-1, 1);
-  ctx.translate(-WIDTH, 0);
+  const context = ctx;
+
+  context.save();
+  context.scale(-1, 1);
+  context.translate(-WIDTH, 0);
 
   const isSilhouette = props.mode === "silhouette";
 
-  ctx.strokeStyle = isSilhouette ? "white" : "cyan";
-  ctx.lineWidth = isSilhouette ? 8 : 2;
+  context.strokeStyle = isSilhouette ? "white" : "cyan";
+  context.lineWidth = isSilhouette ? 8 : 2;
 
-  const connections = [
+  const connections: Array<[number, number]> = [
     [0, 1],
     [1, 2],
     [2, 3],
@@ -276,22 +296,22 @@ const drawHands = (handsLandmarks: any[]) => {
 
   handsLandmarks.forEach((hand) => {
     const point = (i: number) => ({
-      x: hand[i].x * WIDTH,
-      y: hand[i].y * HEIGHT,
+      x: (hand[i]?.x ?? 0) * WIDTH,
+      y: (hand[i]?.y ?? 0) * HEIGHT,
     });
 
     connections.forEach(([a, b]) => {
       const p1 = point(a);
       const p2 = point(b);
 
-      ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      ctx.stroke();
+      context.beginPath();
+      context.moveTo(p1.x, p1.y);
+      context.lineTo(p2.x, p2.y);
+      context.stroke();
     });
   });
 
-  ctx.restore();
+  context.restore();
 };
 </script>
 
