@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="220">
+
+  <!-- Shirt -->
+  <path
+    d="
+      M20 40
+      Q70 5 120 40
+      L120 190
+      Q70 215 20 190
+      Z
+    "
+    fill="#5DADE2"
+    stroke="#222"
+    stroke-width="6"
+  />
+
+  <!-- Hals -->
+  <ellipse
+    cx="70"
+    cy="38"
+    rx="22"
+    ry="12"
+    fill="#FFD7B5"
+  />
+</svg>

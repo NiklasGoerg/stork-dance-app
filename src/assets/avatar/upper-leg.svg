@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="140">
+  <!-- Oberschenkel -->
+  <rect
+    x="10"
+    y="0"
+    width="40"
+    height="135"
+    rx="20"
+    fill="#34495E"
+    stroke="#222"
+    stroke-width="4"
+  />
+</svg>
