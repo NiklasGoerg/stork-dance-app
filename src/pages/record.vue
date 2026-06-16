@@ -6,7 +6,7 @@
       mode="silhouette"
       :show-hands="false"
     />
-    <PlaybackCanvas v-else class="playback-stage" />
+    <PlaybackCanvas v-if="mode === 'playback'" class="playback-stage" />
 
     <!-- UI Overlay: Modern Card Design -->
     <div class="overlay">
@@ -15,6 +15,7 @@
 
         <div class="tab-content">
           <RecordControls v-if="mode === 'record'" />
+          <VideoMovementRecorder v-if="mode === 'record-video'" />
           <PlaybackControls v-if="mode === 'playback'" />
         </div>
       </div>
@@ -30,9 +31,12 @@ import PlaybackCanvas from "~/components/record/PlaybackCanvas.vue";
 
 import TabSwitcher from "~/components/record/TabSwitcher.vue";
 import RecordControls from "~/components/record/RecordControls.vue";
+import VideoMovementRecorder from "~/components/record/VideoMovementRecorder.vue";
 import PlaybackControls from "~/components/record/PlaybackControls.vue";
 
-const mode = ref<"record" | "playback">("record");
+type StudioMode = "record" | "record-video" | "playback";
+
+const mode = ref<StudioMode>("record");
 </script>
 
 <style scoped>

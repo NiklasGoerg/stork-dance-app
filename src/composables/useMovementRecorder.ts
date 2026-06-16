@@ -11,6 +11,11 @@ type RecordableLandmark = {
   z: number;
 };
 
+type StartRecordingOptions = {
+  skipCountdown?: boolean;
+  source?: MovementRecording["source"];
+};
+
 const isRecording = ref(false);
 
 const countdown = ref(0);
@@ -26,24 +31,35 @@ let lastFrameTime = 0;
 // START
 // ========================================
 
-const startRecording = async (movementName: string) => {
+const startRecording = async (
+  movementName: string,
+  options: StartRecordingOptions = {},
+) => {
   if (isRecording.value) return;
 
-  countdown.value = 3;
+  countdown.value = options.skipCountdown ? 0 : 3;
 
-  await runCountdown();
+  if (!options.skipCountdown) {
+    await runCountdown();
+  }
 
   frames = [];
 
   startTime = performance.now();
   lastFrameTime = 0;
 
-  recording.value = {
+  const nextRecording: MovementRecording = {
     name: movementName,
     fps: FPS,
     createdAt: new Date().toISOString(),
     frames,
   };
+
+  if (options.source) {
+    nextRecording.source = options.source;
+  }
+
+  recording.value = nextRecording;
 
   isRecording.value = true;
 };

@@ -5,7 +5,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount } from "vue";
 
-import type { LandmarkFrame } from "~/types/movement";
+import type { LandmarkFrame, MovementRecording } from "~/types/movement";
 
 import { useMovementPlayback } from "~/composables/useMovementPlayback";
 
@@ -16,7 +16,7 @@ let HEIGHT = 720;
 
 let ctx: CanvasRenderingContext2D | null = null;
 
-const { currentFrame } = useMovementPlayback();
+const { currentFrame, recording } = useMovementPlayback();
 
 // ========================================
 // INIT
@@ -55,6 +55,7 @@ const drawSkeleton = (landmarks: LandmarkFrame["landmarks"]) => {
   if (!ctx) return;
 
   const context = ctx;
+  const drawRect = getDrawRect(recording.value);
 
   context.clearRect(0, 0, WIDTH, HEIGHT);
 
@@ -69,8 +70,8 @@ const drawSkeleton = (landmarks: LandmarkFrame["landmarks"]) => {
   context.lineCap = "round";
 
   const point = (i: number) => ({
-    x: (landmarks[i]?.x ?? 0) * WIDTH,
-    y: (landmarks[i]?.y ?? 0) * HEIGHT,
+    x: drawRect.x + (landmarks[i]?.x ?? 0) * drawRect.width,
+    y: drawRect.y + (landmarks[i]?.y ?? 0) * drawRect.height,
   });
 
   const line = (a: number, b: number) => {
@@ -111,13 +112,15 @@ const drawHead = (landmarks: LandmarkFrame["landmarks"]) => {
   if (!ctx) return;
 
   const context = ctx;
+  const drawRect = getDrawRect(recording.value);
+
   context.save();
   context.scale(-1, 1);
   context.translate(-WIDTH, 0);
 
   const point = (i: number) => ({
-    x: (landmarks[i]?.x ?? 0) * WIDTH,
-    y: (landmarks[i]?.y ?? 0) * HEIGHT,
+    x: drawRect.x + (landmarks[i]?.x ?? 0) * drawRect.width,
+    y: drawRect.y + (landmarks[i]?.y ?? 0) * drawRect.height,
   });
   const nose = point(0);
   const leftEar = point(7);
@@ -143,6 +146,42 @@ const drawHead = (landmarks: LandmarkFrame["landmarks"]) => {
   context.stroke();
 
   context.restore();
+};
+
+const getDrawRect = (movement: MovementRecording | null) => {
+  const source = movement?.source;
+
+  if (!source?.width || !source.height) {
+    return {
+      x: 0,
+      y: 0,
+      width: WIDTH,
+      height: HEIGHT,
+    };
+  }
+
+  const sourceAspect = source.width / source.height;
+  const canvasAspect = WIDTH / HEIGHT;
+
+  if (canvasAspect > sourceAspect) {
+    const width = HEIGHT * sourceAspect;
+
+    return {
+      x: (WIDTH - width) / 2,
+      y: 0,
+      width,
+      height: HEIGHT,
+    };
+  }
+
+  const height = WIDTH / sourceAspect;
+
+  return {
+    x: 0,
+    y: (HEIGHT - height) / 2,
+    width: WIDTH,
+    height,
+  };
 };
 
 const resizeCanvas = () => {

@@ -12,6 +12,10 @@ export type MovementRecording = {
   name: string;
   fps: number;
   createdAt: string;
+  source?: {
+    width: number;
+    height: number;
+  };
 
   frames: LandmarkFrame[];
 };
