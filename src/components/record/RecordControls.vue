@@ -14,7 +14,7 @@
           type="text"
           placeholder="e.g. arms_up"
           class="input-modern"
-        />
+        >
       </div>
 
       <div class="control-main">

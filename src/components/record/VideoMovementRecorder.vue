@@ -47,7 +47,9 @@
           :disabled="!canAnalyze"
           @click="analyzeVideo"
         >
-          <BaseIcon :path="isProcessing ? mdiTimerSand : mdiPlayCircleOutline" />
+          <BaseIcon
+            :path="isProcessing ? mdiTimerSand : mdiPlayCircleOutline"
+          />
           {{ isProcessing ? "Processing..." : "Analyze Video" }}
         </button>
       </div>
@@ -81,11 +83,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
 import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
-import {
-  mdiPlayCircleOutline,
-  mdiTimerSand,
-  mdiVideoOutline,
-} from "@mdi/js";
+import { mdiPlayCircleOutline, mdiTimerSand, mdiVideoOutline } from "@mdi/js";
 
 import BaseIcon from "~/components/ui/BaseIcon.vue";
 import { useMovementRecorder } from "~/composables/useMovementRecorder";
@@ -100,8 +98,13 @@ const isProcessing = ref(false);
 const isReady = ref(false);
 const errorMessage = ref("");
 
-const { recording, startRecording, stopRecording, recordFrame, exportRecording } =
-  useMovementRecorder();
+const {
+  recording,
+  startRecording,
+  stopRecording,
+  recordFrame,
+  exportRecording,
+} = useMovementRecorder();
 
 let animationFrameId = 0;
 let pose: Awaited<ReturnType<typeof usePose>> | null = null;

@@ -14,7 +14,7 @@
           accept=".json"
           class="input-modern"
           @change="onFileSelected"
-        />
+        >
       </div>
 
       <div v-if="fileName" class="file-info">
