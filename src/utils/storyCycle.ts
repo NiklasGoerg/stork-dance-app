@@ -29,10 +29,30 @@ export type StorySeasonBoundary = StoryBoundary & {
 };
 
 export type StoryDateInput = Date | string;
+export type PlaybackSpeedPhase = "fast" | "focus";
+
+export type StoryWeightedTimelineDay = {
+  date: string;
+  phase: PlaybackSpeedPhase;
+  weight: number;
+  startMs: number;
+  endMs: number;
+};
 
 export const STORY_CYCLE_START_MONTH = 5;
 export const STORY_CYCLE_START_DAY = 1;
 export const DAY_MS = 24 * 60 * 60 * 1000;
+export const STORY_CYCLE_DURATION_MS = 120_000;
+export const STORY_FOCUS_DAY_WEIGHT = 1.0;
+export const STORY_FAST_DAY_WEIGHT = 0.15;
+
+export type PlaybackSpeedWindow = {
+  // UTC month index, matching JavaScript Date: Jan = 0, Jun = 5.
+  startMonth: number;
+  startDay: number;
+  endMonth: number;
+  endDay: number;
+};
 
 const storyMonths = [
   { label: "Jun", monthIndex: 5 },
@@ -59,6 +79,15 @@ const seasons: StorySeason[] = [
   autumnSeason,
   winterSeason,
   springSeason,
+];
+
+// Fixed global windows: every shown cycle follows the same playback rhythm.
+// May is intentionally fast for this first version so late-cycle calm time
+// compresses before the next 1 June cycle starts.
+export const STORY_FAST_PLAYBACK_WINDOWS: PlaybackSpeedWindow[] = [
+  { startMonth: 5, startDay: 1, endMonth: 6, endDay: 31 },
+  { startMonth: 10, startDay: 1, endMonth: 0, endDay: 15 },
+  { startMonth: 4, startDay: 1, endMonth: 4, endDay: 31 },
 ];
 
 const toUtcDate = (date: StoryDateInput) => {
@@ -251,6 +280,114 @@ export const getNextStoryDate = (date: StoryDateInput) => {
   }
 
   return nextDate;
+};
+
+const getMonthDayOrderValue = (month: number, day: number) => month * 100 + day;
+
+const isMonthDayInPlaybackWindow = (
+  month: number,
+  day: number,
+  window: PlaybackSpeedWindow,
+) => {
+  const dateValue = getMonthDayOrderValue(month, day);
+  const startValue = getMonthDayOrderValue(window.startMonth, window.startDay);
+  const endValue = getMonthDayOrderValue(window.endMonth, window.endDay);
+
+  if (startValue <= endValue) {
+    return dateValue >= startValue && dateValue <= endValue;
+  }
+
+  return dateValue >= startValue || dateValue <= endValue;
+};
+
+export const getGlobalPlaybackSpeedPhase = (
+  date: StoryDateInput,
+): PlaybackSpeedPhase => {
+  const utcDate = toUtcDate(date);
+  const month = utcDate.getUTCMonth();
+  const day = utcDate.getUTCDate();
+  const isFast = STORY_FAST_PLAYBACK_WINDOWS.some((window) =>
+    isMonthDayInPlaybackWindow(month, day, window),
+  );
+
+  return isFast ? "fast" : "focus";
+};
+
+export const buildGlobalWeightedCalendarTimeline = (
+  year: number,
+  cycleDurationMs = STORY_CYCLE_DURATION_MS,
+): StoryWeightedTimelineDay[] => {
+  const cycleStart = new Date(
+    Date.UTC(year, STORY_CYCLE_START_MONTH, STORY_CYCLE_START_DAY),
+  );
+  const { totalDays } = getDayProgressInStoryCycle(cycleStart);
+  const days = Array.from({ length: totalDays }, (_, index) => {
+    const date = formatStoryDate(addStoryDays(cycleStart, index));
+    const phase = getGlobalPlaybackSpeedPhase(date);
+    const weight =
+      phase === "focus" ? STORY_FOCUS_DAY_WEIGHT : STORY_FAST_DAY_WEIGHT;
+
+    return {
+      date,
+      phase,
+      weight,
+    };
+  });
+  const totalWeight = days.reduce((sum, day) => sum + day.weight, 0);
+  let cursorMs = 0;
+
+  return days.map((day, index) => {
+    const startMs = cursorMs;
+    const durationMs =
+      index === days.length - 1
+        ? cycleDurationMs - startMs
+        : (day.weight / totalWeight) * cycleDurationMs;
+    const endMs = startMs + durationMs;
+
+    cursorMs = endMs;
+
+    return {
+      ...day,
+      startMs,
+      endMs,
+    };
+  });
+};
+
+export const getWeightedStoryTimelineDayAtElapsedMs = (
+  timeline: StoryWeightedTimelineDay[],
+  elapsedMs: number,
+) => {
+  const lastDay = timeline[timeline.length - 1];
+
+  if (!timeline[0] || !lastDay) return null;
+
+  const cycleDurationMs = lastDay.endMs;
+  const normalizedElapsedMs =
+    ((elapsedMs % cycleDurationMs) + cycleDurationMs) % cycleDurationMs;
+
+  return (
+    timeline.find(
+      (day) =>
+        normalizedElapsedMs >= day.startMs && normalizedElapsedMs < day.endMs,
+    ) ?? lastDay
+  );
+};
+
+export const getWeightedStoryTimelineElapsedMsForDate = (
+  timeline: StoryWeightedTimelineDay[],
+  date: StoryDateInput,
+) => {
+  const firstDay = timeline[0];
+
+  if (!firstDay) return 0;
+
+  const { elapsedDays } = getDayProgressInStoryCycle(date);
+  const timelineDate = formatStoryDate(
+    addStoryDays(firstDay.date, elapsedDays),
+  );
+
+  return timeline.find((day) => day.date === timelineDate)?.startMs ?? 0;
 };
 
 export const getStoryDateFromCycleOffset = (

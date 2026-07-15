@@ -8,6 +8,7 @@ import type {
   StorkYearPoint,
   StorkYearRoute,
 } from "~/types/stork";
+import { storyCycleDefinitions } from "~/utils/storkStoryCycles";
 import {
   formatStoryDate,
   getDayProgressInStoryCycle,
@@ -28,6 +29,9 @@ const selectedDayOfYear = ref(1);
 const selectedStoryIndex = ref(0);
 const selectedStoryDate = ref<string | null>(null);
 const showStoryCyclesTogether = ref(false);
+const selectedStoryCycleIds = ref(
+  storyCycleDefinitions.map((cycle) => cycle.label),
+);
 
 const routeColors = [
   "#c1121f",
@@ -44,44 +48,6 @@ const routeColors = [
 
 const getRouteColor = (index: number) =>
   routeColors[index % routeColors.length] ?? "#c1121f";
-
-const storyCycleDefinitions = [
-  {
-    step: 1,
-    targetYear: 2014,
-    tag: "3906",
-    label: "individual_3906_2014_2015",
-    wintering: "Africa",
-  },
-  {
-    step: 2,
-    targetYear: 2016,
-    tag: "3339",
-    label: "individual_3339_2016_2017",
-    wintering: "Africa",
-  },
-  {
-    step: 3,
-    targetYear: 2018,
-    tag: "2561",
-    label: "individual_2561_2018_2019",
-    wintering: "Spain / Iberia",
-  },
-  {
-    step: 4,
-    targetYear: 2020,
-    tag: "3042",
-    label: "individual_3042_2020_2021",
-    wintering: "Spain / Iberia",
-  },
-  {
-    step: 5,
-    targetYear: 2022,
-    tag: "4004",
-    label: "individual_4004_2022_2023",
-    wintering: "Spain / Iberia",
-  },
-];
 
 const getDayOfYear = (date: string) => {
   const [year, month, day] = date.split("-").map(Number);
@@ -299,8 +265,14 @@ export const useStorkData = () => {
     }),
   );
 
+  const visibleStoryCycleRoutes = computed<StorkStoryCycleRoute[]>(() => {
+    const visibleIds = new Set(selectedStoryCycleIds.value);
+
+    return storyCycleRoutes.value.filter((cycle) => visibleIds.has(cycle.id));
+  });
+
   const storyTimelinePoints = computed<StorkStoryPoint[]>(() =>
-    storyCycleRoutes.value
+    visibleStoryCycleRoutes.value
       .flatMap((cycle) =>
         cycle.points.map((point) => ({
           cycle,
@@ -324,7 +296,7 @@ export const useStorkData = () => {
     }
 
     return Math.max(
-      ...storyCycleRoutes.value.map(
+      ...visibleStoryCycleRoutes.value.map(
         (cycle) => getDayProgressInStoryCycle(cycle.startDate).totalDays - 1,
       ),
       0,
@@ -340,14 +312,14 @@ export const useStorkData = () => {
       selectedStoryDate.value ??
       formatStoryDate(
         getStoryDateFromCycleOffset(
-          storyCycleRoutes.value[0]?.startDate ?? "2022-06-01",
+          visibleStoryCycleRoutes.value[0]?.startDate ?? "2022-06-01",
           selectedStoryIndex.value,
         ),
       );
     const storyDayOffset =
       getDayProgressInStoryCycle(dateForSelection).elapsedDays;
 
-    return storyCycleRoutes.value.flatMap((cycle) => {
+    return visibleStoryCycleRoutes.value.flatMap((cycle) => {
       const cycleDate = getStoryDateFromCycleOffset(
         cycle.startDate,
         storyDayOffset,
@@ -414,7 +386,7 @@ export const useStorkData = () => {
 
     selectedStoryDate.value = formatStoryDate(
       getStoryDateFromCycleOffset(
-        storyCycleRoutes.value[0]?.startDate ?? "2022-06-01",
+        visibleStoryCycleRoutes.value[0]?.startDate ?? "2022-06-01",
         index,
       ),
     );
@@ -428,10 +400,29 @@ export const useStorkData = () => {
 
     selectedStoryDate.value = formatStoryDate(
       getStoryDateFromCycleOffset(
-        storyCycleRoutes.value[0]?.startDate ?? "2022-06-01",
+        visibleStoryCycleRoutes.value[0]?.startDate ?? "2022-06-01",
         selectedStoryIndex.value,
       ),
     );
+  });
+
+  watch(selectedStoryCycleIds, (ids) => {
+    const nextIds = ids.filter((id, index) => {
+      const isKnownCycle = storyCycleDefinitions.some(
+        (cycle) => cycle.label === id,
+      );
+
+      return isKnownCycle && ids.indexOf(id) === index;
+    });
+
+    if (
+      nextIds.length === ids.length &&
+      nextIds.every((id) => ids.includes(id))
+    ) {
+      return;
+    }
+
+    selectedStoryCycleIds.value = nextIds;
   });
 
   return {
@@ -449,11 +440,13 @@ export const useStorkData = () => {
     selectedDayOfYear,
     comparisonDayBounds,
     storyCycleRoutes,
+    visibleStoryCycleRoutes,
     storyTimelinePoints,
     selectedStoryPoint,
     selectedStoryPoints,
     selectedStoryIndex,
     selectedStoryDate,
+    selectedStoryCycleIds,
     showStoryCyclesTogether,
     storyCycleSliderMax,
     seekStoryToDate,

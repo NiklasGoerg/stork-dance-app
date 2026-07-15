@@ -9,6 +9,7 @@
       v-model:selected-day-of-year="selectedDayOfYear"
       v-model:selected-map-mode="selectedMapMode"
       v-model:selected-story-index="selectedStoryIndex"
+      v-model:selected-story-cycle-ids="selectedStoryCycleIds"
       v-model:show-story-cycles-together="showStoryCyclesTogether"
       :available-tags="availableTags"
       :available-years="availableYearsForSelectedTag"
@@ -81,10 +82,12 @@ const {
   selectedDayOfYear,
   comparisonDayBounds,
   storyCycleRoutes,
+  visibleStoryCycleRoutes,
   storyTimelinePoints,
   selectedStoryPoint,
   selectedStoryPoints,
   selectedStoryIndex,
+  selectedStoryCycleIds,
   showStoryCyclesTogether,
   storyCycleSliderMax,
   seekStoryToDate,
@@ -135,6 +138,12 @@ const storyLegend = computed(() =>
 );
 
 const selectedStoryPointLabel = computed(() => {
+  const visibleCycleCount = visibleStoryCycleRoutes.value.length;
+
+  if (visibleCycleCount === 0) {
+    return "No cycles selected";
+  }
+
   if (showStoryCyclesTogether.value) {
     return `Cycle day ${selectedStoryIndex.value + 1}`;
   }
@@ -163,7 +172,7 @@ const renderCurrentMode = () => {
   }
 
   if (selectedMapMode.value === "story") {
-    drawYearRoutes(map.value, leaflet.value, storyCycleRoutes.value);
+    drawYearRoutes(map.value, leaflet.value, visibleStoryCycleRoutes.value);
     drawSelectedYearPoints(
       map.value,
       leaflet.value,
@@ -229,7 +238,12 @@ watch(currentDate, (date) => {
 });
 
 watch(
-  [selectedMapMode, selectedRoutePoints, allYearRouteGroups, storyCycleRoutes],
+  [
+    selectedMapMode,
+    selectedRoutePoints,
+    allYearRouteGroups,
+    visibleStoryCycleRoutes,
+  ],
   () => {
     renderCurrentMode();
   },

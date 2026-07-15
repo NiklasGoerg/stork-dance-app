@@ -65,13 +65,23 @@
     </p>
 
     <div v-else-if="selectedMapMode === 'story'" class="route-slider">
-      <label class="story-toggle">
-        <input v-model="showStoryCyclesTogether" type="checkbox" >
-        <span>Show cycles together</span>
-      </label>
+      <div class="story-panel__header">
+        <div>
+          <span class="story-panel__eyebrow">Story cycles</span>
+          <strong
+            >{{ selectedStoryCycleIds.length }} /
+            {{ storyLegend.length }}</strong
+          >
+        </div>
+
+        <label class="story-toggle">
+          <input v-model="showStoryCyclesTogether" type="checkbox" >
+          <span>Compare</span>
+        </label>
+      </div>
 
       <div class="route-slider__meta">
-        <span>{{ storyLegend.length }} cycles</span>
+        <span>{{ selectedStoryCycleIds.length }} visible</span>
         <span>{{ storyPointLabel }}</span>
       </div>
 
@@ -85,22 +95,35 @@
         :disabled="storySliderMax <= 0"
       >
 
-      <div class="year-legend">
-        <div
+      <div class="year-legend year-legend--story">
+        <label
           v-for="cycle in storyLegend"
           :key="cycle.id"
           class="year-legend__item year-legend__item--story"
+          :class="{
+            'year-legend__item--muted': !selectedStoryCycleIds.includes(
+              cycle.id,
+            ),
+          }"
         >
+          <input
+            v-model="selectedStoryCycleIds"
+            class="year-legend__checkbox"
+            type="checkbox"
+            :value="cycle.id"
+          >
           <span
             class="year-legend__swatch"
             :style="{ backgroundColor: cycle.color }"
           />
-          <span class="year-legend__year">Step {{ cycle.step }}</span>
-          <span class="year-legend__meta">
-            {{ cycle.targetYear }} - {{ cycle.tag }} - {{ cycle.wintering }} -
-            {{ cycle.pointCount }} points
+          <span class="year-legend__main">
+            <span class="year-legend__year">Step {{ cycle.step }}</span>
+            <span class="year-legend__meta">
+              {{ cycle.targetYear }} - {{ cycle.tag }} - {{ cycle.wintering }}
+            </span>
           </span>
-        </div>
+          <span class="year-legend__count">{{ cycle.pointCount }}</span>
+        </label>
       </div>
     </div>
 
@@ -176,6 +199,9 @@ const selectedMapMode = defineModel<StorkMapMode>("selectedMapMode", {
 const selectedStoryIndex = defineModel<number>("selectedStoryIndex", {
   required: true,
 });
+const selectedStoryCycleIds = defineModel<string[]>("selectedStoryCycleIds", {
+  required: true,
+});
 const showStoryCyclesTogether = defineModel<boolean>(
   "showStoryCyclesTogether",
   {
@@ -219,16 +245,17 @@ defineProps<{
   left: 54px;
   z-index: 500;
   display: grid;
-  grid-template-columns: minmax(120px, 160px) minmax(96px, 120px);
+  grid-template-columns: minmax(132px, 1fr) minmax(108px, 128px);
   gap: 12px;
   align-items: end;
   max-width: calc(100% - 72px);
-  width: min(460px, calc(100% - 72px));
-  padding: 14px;
+  width: min(520px, calc(100% - 72px));
+  padding: 12px;
   border: 1px solid rgba(22, 22, 22, 0.12);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(10px);
 }
 
 .mode-tabs {
@@ -278,15 +305,43 @@ defineProps<{
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+}
+
+.story-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.story-panel__header strong {
+  display: block;
+  color: var(--color-text);
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+.story-panel__eyebrow {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .story-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   color: var(--color-text);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 550;
 }
 
@@ -294,8 +349,20 @@ defineProps<{
   display: flex;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
   color: var(--color-text-muted);
   font-size: 0.86rem;
+}
+
+.route-slider__meta span {
+  min-width: 0;
+}
+
+.route-slider__meta span:last-child {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .route-slider__input {
@@ -309,10 +376,15 @@ defineProps<{
 
 .year-legend {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   max-height: 220px;
   overflow: auto;
   padding-top: 2px;
+}
+
+.year-legend--story {
+  max-height: 250px;
+  padding-right: 2px;
 }
 
 .year-legend__item {
@@ -325,13 +397,41 @@ defineProps<{
 }
 
 .year-legend__item--story {
-  grid-template-columns: 10px 54px minmax(0, 1fr);
+  grid-template-columns: 16px 10px minmax(0, 1fr) auto;
+  min-height: 42px;
+  padding: 7px 8px;
+  border: 1px solid rgba(37, 51, 41, 0.1);
+  border-radius: var(--radius-sm);
+  background: rgba(250, 253, 248, 0.8);
+  cursor: pointer;
+}
+
+.year-legend__item--story:hover {
+  border-color: rgba(31, 119, 180, 0.28);
+  background: #fff;
+}
+
+.year-legend__item--muted {
+  opacity: 0.52;
+}
+
+.year-legend__checkbox {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--color-primary);
 }
 
 .year-legend__swatch {
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+.year-legend__main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .year-legend__year {
@@ -341,7 +441,15 @@ defineProps<{
 
 .year-legend__meta {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.year-legend__count {
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+  font-weight: 650;
 }
 
 @media (max-width: 560px) {

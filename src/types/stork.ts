@@ -21,13 +21,24 @@ export type StorkYearPoint = {
 
 export type StorkMapMode = "explore" | "all-years" | "story";
 
-export type StorkStoryCycleRoute = {
-  id: string;
+export type StorkStoryCycleEvents = {
+  breedingDeparture: string;
+  winterArrival: string;
+  winterDeparture: string;
+  nextBreedingArrival: string;
+};
+
+export type StorkStoryCycleDefinition = {
   step: number;
   targetYear: number;
   tag: string;
   label: string;
   wintering: string;
+  events: StorkStoryCycleEvents;
+};
+
+export type StorkStoryCycleRoute = StorkStoryCycleDefinition & {
+  id: string;
   color: string;
   startDate: string;
   endDate: string;

@@ -1,6 +1,7 @@
 <template>
   <div
     class="container"
+    :class="{ 'container--fixed': fixed }"
     :style="{
       backgroundColor: mode === 'silhouette' ? 'black' : 'transparent',
     }"
@@ -27,9 +28,19 @@ import { useHands } from "~/composables/useHands";
 import { useMovementRecorder } from "~/composables/useMovementRecorder";
 import { useLandmarkSmoothing } from "~/composables/useLandmarkSmoothing";
 
-const props = defineProps<{
-  mode: ViewMode;
-  showHands?: boolean;
+const props = withDefaults(
+  defineProps<{
+    mode: ViewMode;
+    showHands?: boolean;
+    fixed?: boolean;
+  }>(),
+  {
+    fixed: true,
+  },
+);
+
+const emit = defineEmits<{
+  poseLandmarks: [landmarks: NormalizedLandmark[] | null];
 }>();
 
 const video = ref<HTMLVideoElement | null>(null);
@@ -111,9 +122,12 @@ const detectFrame = () => {
   );
 
   if (smoothedPoseLandmarks) {
+    emit("poseLandmarks", smoothedPoseLandmarks);
     drawBody(smoothedPoseLandmarks);
     drawHead(smoothedPoseLandmarks);
     recordFrame(smoothedPoseLandmarks);
+  } else {
+    emit("poseLandmarks", null);
   }
 
   const handLandmarks = lastHandResult?.landmarks;
@@ -317,9 +331,13 @@ const drawHands = (handsLandmarks: NormalizedLandmark[][]) => {
 
 <style scoped>
 .container {
-  position: fixed;
+  position: absolute;
   inset: 0;
   overflow: hidden;
+}
+
+.container--fixed {
+  position: fixed;
 }
 
 .video,
