@@ -3,6 +3,7 @@
     <div ref="mapContainer" class="map" />
 
     <StorkRouteControls
+      v-if="showControls"
       v-model:selected-tag="selectedTag"
       v-model:selected-year="selectedYear"
       v-model:selected-point-index="selectedPointIndex"
@@ -45,6 +46,7 @@ import {
 } from "~/composables/useLeafletStorkRoute";
 import { useStorkData } from "~/composables/useStorkData";
 import { useStoryPlaybackStore } from "~/store/storyPlayback";
+import { storyCycleDefinitions } from "~/utils/storkStoryCycles";
 
 type LeafletMapInstance = LeafletRouteMap & {
   remove: () => void;
@@ -67,6 +69,16 @@ type LeafletModule = LeafletRouteModule & {
 const mapContainer = ref<HTMLDivElement | null>(null);
 const leaflet = ref<LeafletModule | null>(null);
 const map = ref<LeafletMapInstance | null>(null);
+const props = withDefaults(
+  defineProps<{
+    showControls?: boolean;
+    storyCycleIds?: string[];
+  }>(),
+  {
+    showControls: true,
+    storyCycleIds: undefined,
+  },
+);
 
 const {
   availableTags,
@@ -160,6 +172,18 @@ const selectedStoryMapPoints = computed(() =>
   })),
 );
 
+const getConfiguredStoryCycleIds = () =>
+  props.storyCycleIds?.length
+    ? [...props.storyCycleIds]
+    : storyCycleDefinitions.map((cycle) => cycle.label);
+
+const configureStoryMode = () => {
+  selectedMapMode.value = "story";
+  showStoryCyclesTogether.value = true;
+  selectedStoryCycleIds.value = getConfiguredStoryCycleIds();
+  seekStoryToDate(currentDate.value);
+};
+
 const renderCurrentMode = () => {
   if (selectedMapMode.value === "all-years") {
     drawYearRoutes(map.value, leaflet.value, allYearRouteGroups.value);
@@ -223,9 +247,7 @@ onMounted(() => {
     });
   };
 
-  selectedMapMode.value = "story";
-  showStoryCyclesTogether.value = true;
-  seekStoryToDate(currentDate.value);
+  configureStoryMode();
 
   void createMap();
   void loadStorkData();
@@ -236,6 +258,14 @@ watch(currentDate, (date) => {
   showStoryCyclesTogether.value = true;
   seekStoryToDate(date);
 });
+
+watch(
+  () => props.storyCycleIds?.join("|") ?? "",
+  () => {
+    configureStoryMode();
+    renderCurrentMode();
+  },
+);
 
 watch(
   [

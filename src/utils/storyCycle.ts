@@ -1,3 +1,6 @@
+import type { StorkStoryCycleDefinition } from "~/types/stork";
+import { STORY_AUDIO_CONFIG } from "~/utils/storyAudioConfig";
+
 export type StorySeasonId = "summer" | "autumn" | "winter" | "spring";
 
 export type StorySeason = {
@@ -30,11 +33,28 @@ export type StorySeasonBoundary = StoryBoundary & {
 
 export type StoryDateInput = Date | string;
 export type PlaybackSpeedPhase = "fast" | "focus";
+export type CycleSegmentType =
+  | "breedingResidence"
+  | "autumnMigration"
+  | "winterResidence"
+  | "springMigration"
+  | "postReturnResidence";
+export type PlaybackPhase = "migration" | "residence";
+
+export type CycleSegment = {
+  type: CycleSegmentType;
+  playbackPhase: PlaybackPhase;
+  startDate: string;
+  endDate: string;
+};
 
 export type StoryWeightedTimelineDay = {
   date: string;
   phase: PlaybackSpeedPhase;
+  playbackPhase: PlaybackPhase;
+  segmentType: CycleSegmentType | "calendarFallback";
   weight: number;
+  dayDurationMs: number;
   startMs: number;
   endMs: number;
 };
@@ -42,9 +62,9 @@ export type StoryWeightedTimelineDay = {
 export const STORY_CYCLE_START_MONTH = 5;
 export const STORY_CYCLE_START_DAY = 1;
 export const DAY_MS = 24 * 60 * 60 * 1000;
-export const STORY_CYCLE_DURATION_MS = 120_000;
+export const STORY_CYCLE_DURATION_MS = STORY_AUDIO_CONFIG.cycleDurationMs;
 export const STORY_FOCUS_DAY_WEIGHT = 1.0;
-export const STORY_FAST_DAY_WEIGHT = 0.15;
+export const STORY_FAST_DAY_WEIGHT = 0.01;
 
 export type PlaybackSpeedWindow = {
   // UTC month index, matching JavaScript Date: Jan = 0, Jun = 5.
@@ -81,13 +101,10 @@ const seasons: StorySeason[] = [
   springSeason,
 ];
 
-// Fixed global windows: every shown cycle follows the same playback rhythm.
-// May is intentionally fast for this first version so late-cycle calm time
-// compresses before the next 1 June cycle starts.
+// Fixed global windows are the basis before residence segments are smoothed.
 export const STORY_FAST_PLAYBACK_WINDOWS: PlaybackSpeedWindow[] = [
   { startMonth: 5, startDay: 1, endMonth: 6, endDay: 31 },
   { startMonth: 10, startDay: 1, endMonth: 0, endDay: 15 },
-  { startMonth: 4, startDay: 1, endMonth: 4, endDay: 31 },
 ];
 
 const toUtcDate = (date: StoryDateInput) => {
@@ -313,46 +330,248 @@ export const getGlobalPlaybackSpeedPhase = (
   return isFast ? "fast" : "focus";
 };
 
-export const buildGlobalWeightedCalendarTimeline = (
-  year: number,
-  cycleDurationMs = STORY_CYCLE_DURATION_MS,
-): StoryWeightedTimelineDay[] => {
+export const getBaseCalendarWeight = (date: StoryDateInput) =>
+  getGlobalPlaybackSpeedPhase(date) === "focus"
+    ? STORY_FOCUS_DAY_WEIGHT
+    : STORY_FAST_DAY_WEIGHT;
+
+const clampStoryDateToCycle = (
+  date: StoryDateInput,
+  cycleStartDate: string,
+  nextCycleStartDate: string,
+) => {
+  const formattedDate = formatStoryDate(date);
+
+  if (formattedDate < cycleStartDate) return cycleStartDate;
+  if (formattedDate > nextCycleStartDate) return nextCycleStartDate;
+
+  return formattedDate;
+};
+
+const isValidSegment = (startDate: string, endDate: string) =>
+  startDate < endDate;
+
+export const getCycleSegments = (
+  cycle: StorkStoryCycleDefinition | null | undefined,
+  cycleStart: StoryDateInput,
+): CycleSegment[] => {
+  const cycleStartDate = formatStoryDate(getStoryCycleStart(cycleStart));
+  const nextCycleStartDate = formatStoryDate(
+    getNextStoryCycleStart(cycleStart),
+  );
+
+  if (!cycle?.events) {
+    return [];
+  }
+
+  const breedingDeparture = clampStoryDateToCycle(
+    cycle.events.breedingDeparture,
+    cycleStartDate,
+    nextCycleStartDate,
+  );
+  const winterArrival = clampStoryDateToCycle(
+    cycle.events.winterArrival,
+    cycleStartDate,
+    nextCycleStartDate,
+  );
+  const winterDeparture = clampStoryDateToCycle(
+    cycle.events.winterDeparture,
+    cycleStartDate,
+    nextCycleStartDate,
+  );
+  const nextBreedingArrival = clampStoryDateToCycle(
+    cycle.events.nextBreedingArrival,
+    cycleStartDate,
+    nextCycleStartDate,
+  );
+  const candidates: CycleSegment[] = [
+    {
+      type: "breedingResidence",
+      playbackPhase: "residence",
+      startDate: cycleStartDate,
+      endDate: breedingDeparture,
+    },
+    {
+      type: "autumnMigration",
+      playbackPhase: "migration",
+      startDate: breedingDeparture,
+      endDate: winterArrival,
+    },
+    {
+      type: "winterResidence",
+      playbackPhase: "residence",
+      startDate: winterArrival,
+      endDate: winterDeparture,
+    },
+    {
+      type: "springMigration",
+      playbackPhase: "migration",
+      startDate: winterDeparture,
+      endDate: nextBreedingArrival,
+    },
+    {
+      type: "postReturnResidence",
+      playbackPhase: "residence",
+      startDate: nextBreedingArrival,
+      endDate: nextCycleStartDate,
+    },
+  ];
+
+  return candidates.filter((segment) =>
+    isValidSegment(segment.startDate, segment.endDate),
+  );
+};
+
+const getSegmentForDate = (segments: CycleSegment[], date: StoryDateInput) => {
+  const formattedDate = formatStoryDate(date);
+
+  return (
+    segments.find(
+      (segment) =>
+        formattedDate >= segment.startDate && formattedDate < segment.endDate,
+    ) ?? null
+  );
+};
+
+const buildCalendarFallbackTimeline = (year: number) => {
   const cycleStart = new Date(
     Date.UTC(year, STORY_CYCLE_START_MONTH, STORY_CYCLE_START_DAY),
   );
   const { totalDays } = getDayProgressInStoryCycle(cycleStart);
-  const days = Array.from({ length: totalDays }, (_, index) => {
+
+  return Array.from({ length: totalDays }, (_, index) => {
     const date = formatStoryDate(addStoryDays(cycleStart, index));
     const phase = getGlobalPlaybackSpeedPhase(date);
-    const weight =
-      phase === "focus" ? STORY_FOCUS_DAY_WEIGHT : STORY_FAST_DAY_WEIGHT;
 
     return {
       date,
       phase,
-      weight,
+      playbackPhase: phase === "focus" ? "migration" : "residence",
+      segmentType: "calendarFallback",
+      weight: getBaseCalendarWeight(date),
     };
   });
+};
+
+export const buildPhaseSmoothedCycleTimeline = (
+  cycle: StorkStoryCycleDefinition | null | undefined,
+  options: {
+    year?: number;
+    cycleDurationMs?: number;
+  } = {},
+): StoryWeightedTimelineDay[] => {
+  const year = options.year ?? cycle?.targetYear ?? defaultStoryStartYear;
+  const cycleDurationMs = options.cycleDurationMs ?? STORY_CYCLE_DURATION_MS;
+  const cycleStart = new Date(
+    Date.UTC(year, STORY_CYCLE_START_MONTH, STORY_CYCLE_START_DAY),
+  );
+  const { totalDays } = getDayProgressInStoryCycle(cycleStart);
+  const segments = getCycleSegments(cycle, cycleStart);
+
+  if (!segments.length) {
+    return normalizeWeightedTimelineDays(
+      buildCalendarFallbackTimeline(year),
+      cycleDurationMs,
+    );
+  }
+
+  const baseDays = Array.from({ length: totalDays }, (_, index) => {
+    const date = formatStoryDate(addStoryDays(cycleStart, index));
+    const segment = getSegmentForDate(segments, date);
+
+    return {
+      date,
+      phase: getGlobalPlaybackSpeedPhase(date),
+      playbackPhase: segment?.playbackPhase ?? "residence",
+      segmentType: segment?.type ?? "calendarFallback",
+      weight: getBaseCalendarWeight(date),
+    };
+  });
+  const residenceSegmentWeights = new Map<CycleSegmentType, number>();
+
+  for (const segment of segments) {
+    if (segment.playbackPhase !== "residence") continue;
+
+    const segmentDays = baseDays.filter(
+      (day) => day.segmentType === segment.type,
+    );
+
+    if (!segmentDays.length) continue;
+
+    const segmentBaseWeightSum = segmentDays.reduce(
+      (sum, day) => sum + day.weight,
+      0,
+    );
+
+    residenceSegmentWeights.set(
+      segment.type,
+      segmentBaseWeightSum / segmentDays.length,
+    );
+  }
+
+  return normalizeWeightedTimelineDays(
+    baseDays.map((day) => {
+      if (day.playbackPhase === "migration") {
+        return {
+          ...day,
+          phase: "focus",
+          weight: STORY_FOCUS_DAY_WEIGHT,
+        };
+      }
+
+      const smoothedResidenceWeight =
+        day.segmentType === "calendarFallback"
+          ? day.weight
+          : (residenceSegmentWeights.get(day.segmentType) ?? day.weight);
+
+      return {
+        ...day,
+        weight: smoothedResidenceWeight,
+      };
+    }),
+    cycleDurationMs,
+  );
+};
+
+const normalizeWeightedTimelineDays = (
+  days: Omit<StoryWeightedTimelineDay, "dayDurationMs" | "startMs" | "endMs">[],
+  cycleDurationMs: number,
+): StoryWeightedTimelineDay[] => {
   const totalWeight = days.reduce((sum, day) => sum + day.weight, 0);
+
+  if (!days.length || totalWeight <= 0) return [];
+
   let cursorMs = 0;
 
   return days.map((day, index) => {
     const startMs = cursorMs;
-    const durationMs =
+    const dayDurationMs =
       index === days.length - 1
         ? cycleDurationMs - startMs
         : (day.weight / totalWeight) * cycleDurationMs;
-    const endMs = startMs + durationMs;
+    const endMs = startMs + dayDurationMs;
 
     cursorMs = endMs;
 
     return {
       ...day,
+      dayDurationMs,
       startMs,
       endMs,
     };
   });
 };
+
+const defaultStoryStartYear = 2022;
+
+export const buildGlobalWeightedCalendarTimeline = (
+  year: number,
+  cycleDurationMs = STORY_CYCLE_DURATION_MS,
+): StoryWeightedTimelineDay[] =>
+  normalizeWeightedTimelineDays(
+    buildCalendarFallbackTimeline(year),
+    cycleDurationMs,
+  );
 
 export const getWeightedStoryTimelineDayAtElapsedMs = (
   timeline: StoryWeightedTimelineDay[],

@@ -1,21 +1,13 @@
-export type LandmarkFrame = {
-  time: number;
+import type {
+  PoseLandmark,
+  RecordedMovement,
+  RecordedPoseFrame,
+} from "~/story/types";
 
-  landmarks: {
-    x: number;
-    y: number;
-    z: number;
-  }[];
-};
+export type AvatarSourceMode = "live-camera" | "recorded-motion";
 
-export type MovementRecording = {
-  name: string;
-  fps: number;
-  createdAt: string;
-  source?: {
-    width: number;
-    height: number;
-  };
+export type MovementStageLandmark = PoseLandmark;
 
-  frames: LandmarkFrame[];
-};
+export type LandmarkFrame = RecordedPoseFrame;
+
+export type MovementRecording = RecordedMovement;

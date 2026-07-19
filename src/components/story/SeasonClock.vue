@@ -126,6 +126,7 @@
     </svg>
 
     <SeasonClockControls
+      v-if="showControls"
       :is-playing="isPlaying"
       @toggle-playback="playbackStore.togglePlayback"
       @reset="playbackStore.resetToStoryStart"
@@ -144,6 +145,15 @@ import {
   getSeasonBoundariesForCycle,
   getSeasonForDate,
 } from "~/utils/storyCycle";
+
+withDefaults(
+  defineProps<{
+    showControls?: boolean;
+  }>(),
+  {
+    showControls: true,
+  },
+);
 
 const center = 180;
 const outerRadius = 124;

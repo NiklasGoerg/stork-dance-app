@@ -1,7 +1,10 @@
 <template>
   <div class="bird-map">
     <ClientOnly>
-      <LeafletMap />
+      <LeafletMap
+        :show-controls="showControls"
+        :story-cycle-ids="storyCycleIds"
+      />
       <template #fallback>
         <div class="map-fallback" />
       </template>
@@ -11,6 +14,17 @@
 
 <script setup lang="ts">
 import LeafletMap from "~/components/map/LeafletMap.vue";
+
+withDefaults(
+  defineProps<{
+    showControls?: boolean;
+    storyCycleIds?: string[];
+  }>(),
+  {
+    showControls: true,
+    storyCycleIds: undefined,
+  },
+);
 </script>
 
 <style scoped>

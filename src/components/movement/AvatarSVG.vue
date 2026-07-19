@@ -132,9 +132,15 @@ import head from "~/assets/avatar/head.svg";
 import torso from "~/assets/avatar/torso.svg";
 import arm from "~/assets/avatar/arm.svg";
 import leg from "~/assets/avatar/leg.svg";
+import type { MovementStageLandmark } from "~/types/movement";
+
+type AvatarPoint = {
+  x: number;
+  y: number;
+};
 
 const props = defineProps<{
-  landmarks: any[];
+  landmarks: MovementStageLandmark[];
   width: number;
   height: number;
 }>();
@@ -144,19 +150,19 @@ const props = defineProps<{
 // ==============================
 
 const point = (i: number) => ({
-  x: props.landmarks[i].x * props.width,
-  y: props.landmarks[i].y * props.height,
+  x: (props.landmarks[i]?.x ?? 0) * props.width,
+  y: (props.landmarks[i]?.y ?? 0) * props.height,
 });
 
-const distance = (a: any, b: any) => {
+const distance = (a: AvatarPoint, b: AvatarPoint) => {
   return Math.hypot(b.x - a.x, b.y - a.y);
 };
 
-const angle = (a: any, b: any) => {
+const angle = (a: AvatarPoint, b: AvatarPoint) => {
   return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI - 90;
 };
 
-const limbTransform = (a: any, b: any) => {
+const limbTransform = (a: AvatarPoint, b: AvatarPoint) => {
   return `
     translate(${a.x} ${a.y})
     rotate(${angle(a, b)})

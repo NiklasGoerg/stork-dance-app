@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
+import { useAudioStore } from "~/store/audioStore";
 import {
-  buildGlobalWeightedCalendarTimeline,
+  buildPhaseSmoothedCycleTimeline,
   formatStoryDate,
   getStoryCycleStart,
   getWeightedStoryTimelineDayAtElapsedMs,
@@ -8,11 +9,18 @@ import {
   STORY_CYCLE_DURATION_MS,
   type StoryDateInput,
 } from "~/utils/storyCycle";
+import { storyCycleDefinitions } from "~/utils/storkStoryCycles";
 
 const defaultStoryStartYear = 2022;
 const defaultStoryStartDate = `${defaultStoryStartYear}-06-01`;
-const weightedStoryTimeline = buildGlobalWeightedCalendarTimeline(
-  defaultStoryStartYear,
+const defaultStoryCycle = storyCycleDefinitions.find(
+  (cycle) => cycle.targetYear === defaultStoryStartYear,
+);
+const weightedStoryTimeline = buildPhaseSmoothedCycleTimeline(
+  defaultStoryCycle,
+  {
+    year: defaultStoryStartYear,
+  },
 );
 const playbackTickMs = 100;
 
@@ -28,6 +36,8 @@ const clearPlaybackTimer = () => {
   clearInterval(playbackTimer);
   playbackTimer = null;
 };
+
+const getBaseRhythmOffsetSeconds = (elapsedMs: number) => elapsedMs / 1000;
 
 const setPlaybackAnchor = (date: StoryDateInput) => {
   playbackStartedAtMs = getNowMs();
@@ -46,9 +56,14 @@ export const useStoryPlaybackStore = defineStore("storyPlayback", {
     play() {
       if (this.isPlaying) return;
 
+      const audioStore = useAudioStore();
+
       this.isPlaying = true;
       clearPlaybackTimer();
       playbackStartedAtMs = getNowMs();
+      void audioStore.startBaseRhythmLoop(
+        getBaseRhythmOffsetSeconds(playbackStartElapsedMs),
+      );
 
       const updateCurrentDate = () => {
         const timelineDay = getWeightedStoryTimelineDayAtElapsedMs(
@@ -65,6 +80,8 @@ export const useStoryPlaybackStore = defineStore("storyPlayback", {
       playbackTimer = setInterval(updateCurrentDate, playbackTickMs);
     },
     pause() {
+      const audioStore = useAudioStore();
+
       if (this.isPlaying) {
         playbackStartElapsedMs =
           (playbackStartElapsedMs + getNowMs() - playbackStartedAtMs) %
@@ -73,6 +90,7 @@ export const useStoryPlaybackStore = defineStore("storyPlayback", {
 
       this.isPlaying = false;
       clearPlaybackTimer();
+      audioStore.pauseBaseRhythmLoop();
     },
     togglePlayback() {
       if (this.isPlaying) {
@@ -83,13 +101,25 @@ export const useStoryPlaybackStore = defineStore("storyPlayback", {
       this.play();
     },
     resetToStoryStart() {
+      const audioStore = useAudioStore();
+
       this.pause();
+      audioStore.resetBaseRhythmLoop();
       this.currentDate = formatStoryDate(getStoryCycleStart(this.currentDate));
       setPlaybackAnchor(this.currentDate);
     },
     seekToDate(date: StoryDateInput) {
+      const audioStore = useAudioStore();
+
       this.currentDate = formatStoryDate(date);
       setPlaybackAnchor(this.currentDate);
+
+      if (this.isPlaying) {
+        audioStore.pauseBaseRhythmLoop();
+        void audioStore.startBaseRhythmLoop(
+          getBaseRhythmOffsetSeconds(playbackStartElapsedMs),
+        );
+      }
     },
   },
 });
