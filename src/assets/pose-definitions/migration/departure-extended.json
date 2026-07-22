@@ -1,0 +1,33 @@
+{
+  "id": "departure-extended",
+  "label": "Departure Extended",
+  "minimumScore": 0.75,
+  "minimumMatchedConditions": 2,
+  "stabilityMs": 160,
+  "conditions": [
+    {
+      "id": "both-wrists-above-head",
+      "feature": "wristsAboveHead",
+      "operator": "greaterThanOrEqual",
+      "value": 2,
+      "weight": 0.5,
+      "required": true
+    },
+    {
+      "id": "extended-body-height",
+      "feature": "bodySpanRatio",
+      "operator": "greaterThanOrEqual",
+      "value": 0.9,
+      "weight": 0.3,
+      "required": true
+    },
+    {
+      "id": "extended-knees",
+      "feature": "averageKneeAngle",
+      "operator": "greaterThanOrEqual",
+      "value": 145,
+      "weight": 0.2,
+      "required": false
+    }
+  ]
+}

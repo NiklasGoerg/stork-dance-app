@@ -51,13 +51,18 @@ export const useStoryPlaybackStore = defineStore("storyPlayback", {
   state: () => ({
     currentDate: defaultStoryStartDate,
     isPlaying: false,
+    pauseReasons: [] as string[],
   }),
+  getters: {
+    isStoryPlaybackPaused: (state) => state.pauseReasons.length > 0,
+  },
   actions: {
     play() {
       if (this.isPlaying) return;
 
       const audioStore = useAudioStore();
 
+      this.pauseReasons = [];
       this.isPlaying = true;
       clearPlaybackTimer();
       playbackStartedAtMs = getNowMs();
@@ -92,6 +97,54 @@ export const useStoryPlaybackStore = defineStore("storyPlayback", {
       clearPlaybackTimer();
       audioStore.pauseBaseRhythmLoop();
     },
+    pauseStoryPlayback(reason = "manual") {
+      const wasPlaying = this.isPlaying;
+
+      if (!this.pauseReasons.includes(reason)) {
+        this.pauseReasons.push(reason);
+      }
+
+      if (this.isPlaying) {
+        playbackStartElapsedMs =
+          (playbackStartElapsedMs + getNowMs() - playbackStartedAtMs) %
+          STORY_CYCLE_DURATION_MS;
+      }
+
+      this.isPlaying = false;
+      clearPlaybackTimer();
+
+      return wasPlaying;
+    },
+    resumeStoryPlayback(reason = "manual") {
+      this.pauseReasons = this.pauseReasons.filter(
+        (pauseReason) => pauseReason !== reason,
+      );
+
+      if (this.pauseReasons.length > 0 || this.isPlaying) return;
+
+      this.isPlaying = true;
+      clearPlaybackTimer();
+      playbackStartedAtMs = getNowMs();
+
+      const updateCurrentDate = () => {
+        const timelineDay = getWeightedStoryTimelineDayAtElapsedMs(
+          weightedStoryTimeline,
+          playbackStartElapsedMs + getNowMs() - playbackStartedAtMs,
+        );
+
+        if (!timelineDay) return;
+
+        this.currentDate = timelineDay.date;
+      };
+
+      updateCurrentDate();
+      playbackTimer = setInterval(updateCurrentDate, playbackTickMs);
+    },
+    releaseStoryPlaybackPause(reason = "manual") {
+      this.pauseReasons = this.pauseReasons.filter(
+        (pauseReason) => pauseReason !== reason,
+      );
+    },
     togglePlayback() {
       if (this.isPlaying) {
         this.pause();
@@ -103,6 +156,7 @@ export const useStoryPlaybackStore = defineStore("storyPlayback", {
     resetToStoryStart() {
       const audioStore = useAudioStore();
 
+      this.pauseReasons = [];
       this.pause();
       audioStore.resetBaseRhythmLoop();
       this.currentDate = formatStoryDate(getStoryCycleStart(this.currentDate));

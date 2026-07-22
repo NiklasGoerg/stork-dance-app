@@ -1,3 +1,5 @@
+import type { StorkStoryCycleDefinition } from "~/types/stork";
+
 export type StoryActId =
   | "prologue"
   | "act-2"
@@ -62,6 +64,15 @@ export type StoryScene = {
   feedbackCueId?: string;
 };
 
+export type StoryMigrationCycle = {
+  id: string;
+  cycleId: string;
+  cycleStartYear?: number;
+  cycleDurationMs?: number;
+  title?: string;
+  storyCycleDefinitions?: StorkStoryCycleDefinition[];
+};
+
 export type StoryAct = {
   id: StoryActId;
   title: string;
@@ -74,6 +85,7 @@ export type StoryAct = {
   repeatCount?: number;
   instructorMovementId?: string;
   bpm?: number;
+  migrationCycles?: StoryMigrationCycle[];
 };
 
 export type StoryEvent =

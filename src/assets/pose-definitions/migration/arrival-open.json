@@ -1,0 +1,33 @@
+{
+  "id": "arrival-open",
+  "label": "Arrival Open",
+  "minimumScore": 0.75,
+  "minimumMatchedConditions": 2,
+  "stabilityMs": 180,
+  "conditions": [
+    {
+      "id": "wide-wrist-span",
+      "feature": "wristSpanInShoulderWidths",
+      "operator": "greaterThanOrEqual",
+      "value": 2.6,
+      "weight": 0.45,
+      "required": true
+    },
+    {
+      "id": "wrists-at-or-above-shoulders",
+      "feature": "wristsAtOrAboveShoulders",
+      "operator": "greaterThanOrEqual",
+      "value": 2,
+      "weight": 0.35,
+      "required": true
+    },
+    {
+      "id": "extended-elbows",
+      "feature": "averageElbowAngle",
+      "operator": "greaterThanOrEqual",
+      "value": 135,
+      "weight": 0.2,
+      "required": false
+    }
+  ]
+}

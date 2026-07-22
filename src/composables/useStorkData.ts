@@ -1,8 +1,9 @@
-import { computed, ref, watch } from "vue";
+import { computed, ref, unref, watch, type MaybeRef } from "vue";
 import storkDataUrl from "~/assets/storkdata/daily_stork_data.csv?url";
 import type {
   StorkDataPoint,
   StorkMapMode,
+  StorkStoryCycleDefinition,
   StorkStoryCycleRoute,
   StorkStoryPoint,
   StorkYearPoint,
@@ -32,6 +33,10 @@ const showStoryCyclesTogether = ref(false);
 const selectedStoryCycleIds = ref(
   storyCycleDefinitions.map((cycle) => cycle.label),
 );
+
+type UseStorkDataOptions = {
+  storyCycleDefinitions?: MaybeRef<StorkStoryCycleDefinition[]>;
+};
 
 const routeColors = [
   "#c1121f",
@@ -132,7 +137,11 @@ const parseStorkCsv = (csv: string) => {
   return points;
 };
 
-export const useStorkData = () => {
+export const useStorkData = (options: UseStorkDataOptions = {}) => {
+  const activeStoryCycleDefinitions = computed(
+    () => unref(options.storyCycleDefinitions) ?? storyCycleDefinitions,
+  );
+
   const loadStorkData = async () => {
     if (hasLoaded.value || isLoading.value) return;
 
@@ -243,7 +252,7 @@ export const useStorkData = () => {
   );
 
   const storyCycleRoutes = computed<StorkStoryCycleRoute[]>(() =>
-    storyCycleDefinitions.map((cycle, index) => {
+    activeStoryCycleDefinitions.value.map((cycle, index) => {
       const startDate = `${cycle.targetYear}-06-01`;
       const endDate = `${cycle.targetYear + 1}-05-31`;
 
@@ -408,7 +417,7 @@ export const useStorkData = () => {
 
   watch(selectedStoryCycleIds, (ids) => {
     const nextIds = ids.filter((id, index) => {
-      const isKnownCycle = storyCycleDefinitions.some(
+      const isKnownCycle = activeStoryCycleDefinitions.value.some(
         (cycle) => cycle.label === id,
       );
 

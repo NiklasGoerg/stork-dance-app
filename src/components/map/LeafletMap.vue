@@ -46,7 +46,8 @@ import {
 } from "~/composables/useLeafletStorkRoute";
 import { useStorkData } from "~/composables/useStorkData";
 import { useStoryPlaybackStore } from "~/store/storyPlayback";
-import { storyCycleDefinitions } from "~/utils/storkStoryCycles";
+import type { StorkStoryCycleDefinition } from "~/types/stork";
+import { storyCycleDefinitions as defaultStoryCycleDefinitions } from "~/utils/storkStoryCycles";
 
 type LeafletMapInstance = LeafletRouteMap & {
   remove: () => void;
@@ -72,12 +73,20 @@ const map = ref<LeafletMapInstance | null>(null);
 const props = withDefaults(
   defineProps<{
     showControls?: boolean;
+    showMapNavigation?: boolean;
     storyCycleIds?: string[];
+    storyCycleDefinitions?: StorkStoryCycleDefinition[];
   }>(),
   {
     showControls: true,
+    showMapNavigation: true,
     storyCycleIds: undefined,
+    storyCycleDefinitions: undefined,
   },
+);
+
+const activeStoryCycleDefinitions = computed(
+  () => props.storyCycleDefinitions ?? defaultStoryCycleDefinitions,
 );
 
 const {
@@ -106,7 +115,9 @@ const {
   isLoading,
   error,
   loadStorkData,
-} = useStorkData();
+} = useStorkData({
+  storyCycleDefinitions: activeStoryCycleDefinitions,
+});
 
 const storyPlaybackStore = useStoryPlaybackStore();
 const { currentDate } = storeToRefs(storyPlaybackStore);
@@ -175,7 +186,7 @@ const selectedStoryMapPoints = computed(() =>
 const getConfiguredStoryCycleIds = () =>
   props.storyCycleIds?.length
     ? [...props.storyCycleIds]
-    : storyCycleDefinitions.map((cycle) => cycle.label);
+    : activeStoryCycleDefinitions.value.map((cycle) => cycle.label);
 
 const configureStoryMode = () => {
   selectedMapMode.value = "story";
@@ -227,7 +238,13 @@ onMounted(() => {
       ],
       maxBoundsViscosity: 1,
       preferCanvas: true,
-      zoomControl: true,
+      zoomControl: props.showMapNavigation,
+      dragging: props.showMapNavigation,
+      scrollWheelZoom: props.showMapNavigation,
+      doubleClickZoom: props.showMapNavigation,
+      boxZoom: props.showMapNavigation,
+      keyboard: props.showMapNavigation,
+      touchZoom: props.showMapNavigation,
       attributionControl: true,
     });
     map.value = leafletMap;
@@ -261,6 +278,14 @@ watch(currentDate, (date) => {
 
 watch(
   () => props.storyCycleIds?.join("|") ?? "",
+  () => {
+    configureStoryMode();
+    renderCurrentMode();
+  },
+);
+
+watch(
+  () => activeStoryCycleDefinitions.value.map((cycle) => cycle.label).join("|"),
   () => {
     configureStoryMode();
     renderCurrentMode();

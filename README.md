@@ -1,6 +1,8 @@
-# Nuxt Minimal Starter
+# Data Dance
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Data Dance is an interactive embodied data storytelling prototype for an HCI
+Master's thesis. The app uses webcam-based MediaPipe landmarks to record,
+replay, and compare movement as part of a bird migration story experience.
 
 ## Setup
 

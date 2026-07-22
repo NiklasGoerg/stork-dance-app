@@ -81,6 +81,31 @@ const stopBaseRhythmSource = () => {
   source.disconnect();
 };
 
+const getBeatDurationMs = (bpm: number) => 60_000 / bpm;
+
+const getBaseRhythmBarDurationMs = (bpm: number, beatsPerBar: number) =>
+  getBeatDurationMs(bpm) * beatsPerBar;
+
+const getBaseRhythmTransportTimeMs = (state: {
+  baseRhythmLoop: {
+    currentOffsetSeconds: number;
+    isPlaying: boolean;
+  };
+}) => {
+  const context = getAudioContext();
+
+  if (!context || !state.baseRhythmLoop.isPlaying) {
+    return state.baseRhythmLoop.currentOffsetSeconds * 1000;
+  }
+
+  return (
+    (baseRhythmStartOffsetSeconds +
+      context.currentTime -
+      baseRhythmStartedAtSeconds) *
+    1000
+  );
+};
+
 export const useAudioStore = defineStore("audio", {
   state: () => ({
     bpm: STORY_AUDIO_CONFIG.bpm,
@@ -120,6 +145,70 @@ export const useAudioStore = defineStore("audio", {
     },
   },
   actions: {
+    getBaseRhythmBarDurationMs() {
+      return getBaseRhythmBarDurationMs(
+        this.baseRhythmLoop.bpm,
+        this.baseRhythmLoop.beatsPerBar,
+      );
+    },
+    getBeatDurationMs() {
+      return getBeatDurationMs(this.baseRhythmLoop.bpm);
+    },
+    getBaseRhythmTransportTimeMs() {
+      return getBaseRhythmTransportTimeMs(this);
+    },
+    getMsUntilNextBaseRhythmBeat(targetBeat: number) {
+      const beatDurationMs = this.getBeatDurationMs();
+      const beatsPerBar = this.baseRhythmLoop.beatsPerBar;
+      const targetBeatIndex =
+        (((Math.round(targetBeat) - 1) % beatsPerBar) + beatsPerBar) %
+        beatsPerBar;
+      const transportTimeMs = this.getBaseRhythmTransportTimeMs();
+      const currentBeatIndex = Math.floor(transportTimeMs / beatDurationMs);
+      const currentBarStartBeatIndex =
+        Math.floor(currentBeatIndex / beatsPerBar) * beatsPerBar;
+      let targetGlobalBeatIndex = currentBarStartBeatIndex + targetBeatIndex;
+      let targetTransportTimeMs = targetGlobalBeatIndex * beatDurationMs;
+
+      if (targetTransportTimeMs <= transportTimeMs + 40) {
+        targetGlobalBeatIndex += beatsPerBar;
+        targetTransportTimeMs = targetGlobalBeatIndex * beatDurationMs;
+      }
+
+      return Math.max(0, Math.round(targetTransportTimeMs - transportTimeMs));
+    },
+    getMsUntilNextBaseRhythmBar() {
+      const offsetSeconds = this.syncBaseRhythmLoopOffset();
+      const barDurationMs = this.getBaseRhythmBarDurationMs();
+      const offsetMs = offsetSeconds * 1000;
+      const msIntoBar =
+        ((offsetMs % barDurationMs) + barDurationMs) % barDurationMs;
+      const msUntilNextBar = barDurationMs - msIntoBar;
+
+      return Math.max(0, Math.round(msUntilNextBar || barDurationMs));
+    },
+    scheduleAtNextBaseRhythmBar(callback: () => void) {
+      const delayMs = this.getMsUntilNextBaseRhythmBar();
+      const timer = setTimeout(() => {
+        this.syncBaseRhythmLoopOffset();
+        callback();
+      }, delayMs);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    },
+    scheduleAtNextBaseRhythmBeat(targetBeat: number, callback: () => void) {
+      const delayMs = this.getMsUntilNextBaseRhythmBeat(targetBeat);
+      const timer = setTimeout(() => {
+        this.syncBaseRhythmLoopOffset();
+        callback();
+      }, delayMs);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    },
     setBpm(bpm: number) {
       this.bpm = Math.max(20, Math.min(240, Math.round(bpm)));
 

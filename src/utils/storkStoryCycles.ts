@@ -67,3 +67,17 @@ export const storyCycleDefinitions: StorkStoryCycleDefinition[] = [
     },
   },
 ];
+
+export const act3EasternRouteCycleDefinition: StorkStoryCycleDefinition = {
+  step: 6,
+  targetYear: 2020,
+  tag: "7347",
+  label: "individual_7347_2020_2021",
+  wintering: "Central Africa",
+  events: {
+    breedingDeparture: "2020-08-21",
+    winterArrival: "2020-10-04",
+    winterDeparture: "2021-02-28",
+    nextBreedingArrival: "2021-04-19",
+  },
+};

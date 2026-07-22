@@ -1,0 +1,33 @@
+{
+  "id": "crouch",
+  "label": "Crouch",
+  "minimumScore": 0.7,
+  "minimumMatchedConditions": 2,
+  "stabilityMs": 180,
+  "conditions": [
+    {
+      "id": "compressed-body-height",
+      "feature": "bodySpanRatio",
+      "operator": "lessThanOrEqual",
+      "value": 0.78,
+      "weight": 0.45,
+      "required": false
+    },
+    {
+      "id": "lowered-hip",
+      "feature": "hipHeightRatio",
+      "operator": "lessThanOrEqual",
+      "value": 0.78,
+      "weight": 0.3,
+      "required": false
+    },
+    {
+      "id": "bent-knees",
+      "feature": "averageKneeAngle",
+      "operator": "lessThanOrEqual",
+      "value": 135,
+      "weight": 0.25,
+      "required": false
+    }
+  ]
+}

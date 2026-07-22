@@ -3,7 +3,9 @@
     <ClientOnly>
       <LeafletMap
         :show-controls="showControls"
+        :show-map-navigation="showMapNavigation"
         :story-cycle-ids="storyCycleIds"
+        :story-cycle-definitions="storyCycleDefinitions"
       />
       <template #fallback>
         <div class="map-fallback" />
@@ -14,15 +16,20 @@
 
 <script setup lang="ts">
 import LeafletMap from "~/components/map/LeafletMap.vue";
+import type { StorkStoryCycleDefinition } from "~/types/stork";
 
 withDefaults(
   defineProps<{
     showControls?: boolean;
+    showMapNavigation?: boolean;
     storyCycleIds?: string[];
+    storyCycleDefinitions?: StorkStoryCycleDefinition[];
   }>(),
   {
     showControls: true,
+    showMapNavigation: true,
     storyCycleIds: undefined,
+    storyCycleDefinitions: undefined,
   },
 );
 </script>
