@@ -72,10 +72,10 @@ export const departureGesture: StoryGestureDefinition = {
   movementId: "departure-gesture",
   timing: migrationGestureTiming,
   beatCues: [
-    { sourceStartMs: 0, sourceEndMs: 1000, text: "Tief gehen" },
-    { sourceStartMs: 1000, sourceEndMs: 2000, text: "Hoch strecken" },
-    { sourceStartMs: 2000, sourceEndMs: 3000, text: "Arme führen" },
-    { sourceStartMs: 3000, sourceEndMs: 4000, text: "Zurückführen" },
+    { sourceStartMs: 0, sourceEndMs: 1000, text: "Crouch down" },
+    { sourceStartMs: 1000, sourceEndMs: 2000, text: "Reach up" },
+    { sourceStartMs: 2000, sourceEndMs: 3000, text: "Guide your arms" },
+    { sourceStartMs: 3000, sourceEndMs: 4000, text: "Return" },
   ],
   checkpoints: [
     {
@@ -96,8 +96,9 @@ export const departureGesture: StoryGestureDefinition = {
       hint: "Open into the departure shape.",
       targetMovementTimeMs: 2000,
       targetBeat: 2,
-      windowBeforeMs: 450,
-      windowAfterMs: 550,
+      windowBeforeMs: 650,
+      windowAfterMs: 950,
+      requiredStableMs: 120,
       required: true,
     },
   ],
@@ -111,10 +112,10 @@ export const arrivalGesture: StoryGestureDefinition = {
   movementId: "arrival-gesture",
   timing: migrationGestureTiming,
   beatCues: [
-    { sourceStartMs: 0, sourceEndMs: 1000, text: "Arme öffnen" },
-    { sourceStartMs: 1000, sourceEndMs: 2000, text: "Arme halten" },
-    { sourceStartMs: 2000, sourceEndMs: 3000, text: "Tief gehen" },
-    { sourceStartMs: 3000, sourceEndMs: 4000, text: "Hocke halten" },
+    { sourceStartMs: 0, sourceEndMs: 1000, text: "Open your arms" },
+    { sourceStartMs: 1000, sourceEndMs: 2000, text: "Hold open" },
+    { sourceStartMs: 2000, sourceEndMs: 3000, text: "Crouch down" },
+    { sourceStartMs: 3000, sourceEndMs: 4000, text: "Hold the crouch" },
   ],
   checkpoints: [
     {

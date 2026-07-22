@@ -74,8 +74,8 @@
           >
         </div>
 
-        <label class="story-toggle">
-          <input v-model="showStoryCyclesTogether" type="checkbox" >
+        <label v-if="!singleStoryCycleMode" class="story-toggle">
+          <input v-model="showStoryCyclesTogether" type="checkbox" />
           <span>Compare</span>
         </label>
       </div>
@@ -93,7 +93,7 @@
         :max="storySliderMax"
         step="1"
         :disabled="storySliderMax <= 0"
-      >
+      />
 
       <div class="year-legend year-legend--story">
         <label
@@ -107,11 +107,21 @@
           }"
         >
           <input
+            v-if="!singleStoryCycleMode"
             v-model="selectedStoryCycleIds"
             class="year-legend__checkbox"
             type="checkbox"
             :value="cycle.id"
-          >
+          />
+          <input
+            v-else
+            class="year-legend__checkbox"
+            type="radio"
+            name="story-cycle"
+            :checked="selectedStoryCycleIds[0] === cycle.id"
+            :value="cycle.id"
+            @change="selectSingleStoryCycle(cycle.id)"
+          />
           <span
             class="year-legend__swatch"
             :style="{ backgroundColor: cycle.color }"
@@ -141,7 +151,7 @@
         :max="comparisonDayMax"
         step="1"
         :disabled="comparisonDayMax <= comparisonDayMin"
-      >
+      />
 
       <div class="year-legend">
         <div
@@ -175,7 +185,7 @@
         :max="Math.max(pointCount - 1, 0)"
         step="1"
         :disabled="pointCount <= 1"
-      >
+      />
     </div>
   </div>
 </template>
@@ -235,7 +245,13 @@ defineProps<{
   }[];
   isLoading: boolean;
   error: string | null;
+  singleStoryCycleMode?: boolean;
 }>();
+
+const selectSingleStoryCycle = (cycleId: string) => {
+  selectedStoryCycleIds.value = [cycleId];
+  showStoryCyclesTogether.value = false;
+};
 </script>
 
 <style scoped>

@@ -5,7 +5,22 @@
       :class="{ 'map-panel--gesture-active': isGestureActive }"
       aria-label="Story map"
     >
-      <BirdMap />
+      <div class="map-panel__content">
+        <BirdMap
+          :story-cycle-definitions="storyCycleDefinitions"
+          :single-story-cycle-mode="true"
+        />
+      </div>
+
+      <StoryGestureOverlay
+        :gesture-label="gestureOverlayLabel"
+        :state="gestureState"
+        :feedback-text="storyGestureStore.feedbackText"
+        :show-dev-controls="isGestureDevControlsVisible"
+        @mark="storyGestureStore.markGestureSuccessful"
+        @repeat="storyGestureStore.repeatAttempt"
+        @cancel="storyGestureStore.cancelGesture"
+      />
     </section>
 
     <section class="movement-panel" aria-label="Movement stage">
@@ -84,20 +99,39 @@
     </section>
 
     <section class="gesture-test-controls" aria-label="Gesture test controls">
+      <div class="story-cycle-controls__actions">
+        <button
+          class="btn btn--primary"
+          type="button"
+          :disabled="isStoryPlaybackControlDisabled"
+          @click="storyPlaybackStore.togglePlayback"
+        >
+          {{ storyPlaybackStore.isPlaying ? "Pause Story" : "Play Story" }}
+        </button>
+        <button
+          class="btn"
+          type="button"
+          :disabled="isStoryPlaybackControlDisabled"
+          @click="restartStoryCycle"
+        >
+          Restart
+        </button>
+      </div>
+
       <div class="gesture-test-controls__actions">
         <button
           class="btn btn--primary"
           type="button"
-          :disabled="isGestureActive"
-          @click="storyGestureStore.startGesture('arrival')"
+          :disabled="isManualGestureDisabled"
+          @click="startManualGesture('arrival')"
         >
           Test Arrival Gesture
         </button>
         <button
           class="btn btn--primary"
           type="button"
-          :disabled="isGestureActive"
-          @click="storyGestureStore.startGesture('departure')"
+          :disabled="isManualGestureDisabled"
+          @click="startManualGesture('departure')"
         >
           Test Departure Gesture
         </button>
@@ -129,6 +163,14 @@
           <dd>{{ storyPlaybackPausedLabel }}</dd>
         </div>
         <div>
+          <dt>Story</dt>
+          <dd>{{ storyPlaybackDebugLabel }}</dd>
+        </div>
+        <div>
+          <dt>Auto</dt>
+          <dd>{{ automaticGestureDebugLabel }}</dd>
+        </div>
+        <div>
           <dt>Movement</dt>
           <dd>{{ gestureMovementStatus }}</dd>
         </div>
@@ -158,26 +200,6 @@
         </div>
       </dl>
     </section>
-
-    <StoryPoseDebugPanel
-      v-if="isPoseDebugVisible"
-      v-model:target-pose-id="targetPoseId"
-      :definitions="poseDefinitions"
-      :features="currentPoseFeatures"
-      :evaluations="currentPoseEvaluations"
-      :stable-results="stablePoseResults"
-      :calibration="poseCalibration"
-    />
-
-    <StoryGestureOverlay
-      :gesture-label="activeGesture?.label ?? 'Gesture'"
-      :state="gestureState"
-      :feedback-text="storyGestureStore.feedbackText"
-      :show-dev-controls="isPoseDebugVisible"
-      @mark="storyGestureStore.markGestureSuccessful"
-      @repeat="storyGestureStore.repeatAttempt"
-      @cancel="storyGestureStore.cancelGesture"
-    />
   </main>
 </template>
 
@@ -188,17 +210,25 @@ import MovementCamera from "~/components/movement/MovementCamera.vue";
 import MovementStage from "~/components/movement/MovementStage.vue";
 import SeasonClock from "~/components/story/SeasonClock.vue";
 import StoryGestureOverlay from "~/components/story/StoryGestureOverlay.vue";
-import StoryPoseDebugPanel from "~/components/story/StoryPoseDebugPanel.vue";
 import { useMovementPlayback } from "~/composables/useMovementPlayback";
 import { usePoseComparison } from "~/composables/usePoseComparison";
+import { useStorkData } from "~/composables/useStorkData";
 import { loadGestureMovement } from "~/story/gestureMovements";
+import type { StoryGestureId } from "~/story/gestures";
+import {
+  createStoryGestureEvents,
+  formatStoryGestureEventLabel,
+  type StoryGestureEvent,
+} from "~/story/storyGestureEvents";
 import { useAudioStore } from "~/store/audioStore";
 import { useStoryGestureStore } from "~/store/storyGestureStore";
+import type { StoryGestureResult } from "~/store/storyGestureStore";
 import { useStoryPlaybackStore } from "~/store/storyPlayback";
 import type { PoseLandmarkLike } from "~/types/pose";
 import type { AvatarSourceMode, MovementRecording } from "~/types/movement";
 import { normalizeMovementRecordingToViewport } from "~/utils/movementFrames";
-import { poseDefinitions } from "~/utils/pose/poseDefinitionRegistry";
+import { buildPhaseSmoothedCycleTimeline } from "~/utils/storyCycle";
+import { storyCycleDefinitions } from "~/utils/storkStoryCycles";
 
 const poseLandmarks = ref<PoseLandmarkLike[] | null>(null);
 const avatarSourceMode = ref<AvatarSourceMode>("live-camera");
@@ -207,15 +237,62 @@ const gestureMovementRecording = ref<MovementRecording | null>(null);
 const isTestDanceLoading = ref(false);
 const isGestureMovementLoading = ref(false);
 const previousAvatarSourceMode = ref<AvatarSourceMode | null>(null);
+const storyGestureEvents = ref<StoryGestureEvent[]>([]);
+const activeAutomaticGestureEventId = ref<string | null>(null);
+const isAutomaticGestureTransitioning = ref(false);
 const avatarStageAspect = 16 / 9;
 const audioStore = useAudioStore();
 const storyPlaybackStore = useStoryPlaybackStore();
 const storyGestureStore = useStoryGestureStore();
+const { selectedMapMode, selectedStoryCycleIds, showStoryCyclesTogether } =
+  useStorkData({
+    storyCycleDefinitions,
+  });
+const automaticGesturePauseReason = "automatic-story-gesture";
 const baseRhythmLoop = computed(() => audioStore.baseRhythmLoop);
 const baseRhythmPosition = computed(() => audioStore.baseRhythmPosition);
 const activeGesture = computed(() => storyGestureStore.activeGesture);
 const gestureState = computed(() => storyGestureStore.state);
 const isGestureActive = computed(() => storyGestureStore.isActive);
+const selectedStoryCycle = computed(
+  () =>
+    storyCycleDefinitions.find(
+      (cycle) => cycle.label === selectedStoryCycleIds.value[0],
+    ) ?? storyCycleDefinitions[0]!,
+);
+const isAutomaticGestureContextReady = computed(
+  () =>
+    selectedMapMode.value === "story" &&
+    selectedStoryCycleIds.value.length === 1 &&
+    !showStoryCyclesTogether.value,
+);
+const selectedStoryTimeline = computed(() =>
+  buildPhaseSmoothedCycleTimeline(selectedStoryCycle.value, {
+    year: selectedStoryCycle.value.targetYear,
+  }),
+);
+const activeAutomaticGestureEvent = computed(() =>
+  storyGestureEvents.value.find(
+    (event) => event.id === activeAutomaticGestureEventId.value,
+  ),
+);
+const gestureOverlayLabel = computed(() =>
+  activeAutomaticGestureEvent.value
+    ? formatStoryGestureEventLabel(activeAutomaticGestureEvent.value)
+    : (activeGesture.value?.label ?? "Gesture"),
+);
+const isStoryPlaybackControlDisabled = computed(
+  () =>
+    isGestureActive.value ||
+    isAutomaticGestureTransitioning.value ||
+    !isAutomaticGestureContextReady.value,
+);
+const isManualGestureDisabled = computed(
+  () =>
+    isGestureActive.value ||
+    isAutomaticGestureTransitioning.value ||
+    storyPlaybackStore.isPlaying,
+);
 const isGestureAttemptRunning = computed(() =>
   ["attempt-playing", "retry-scheduled", "success-exit"].includes(
     storyGestureStore.state,
@@ -253,17 +330,37 @@ const completedCheckpointDebugLabel = computed(
   () =>
     `${storyGestureStore.completedCheckpointCount}/${storyGestureStore.requiredCheckpointCount}`,
 );
+const storyPlaybackDebugLabel = computed(
+  () =>
+    `${storyPlaybackStore.isPlaying ? "playing" : "paused"} @ ${(
+      storyPlaybackStore.currentElapsedMs / 1000
+    ).toFixed(1)}s`,
+);
+const automaticGestureDebugLabel = computed(() => {
+  if (!isAutomaticGestureContextReady.value) return "disabled";
+
+  const activeEvent = activeAutomaticGestureEvent.value;
+
+  if (activeEvent) return `${formatStoryGestureEventLabel(activeEvent)}`;
+
+  const counts = storyGestureEvents.value.reduce(
+    (summary, event) => {
+      summary[event.status]++;
+      return summary;
+    },
+    { pending: 0, active: 0, completed: 0, skipped: 0 },
+  );
+
+  return `${counts.completed + counts.skipped}/${storyGestureEvents.value.length}`;
+});
 const baseRhythmStatus = computed(() => {
   if (baseRhythmLoop.value.isLoading) return "loading";
   if (!baseRhythmLoop.value.isLoaded) return "click play";
 
   return baseRhythmLoop.value.isPlaying ? "playing" : "loaded";
 });
-const isPoseDebugVisible = import.meta.dev;
+const isGestureDevControlsVisible = import.meta.dev;
 const {
-  targetPoseId,
-  currentFeatures: currentPoseFeatures,
-  currentEvaluations: currentPoseEvaluations,
   stableResults: stablePoseResults,
   stableMatches: stablePoseMatches,
   calibration: poseCalibration,
@@ -318,6 +415,158 @@ const loadTestDanceRecording = async () => {
   } finally {
     isTestDanceLoading.value = false;
   }
+};
+
+const logAutomaticStoryGesture = (message: string, details?: unknown) => {
+  if (!import.meta.dev) return;
+
+  if (details === undefined) {
+    console.info(`[StoryGesture] ${message}`);
+    return;
+  }
+
+  console.info(`[StoryGesture] ${message}`, details);
+};
+
+const resetAutomaticGestureEvents = (reason: string) => {
+  storyGestureEvents.value = createStoryGestureEvents(
+    selectedStoryCycle.value,
+    selectedStoryTimeline.value,
+    `${selectedStoryCycle.value.targetYear}-06-01`,
+  );
+  activeAutomaticGestureEventId.value = null;
+
+  logAutomaticStoryGesture(
+    `Created ${storyGestureEvents.value.length} events for cycle ${selectedStoryCycle.value.label}`,
+    {
+      reason,
+      events: storyGestureEvents.value.map((event) => ({
+        id: event.id,
+        boundaryDate: event.boundaryDate,
+        boundaryTimeS: (event.boundaryTimeMs / 1000).toFixed(1),
+      })),
+    },
+  );
+};
+
+const configureSelectedStoryCycle = () => {
+  if (!isAutomaticGestureContextReady.value) return;
+
+  storyPlaybackStore.configureCycle(selectedStoryCycle.value);
+  resetAutomaticGestureEvents("cycle configured");
+};
+
+const setAutomaticGestureEventStatus = (
+  eventId: string,
+  status: StoryGestureEvent["status"],
+) => {
+  storyGestureEvents.value = storyGestureEvents.value.map((event) =>
+    event.id === eventId ? { ...event, status } : event,
+  );
+};
+
+const getFirstCrossedPendingEvent = (
+  previousElapsedMs: number,
+  currentElapsedMs: number,
+) =>
+  storyGestureEvents.value.find(
+    (event) =>
+      event.status === "pending" &&
+      previousElapsedMs < event.boundaryTimeMs &&
+      currentElapsedMs >= event.boundaryTimeMs,
+  ) ?? null;
+
+const getGestureResultEventStatus = (result: StoryGestureResult) =>
+  result === "completed" ? "completed" : "skipped";
+
+// Pauses the story exactly at a phase boundary, delegates to the existing gesture flow, then resumes.
+const runAutomaticGestureEvent = async (event: StoryGestureEvent) => {
+  if (isAutomaticGestureTransitioning.value || storyGestureStore.isActive) {
+    logAutomaticStoryGesture("Automatic trigger ignored: gesture busy");
+    return;
+  }
+
+  isAutomaticGestureTransitioning.value = true;
+  activeAutomaticGestureEventId.value = event.id;
+  setAutomaticGestureEventStatus(event.id, "active");
+
+  const label = formatStoryGestureEventLabel(event);
+  const shouldResumeStoryPlayback =
+    storyPlaybackStore.pauseStoryPlaybackAtElapsedMs(
+      event.boundaryTimeMs,
+      automaticGesturePauseReason,
+    );
+
+  logAutomaticStoryGesture(`Crossing ${label.toLowerCase()} boundary`, {
+    boundaryDate: event.boundaryDate,
+    boundaryTimeS: (event.boundaryTimeMs / 1000).toFixed(1),
+  });
+  logAutomaticStoryGesture(
+    `Story paused at ${(event.boundaryTimeMs / 1000).toFixed(1)} s`,
+  );
+  logAutomaticStoryGesture(`Starting ${event.type} gesture`);
+
+  try {
+    const result = await storyGestureStore.startGesture(event.type);
+    const status = getGestureResultEventStatus(result);
+
+    setAutomaticGestureEventStatus(event.id, status);
+
+    if (result === "completed") {
+      logAutomaticStoryGesture(`${label} completed`);
+    } else {
+      logAutomaticStoryGesture(`${label} skipped`, { result });
+    }
+  } catch (error) {
+    setAutomaticGestureEventStatus(event.id, "skipped");
+    console.error("[StoryGesture] Automatic gesture failed.", error);
+  } finally {
+    activeAutomaticGestureEventId.value = null;
+    previousStoryElapsedMs = event.boundaryTimeMs;
+
+    if (shouldResumeStoryPlayback && !isUnmounting) {
+      storyPlaybackStore.resumeStoryPlayback(automaticGesturePauseReason);
+      logAutomaticStoryGesture(
+        `Resuming story at ${(event.boundaryTimeMs / 1000).toFixed(1)} s`,
+      );
+    } else {
+      storyPlaybackStore.releaseStoryPlaybackPause(automaticGesturePauseReason);
+    }
+
+    isAutomaticGestureTransitioning.value = false;
+  }
+};
+
+const handleAutomaticGestureCrossing = (
+  previousElapsedMs: number,
+  currentElapsedMs: number,
+) => {
+  if (isAutomaticGestureTransitioning.value) return;
+  if (storyGestureStore.isActive) return;
+  if (!isAutomaticGestureContextReady.value) return;
+  if (storyPlaybackStore.isSeeking) return;
+  if (!storyPlaybackStore.isPlaying) return;
+  if (currentElapsedMs <= previousElapsedMs) return;
+
+  const event = getFirstCrossedPendingEvent(
+    previousElapsedMs,
+    currentElapsedMs,
+  );
+
+  if (!event) return;
+
+  void runAutomaticGestureEvent(event);
+};
+
+const startManualGesture = (id: StoryGestureId) => {
+  if (isManualGestureDisabled.value) return;
+
+  void storyGestureStore.startGesture(id);
+};
+
+const restartStoryCycle = () => {
+  storyPlaybackStore.resetToStoryStart();
+  resetAutomaticGestureEvents("story restarted");
 };
 
 const setAvatarSourceMode = async (mode: AvatarSourceMode) => {
@@ -404,6 +653,8 @@ const restoreAvatarSourceAfterGesture = async () => {
 let audioDebugTimer: ReturnType<typeof setInterval> | null = null;
 let gestureRenderFrameId = 0;
 let isUnmounting = false;
+let previousStoryElapsedMs = storyPlaybackStore.currentElapsedMs;
+let handledSeekRevision = storyPlaybackStore.seekRevision;
 
 const stopGestureRenderLoop = () => {
   if (!gestureRenderFrameId) return;
@@ -452,6 +703,60 @@ onMounted(() => {
     audioStore.syncBaseRhythmLoopOffset();
   }, 250);
 });
+
+watch(
+  [
+    selectedMapMode,
+    () => selectedStoryCycleIds.value.join("|"),
+    showStoryCyclesTogether,
+  ],
+  () => {
+    if (!isAutomaticGestureContextReady.value) {
+      storyGestureEvents.value = [];
+      activeAutomaticGestureEventId.value = null;
+      previousStoryElapsedMs = storyPlaybackStore.currentElapsedMs;
+      handledSeekRevision = storyPlaybackStore.seekRevision;
+      return;
+    }
+
+    configureSelectedStoryCycle();
+    previousStoryElapsedMs = storyPlaybackStore.currentElapsedMs;
+    handledSeekRevision = storyPlaybackStore.seekRevision;
+  },
+  { immediate: true },
+);
+
+watch(
+  () => storyPlaybackStore.playbackSessionId,
+  () => {
+    resetAutomaticGestureEvents("playback session reset");
+    previousStoryElapsedMs = storyPlaybackStore.currentElapsedMs;
+  },
+);
+
+watch(
+  () => storyPlaybackStore.seekRevision,
+  (seekRevision) => {
+    handledSeekRevision = seekRevision;
+    previousStoryElapsedMs = storyPlaybackStore.currentElapsedMs;
+  },
+);
+
+watch(
+  () => storyPlaybackStore.currentElapsedMs,
+  (currentElapsedMs) => {
+    if (handledSeekRevision !== storyPlaybackStore.seekRevision) {
+      handledSeekRevision = storyPlaybackStore.seekRevision;
+      previousStoryElapsedMs = currentElapsedMs;
+      return;
+    }
+
+    const previousElapsedMs = previousStoryElapsedMs;
+
+    previousStoryElapsedMs = currentElapsedMs;
+    handleAutomaticGestureCrossing(previousElapsedMs, currentElapsedMs);
+  },
+);
 
 watch(
   () => storyGestureStore.state,
@@ -505,6 +810,9 @@ onBeforeUnmount(() => {
     audioDebugTimer = null;
   }
 
+  activeAutomaticGestureEventId.value = null;
+  isAutomaticGestureTransitioning.value = false;
+  storyPlaybackStore.releaseStoryPlaybackPause(automaticGesturePauseReason);
   storyGestureStore.cleanupGesture();
   stopGestureRenderLoop();
   stopRecording();
@@ -539,6 +847,14 @@ onBeforeUnmount(() => {
   color: #26382f;
   box-shadow: 0 10px 28px rgba(32, 50, 40, 0.14);
   backdrop-filter: blur(10px);
+}
+
+.story-cycle-controls__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(31, 49, 39, 0.12);
 }
 
 .gesture-test-controls__actions {
@@ -593,18 +909,35 @@ onBeforeUnmount(() => {
 
 .map-panel {
   position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border-right: 1px solid rgba(36, 54, 42, 0.16);
+}
+
+.map-panel__content {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  min-width: 0;
+  min-height: 0;
+  transition:
+    filter 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.map-panel--gesture-active .map-panel__content {
+  filter: grayscale(0.45) brightness(0.82);
+  opacity: 0.5;
 }
 
 .map-panel::after {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 3;
-  background: rgba(240, 244, 239, 0.56);
+  z-index: 2;
+  background: rgba(240, 244, 239, 0.62);
   opacity: 0;
   pointer-events: none;
-  backdrop-filter: saturate(0.82) brightness(0.95);
   transition: opacity 0.18s ease;
 }
 

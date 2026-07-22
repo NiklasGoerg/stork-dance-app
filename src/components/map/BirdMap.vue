@@ -6,6 +6,7 @@
         :show-map-navigation="showMapNavigation"
         :story-cycle-ids="storyCycleIds"
         :story-cycle-definitions="storyCycleDefinitions"
+        :single-story-cycle-mode="singleStoryCycleMode"
       />
       <template #fallback>
         <div class="map-fallback" />
@@ -24,12 +25,14 @@ withDefaults(
     showMapNavigation?: boolean;
     storyCycleIds?: string[];
     storyCycleDefinitions?: StorkStoryCycleDefinition[];
+    singleStoryCycleMode?: boolean;
   }>(),
   {
     showControls: true,
     showMapNavigation: true,
     storyCycleIds: undefined,
     storyCycleDefinitions: undefined,
+    singleStoryCycleMode: false,
   },
 );
 </script>

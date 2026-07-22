@@ -24,6 +24,7 @@
       :story-legend="storyLegend"
       :is-loading="isLoading"
       :error="error"
+      :single-story-cycle-mode="singleStoryCycleMode"
     />
   </div>
 </template>
@@ -76,12 +77,14 @@ const props = withDefaults(
     showMapNavigation?: boolean;
     storyCycleIds?: string[];
     storyCycleDefinitions?: StorkStoryCycleDefinition[];
+    singleStoryCycleMode?: boolean;
   }>(),
   {
     showControls: true,
     showMapNavigation: true,
     storyCycleIds: undefined,
     storyCycleDefinitions: undefined,
+    singleStoryCycleMode: false,
   },
 );
 
@@ -186,11 +189,13 @@ const selectedStoryMapPoints = computed(() =>
 const getConfiguredStoryCycleIds = () =>
   props.storyCycleIds?.length
     ? [...props.storyCycleIds]
-    : activeStoryCycleDefinitions.value.map((cycle) => cycle.label);
+    : props.singleStoryCycleMode
+      ? [activeStoryCycleDefinitions.value[0]?.label].filter(Boolean)
+      : activeStoryCycleDefinitions.value.map((cycle) => cycle.label);
 
 const configureStoryMode = () => {
   selectedMapMode.value = "story";
-  showStoryCyclesTogether.value = true;
+  showStoryCyclesTogether.value = !props.singleStoryCycleMode;
   selectedStoryCycleIds.value = getConfiguredStoryCycleIds();
   seekStoryToDate(currentDate.value);
 };
@@ -271,9 +276,40 @@ onMounted(() => {
 });
 
 watch(currentDate, (date) => {
-  selectedMapMode.value = "story";
-  showStoryCyclesTogether.value = true;
+  if (selectedMapMode.value !== "story") return;
+
+  if (props.singleStoryCycleMode) {
+    showStoryCyclesTogether.value = false;
+  }
+
   seekStoryToDate(date);
+});
+
+watch(selectedMapMode, (mode) => {
+  if (mode !== "story" || !props.singleStoryCycleMode) return;
+
+  showStoryCyclesTogether.value = false;
+
+  if (selectedStoryCycleIds.value.length === 1) return;
+
+  selectedStoryCycleIds.value = getConfiguredStoryCycleIds();
+});
+
+watch(selectedStoryCycleIds, (ids) => {
+  if (!props.singleStoryCycleMode) return;
+
+  const selectedId = ids[ids.length - 1] ?? getConfiguredStoryCycleIds()[0];
+  const nextIds = selectedId ? [selectedId] : [];
+
+  if (
+    nextIds.length === selectedStoryCycleIds.value.length &&
+    nextIds.every((id, index) => id === selectedStoryCycleIds.value[index])
+  ) {
+    return;
+  }
+
+  selectedStoryCycleIds.value = nextIds;
+  showStoryCyclesTogether.value = false;
 });
 
 watch(

@@ -56,37 +56,37 @@ const canUseDevControls = computed(
 .story-gesture-overlay {
   position: absolute;
   inset: 0;
-  z-index: 8;
+  z-index: 5;
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  padding: 40px;
   pointer-events: none;
 }
 
 .story-gesture-overlay__panel {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  z-index: 1;
   display: grid;
-  width: min(420px, calc(100% - 36px));
-  gap: 12px;
-  padding: 18px;
-  border: 1px solid rgba(31, 49, 39, 0.16);
+  width: min(720px, 100%);
+  gap: 18px;
+  padding: 28px 34px;
+  border: 1px solid rgba(31, 49, 39, 0.18);
   border-radius: 8px;
-  background: rgba(249, 251, 247, 0.94);
+  background: rgba(249, 251, 247, 0.9);
   color: #1f3127;
-  box-shadow: 0 14px 34px rgba(29, 45, 36, 0.16);
+  box-shadow: 0 18px 42px rgba(29, 45, 36, 0.2);
   backdrop-filter: blur(10px);
   pointer-events: auto;
 }
 
 .story-gesture-overlay__eyebrow {
   color: rgba(31, 49, 39, 0.62);
-  font-size: 0.72rem;
+  font-size: clamp(0.9rem, 1.3vw, 1.2rem);
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .story-gesture-overlay__panel strong {
-  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-size: clamp(3.2rem, 7vw, 6.8rem);
   line-height: 1.02;
 }
 
@@ -98,14 +98,24 @@ const canUseDevControls = computed(
 
 .story-gesture-overlay__cancel {
   justify-self: start;
-  min-height: 32px;
-  padding: 5px 0;
+  min-height: 40px;
+  padding: 6px 0;
   border: 0;
   background: transparent;
   color: rgba(31, 49, 39, 0.68);
-  font-size: 0.9rem;
+  font-size: 1.1rem;
   font-weight: 800;
   cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .story-gesture-overlay {
+    padding: 18px;
+  }
+
+  .story-gesture-overlay__panel {
+    padding: 20px 22px;
+  }
 }
 
 .gesture-overlay-enter-active,

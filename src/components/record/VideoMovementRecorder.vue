@@ -15,7 +15,7 @@
           placeholder="e.g. temperature_rise"
           class="input-modern"
           :disabled="isProcessing"
-        >
+        />
       </div>
 
       <div class="field">
@@ -27,7 +27,7 @@
           class="input-modern"
           :disabled="isProcessing"
           @change="onFileSelected"
-        >
+        />
       </div>
 
       <video

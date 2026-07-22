@@ -17,6 +17,7 @@ import type {
 import { getPoseDefinition } from "~/utils/pose/poseDefinitionRegistry";
 
 type GestureMovementPlaybackSource = "none" | "recorded";
+export type StoryGestureResult = "completed" | "cancelled" | "error";
 
 type PoseSnapshot = {
   stableResults: Record<StoryPoseId, StablePoseResult | null>;
@@ -60,6 +61,8 @@ const checkpointLateGraceMs = 160;
 let scheduledLeadInCancel: (() => void) | null = null;
 let lastPoseDebugLogAt = Number.NEGATIVE_INFINITY;
 let lastPoseDebugCheckpointId: string | null = null;
+let gestureCompletionResolver: ((result: StoryGestureResult) => void) | null =
+  null;
 
 const getInitialSession = (): GestureInteractionSession => ({
   activeGestureId: null,
@@ -126,6 +129,11 @@ const hasCompletedRequiredCheckpoints = (
 const resetPoseDebugLog = () => {
   lastPoseDebugLogAt = Number.NEGATIVE_INFINITY;
   lastPoseDebugCheckpointId = null;
+};
+
+const resolveGestureCompletion = (result: StoryGestureResult) => {
+  gestureCompletionResolver?.(result);
+  gestureCompletionResolver = null;
 };
 
 const formatDebugValue = (value: number | null | undefined) => {
@@ -305,11 +313,11 @@ export const useStoryGestureStore = defineStore("storyGesture", {
 
       const gesture = getStoryGestureDefinition(state.activeGestureId);
 
-      if (state.state === "loading-movement") return "Laden";
+      if (state.state === "loading-movement") return "Loading";
 
       if (state.state === "waiting-for-lead-in") {
         if (state.leadInTransportTimeMs === null) {
-          return `${gesture.label} bereit`;
+          return `${gesture.label} ready`;
         }
 
         const audioStore = useAudioStore();
@@ -340,11 +348,11 @@ export const useStoryGestureStore = defineStore("storyGesture", {
         state.currentSourceTimeMs >=
           gesture.timing.branchPointMs - retryFeedbackLeadMs
       ) {
-        return "Noch einmal";
+        return "Try again";
       }
 
       if (state.state === "success-exit" || state.state === "completed") {
-        return "Bewegung erkannt";
+        return "Movement recognized";
       }
 
       if (
@@ -365,15 +373,18 @@ export const useStoryGestureStore = defineStore("storyGesture", {
   },
   actions: {
     // Starts a gesture session and pauses the story while the base beat keeps running.
-    async startGesture(id: StoryGestureId) {
+    async startGesture(id: StoryGestureId): Promise<StoryGestureResult> {
       if (this.state !== "inactive") {
         logStoryGesture(`Ignored ${id}; another gesture is active.`);
-        return;
+        return "error";
       }
 
       const gesture = getStoryGestureDefinition(id);
       const audioStore = useAudioStore();
       const storyPlaybackStore = useStoryPlaybackStore();
+      const completionPromise = new Promise<StoryGestureResult>((resolve) => {
+        gestureCompletionResolver = resolve;
+      });
       const shouldResumeStoryPlayback = storyPlaybackStore.pauseStoryPlayback(
         storyGesturePauseReason,
       );
@@ -397,6 +408,8 @@ export const useStoryGestureStore = defineStore("storyGesture", {
       }
 
       this.currentTransportTimeMs = audioStore.getBaseRhythmTransportTimeMs();
+
+      return completionPromise;
     },
     // Arms the loaded avatar movement on the next musically useful lead-in beat.
     async markMovementLoaded(source: GestureMovementPlaybackSource) {
@@ -439,7 +452,7 @@ export const useStoryGestureStore = defineStore("storyGesture", {
 
       this.movementLoadError = getErrorMessage(error);
       console.error("[StoryGesture] Gesture setup aborted.", error);
-      this.finishGesture();
+      this.finishGesture("error");
     },
     // Resets checkpoint progress and starts one synchronized user attempt.
     beginAttempt(transportTimeMs: number, feedbackText: string | null = null) {
@@ -536,7 +549,7 @@ export const useStoryGestureStore = defineStore("storyGesture", {
         }
 
         if (this.decision === "retry") {
-          this.beginAttempt(transportTimeMs, "Noch einmal");
+          this.beginAttempt(transportTimeMs, "Try again");
           return;
         }
 
@@ -549,7 +562,7 @@ export const useStoryGestureStore = defineStore("storyGesture", {
         this.currentSourceTimeMs >= timing.successEndMs
       ) {
         this.state = "completed";
-        this.finishGesture();
+        this.finishGesture("completed");
       }
     },
     markGestureSuccessful() {
@@ -701,10 +714,10 @@ export const useStoryGestureStore = defineStore("storyGesture", {
       logStoryGesture("Cancelled");
       clearScheduledLeadIn();
       this.state = "cancelled";
-      this.finishGesture();
+      this.finishGesture("cancelled");
     },
     // Restores story playback ownership and clears the transient gesture session.
-    finishGesture() {
+    finishGesture(result: StoryGestureResult = "completed") {
       const storyPlaybackStore = useStoryPlaybackStore();
       const shouldResumeStoryPlayback = this.shouldResumeStoryPlayback;
 
@@ -717,6 +730,7 @@ export const useStoryGestureStore = defineStore("storyGesture", {
       }
 
       logStoryGesture("Story resumed");
+      resolveGestureCompletion(result);
       this.$patch(getInitialSession());
     },
     setMovementPlaybackSource(source: GestureMovementPlaybackSource) {
@@ -725,7 +739,7 @@ export const useStoryGestureStore = defineStore("storyGesture", {
     cleanupGesture() {
       if (this.state === "inactive") return;
 
-      this.finishGesture();
+      this.finishGesture("cancelled");
     },
   },
 });
