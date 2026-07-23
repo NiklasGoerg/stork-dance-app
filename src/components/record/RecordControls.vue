@@ -1,18 +1,18 @@
 <template>
   <div class="panel card-panel">
     <h2 class="panel-title">
-      <BaseIcon :path="mdiMicrophone" title="Record" />
-      Record Movement
+      <BaseIcon :path="mdiMicrophone" :title="t('record.webcam.iconTitle')" />
+      {{ t("record.webcam.title") }}
     </h2>
 
     <div class="control-layout">
       <div class="field">
-        <label for="movementName">Movement Name</label>
+        <label for="movementName">{{ t("record.webcam.movementName") }}</label>
         <input
           id="movementName"
           v-model="movementName"
           type="text"
-          placeholder="e.g. arms_up"
+          :placeholder="t('record.webcam.movementNamePlaceholder')"
           class="input-modern"
         />
       </div>
@@ -28,7 +28,7 @@
         <button
           class="btn icon-btn"
           :disabled="!canExport"
-          title="Export recording"
+          :title="t('record.webcam.exportTitle')"
           @click="exportRecording"
         >
           <BaseIcon :path="mdiContentSave" />
@@ -44,13 +44,21 @@
       <div class="status">
         <span class="status-chip" :class="isRecording ? 'active' : ''">
           <span class="dot" />
-          {{ isRecording ? "Recording" : "Idle" }}
+          {{ isRecording ? t("record.webcam.recording") : t("common.idle") }}
         </span>
         <span v-if="countdown > 0" class="countdown">
-          Starting in: <b>{{ countdown }}</b>
+          <i18n-t keypath="record.webcam.startingIn" tag="span">
+            <template #count>
+              <b>{{ countdown }}</b>
+            </template>
+          </i18n-t>
         </span>
         <span v-if="recording" class="frames-info">
-          Frames: <b>{{ recording.frames.length }}</b>
+          <i18n-t keypath="common.frames" tag="span">
+            <template #count>
+              <b>{{ recording.frames.length }}</b>
+            </template>
+          </i18n-t>
         </span>
       </div>
     </div>
@@ -70,6 +78,7 @@ import {
 import BaseIcon from "~/components/ui/BaseIcon.vue";
 import { useMovementRecorder } from "~/composables/useMovementRecorder";
 
+const { t } = useI18n();
 const movementName = ref("movement");
 
 const {
@@ -89,9 +98,9 @@ const canExport = computed(
 );
 
 const primaryActionLabel = computed(() => {
-  if (isCountingDown.value) return "Starting...";
+  if (isCountingDown.value) return t("record.webcam.starting");
 
-  return isRecording.value ? "Stop" : "Start";
+  return isRecording.value ? t("record.webcam.stop") : t("record.webcam.start");
 });
 
 const primaryActionIcon = computed(() => {
@@ -102,14 +111,14 @@ const primaryActionIcon = computed(() => {
 
 const recordingNote = computed(() => {
   if (isCountingDown.value) {
-    return "Prepare your movement posture.";
+    return t("record.webcam.note.prepare");
   }
 
   if (recording.value?.frames.length) {
-    return "Use save icon to export latest take.";
+    return t("record.webcam.note.export");
   }
 
-  return "Press start to capture movement.";
+  return t("record.webcam.note.start");
 });
 
 const onToggleRecord = async () => {

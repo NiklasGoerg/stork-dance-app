@@ -6,6 +6,7 @@ export type StorySeasonId = "summer" | "autumn" | "winter" | "spring";
 export type StorySeason = {
   id: StorySeasonId;
   label: string;
+  labelKey?: string;
 };
 
 export type StoryCycleProgress = {
@@ -23,6 +24,7 @@ export type StoryBoundary = {
 
 export type StoryMonthBoundary = StoryBoundary & {
   label: string;
+  labelKey?: string;
   monthIndex: number;
   midAngle: number;
 };
@@ -75,24 +77,40 @@ export type PlaybackSpeedWindow = {
 };
 
 const storyMonths = [
-  { label: "Jun", monthIndex: 5 },
-  { label: "Jul", monthIndex: 6 },
-  { label: "Aug", monthIndex: 7 },
-  { label: "Sep", monthIndex: 8 },
-  { label: "Okt", monthIndex: 9 },
-  { label: "Nov", monthIndex: 10 },
-  { label: "Dez", monthIndex: 11 },
-  { label: "Jan", monthIndex: 0 },
-  { label: "Feb", monthIndex: 1 },
-  { label: "M\u00e4r", monthIndex: 2 },
-  { label: "Apr", monthIndex: 3 },
-  { label: "Mai", monthIndex: 4 },
+  { label: "Jun", labelKey: "seasonClock.months.jun", monthIndex: 5 },
+  { label: "Jul", labelKey: "seasonClock.months.jul", monthIndex: 6 },
+  { label: "Aug", labelKey: "seasonClock.months.aug", monthIndex: 7 },
+  { label: "Sep", labelKey: "seasonClock.months.sep", monthIndex: 8 },
+  { label: "Oct", labelKey: "seasonClock.months.oct", monthIndex: 9 },
+  { label: "Nov", labelKey: "seasonClock.months.nov", monthIndex: 10 },
+  { label: "Dec", labelKey: "seasonClock.months.dec", monthIndex: 11 },
+  { label: "Jan", labelKey: "seasonClock.months.jan", monthIndex: 0 },
+  { label: "Feb", labelKey: "seasonClock.months.feb", monthIndex: 1 },
+  { label: "Mar", labelKey: "seasonClock.months.mar", monthIndex: 2 },
+  { label: "Apr", labelKey: "seasonClock.months.apr", monthIndex: 3 },
+  { label: "May", labelKey: "seasonClock.months.may", monthIndex: 4 },
 ];
 
-const summerSeason: StorySeason = { id: "summer", label: "Sommer" };
-const autumnSeason: StorySeason = { id: "autumn", label: "Herbst" };
-const winterSeason: StorySeason = { id: "winter", label: "Winter" };
-const springSeason: StorySeason = { id: "spring", label: "Fr\u00fchling" };
+const summerSeason: StorySeason = {
+  id: "summer",
+  label: "Summer",
+  labelKey: "seasonClock.seasons.summer",
+};
+const autumnSeason: StorySeason = {
+  id: "autumn",
+  label: "Autumn",
+  labelKey: "seasonClock.seasons.autumn",
+};
+const winterSeason: StorySeason = {
+  id: "winter",
+  label: "Winter",
+  labelKey: "seasonClock.seasons.winter",
+};
+const springSeason: StorySeason = {
+  id: "spring",
+  label: "Spring",
+  labelKey: "seasonClock.seasons.spring",
+};
 
 const seasons: StorySeason[] = [
   summerSeason,

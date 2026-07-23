@@ -3,21 +3,31 @@
     <button
       class="btn season-clock-controls__button"
       type="button"
-      :aria-label="isPlaying ? 'Pause story playback' : 'Play story playback'"
+      :aria-label="
+        isPlaying
+          ? t('seasonClock.aria.pausePlayback')
+          : t('seasonClock.aria.playPlayback')
+      "
       @click="$emit('toggle-playback')"
     >
       <BaseIcon :path="isPlaying ? mdiPause : mdiPlay" />
-      <span>{{ isPlaying ? "Pause" : "Play" }}</span>
+      <span>
+        {{
+          isPlaying
+            ? t("seasonClock.controls.pause")
+            : t("seasonClock.controls.play")
+        }}
+      </span>
     </button>
 
     <button
       class="btn season-clock-controls__button"
       type="button"
-      aria-label="Reset story date to 1 June"
+      :aria-label="t('seasonClock.aria.resetDate')"
       @click="$emit('reset')"
     >
       <BaseIcon :path="mdiRestart" />
-      <span>Reset</span>
+      <span>{{ t("seasonClock.controls.reset") }}</span>
     </button>
   </div>
 </template>
@@ -25,6 +35,8 @@
 <script setup lang="ts">
 import { mdiPause, mdiPlay, mdiRestart } from "@mdi/js";
 import BaseIcon from "~/components/ui/BaseIcon.vue";
+
+const { t } = useI18n();
 
 defineProps<{
   isPlaying: boolean;

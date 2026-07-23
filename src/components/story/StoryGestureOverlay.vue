@@ -1,7 +1,10 @@
 <template>
   <Transition name="gesture-overlay">
     <div v-if="isVisible" class="story-gesture-overlay" aria-live="polite">
-      <section class="story-gesture-overlay__panel" aria-label="Story gesture">
+      <section
+        class="story-gesture-overlay__panel"
+        :aria-label="t('story.aria.gesture')"
+      >
         <span class="story-gesture-overlay__eyebrow">{{ gestureLabel }}</span>
         <strong>{{ feedbackText }}</strong>
 
@@ -10,10 +13,10 @@
           class="story-gesture-overlay__actions"
         >
           <button class="btn btn--primary" type="button" @click="$emit('mark')">
-            Mark as recognized
+            {{ t("gestures.overlay.markRecognized") }}
           </button>
           <button class="btn" type="button" @click="$emit('repeat')">
-            Repeat
+            {{ t("common.repeat") }}
           </button>
         </div>
 
@@ -22,7 +25,7 @@
           type="button"
           @click="$emit('cancel')"
         >
-          Cancel
+          {{ t("common.cancel") }}
         </button>
       </section>
     </div>
@@ -33,6 +36,7 @@
 import { computed } from "vue";
 import type { GestureInteractionState } from "~/story/gestures";
 
+const { t } = useI18n();
 const props = defineProps<{
   gestureLabel: string;
   state: GestureInteractionState;

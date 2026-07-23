@@ -1,20 +1,26 @@
 <template>
   <main class="story-index-page">
     <section class="story-index-panel" aria-labelledby="story-index-title">
-      <p class="story-index-eyebrow">Data Dance</p>
-      <h1 id="story-index-title">Story Overview</h1>
-      <nav class="story-links" aria-label="Story pages">
-        <NuxtLink to="/story/prologue">Prologue</NuxtLink>
-        <NuxtLink to="/story/act-2">Act 2</NuxtLink>
-        <NuxtLink to="/story/act-3">Act 3</NuxtLink>
-        <NuxtLink to="/story/act-4">Act 4</NuxtLink>
-        <NuxtLink to="/story/act-5">Act 5</NuxtLink>
-        <NuxtLink to="/story/epilogue">Epilogue</NuxtLink>
-        <NuxtLink to="/story/stage">Story Stage Test</NuxtLink>
+      <p class="story-index-eyebrow">{{ t("common.dataDance") }}</p>
+      <h1 id="story-index-title">{{ t("story.overview.title") }}</h1>
+      <nav class="story-links" :aria-label="t('story.aria.pages')">
+        <NuxtLink to="/story/prologue">{{ t("home.nav.prologue") }}</NuxtLink>
+        <NuxtLink to="/story/act-2">{{ t("home.nav.act2") }}</NuxtLink>
+        <NuxtLink to="/story/act-3">{{ t("home.nav.act3") }}</NuxtLink>
+        <NuxtLink to="/story/act-4">{{ t("home.nav.act4") }}</NuxtLink>
+        <NuxtLink to="/story/act-5">{{ t("home.nav.act5") }}</NuxtLink>
+        <NuxtLink to="/story/epilogue">{{ t("home.nav.epilogue") }}</NuxtLink>
+        <NuxtLink to="/story/stage">
+          {{ t("home.nav.storyStageTest") }}
+        </NuxtLink>
       </nav>
     </section>
   </main>
 </template>
+
+<script setup lang="ts">
+const { t } = useI18n();
+</script>
 
 <style scoped>
 .story-index-page {

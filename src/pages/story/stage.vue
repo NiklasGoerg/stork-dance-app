@@ -3,7 +3,7 @@
     <section
       class="map-panel"
       :class="{ 'map-panel--gesture-active': isGestureActive }"
-      aria-label="Story map"
+      :aria-label="t('storyStage.aria.map')"
     >
       <div class="map-panel__content">
         <BirdMap
@@ -15,7 +15,7 @@
       <StoryGestureOverlay
         :gesture-label="gestureOverlayLabel"
         :state="gestureState"
-        :feedback-text="storyGestureStore.feedbackText"
+        :feedback-text="gestureFeedbackText"
         :show-dev-controls="isGestureDevControlsVisible"
         @mark="storyGestureStore.markGestureSuccessful"
         @repeat="storyGestureStore.repeatAttempt"
@@ -23,71 +23,64 @@
       />
     </section>
 
-    <section class="movement-panel" aria-label="Movement stage">
-      <section class="avatar-stage" aria-label="Avatar stage">
-        <div class="avatar-stage__surface">
-          <div class="avatar-stage__toolbar" aria-label="Movement source">
-            <button
-              class="stage-toggle"
-              type="button"
-              :disabled="isGestureActive"
-              :class="{
-                'stage-toggle--active': avatarSourceMode === 'live-camera',
-              }"
-              @click="setAvatarSourceMode('live-camera')"
+    <section
+      class="movement-panel"
+      :aria-label="t('storyStage.aria.movementStage')"
+    >
+      <section
+        class="comparison-panel"
+        :aria-label="t('storyStage.aria.playbackAndMirror')"
+      >
+        <section
+          class="avatar-stage"
+          :aria-label="t('storyStage.aria.avatarStage')"
+        >
+          <div class="avatar-stage__surface">
+            <div
+              class="avatar-stage__toolbar"
+              :aria-label="t('storyStage.aria.movementSource')"
             >
-              Live Camera
-            </button>
-            <button
-              class="stage-toggle"
-              type="button"
-              :disabled="isTestDanceLoading || isGestureActive"
-              :class="{
-                'stage-toggle--active': avatarSourceMode === 'recorded-motion',
-              }"
-              @click="setAvatarSourceMode('recorded-motion')"
-            >
-              {{ isTestDanceLoading ? "Loading" : "Test Dance" }}
-            </button>
+              <button
+                class="stage-toggle"
+                type="button"
+                :disabled="isGestureActive"
+                :class="{
+                  'stage-toggle--active': avatarSourceMode === 'live-camera',
+                }"
+                @click="setAvatarSourceMode('live-camera')"
+              >
+                {{ t("storyStage.source.liveCamera") }}
+              </button>
+              <button
+                class="stage-toggle"
+                type="button"
+                :disabled="isTestDanceLoading || isGestureActive"
+                :class="{
+                  'stage-toggle--active': avatarSourceMode === 'recorded-motion',
+                }"
+                @click="setAvatarSourceMode('recorded-motion')"
+              >
+                {{
+                  isTestDanceLoading
+                    ? t("common.loading")
+                    : t("storyStage.source.testDance")
+                }}
+              </button>
+            </div>
+
+            <MovementStage
+              :landmarks="stageLandmarks"
+              :source-mode="avatarSourceMode"
+              :source-aspect="stageSourceAspect"
+              :fill-frame="true"
+            />
           </div>
-
-          <dl class="audio-debug" aria-label="Base rhythm debug">
-            <div>
-              <dt>BPM</dt>
-              <dd>{{ baseRhythmLoop.bpm }}</dd>
-            </div>
-            <div>
-              <dt>Bar</dt>
-              <dd>{{ baseRhythmPosition.currentBar }}</dd>
-            </div>
-            <div>
-              <dt>Beat</dt>
-              <dd>{{ baseRhythmPosition.currentBeat }}</dd>
-            </div>
-            <div>
-              <dt>Audio</dt>
-              <dd>{{ baseRhythmStatus }}</dd>
-            </div>
-            <div v-if="baseRhythmLoop.error">
-              <dt>Error</dt>
-              <dd>{{ baseRhythmLoop.error }}</dd>
-            </div>
-          </dl>
-
-          <MovementStage
-            :landmarks="stageLandmarks"
-            :source-mode="avatarSourceMode"
-            :source-aspect="stageSourceAspect"
-          />
-        </div>
-      </section>
-
-      <section class="support-rail" aria-label="Playback and user mirror">
-        <section class="season-clock-panel" aria-label="Season clock">
-          <SeasonClock />
         </section>
 
-        <section class="user-mirror-panel" aria-label="User mirror">
+        <section
+          class="user-mirror-panel"
+          :aria-label="t('story.aria.userMirror')"
+        >
           <MovementCamera
             mode="camera"
             :fixed="false"
@@ -96,9 +89,56 @@
           />
         </section>
       </section>
+
+      <section
+        class="story-info-panel"
+        :aria-label="t('storyStage.aria.gestureDebug')"
+      >
+        <div class="story-info-panel__copy">
+          <p class="story-info-panel__eyebrow">{{ currentDate }}</p>
+          <h1>{{ automaticGestureDebugLabel }}</h1>
+          <p>{{ gestureFeedbackText || storyPlaybackDebugLabel }}</p>
+        </div>
+
+        <dl
+          class="audio-debug"
+          :aria-label="t('storyStage.aria.baseRhythmDebug')"
+        >
+          <div>
+            <dt>{{ t("storyStage.debug.bpm") }}</dt>
+            <dd>{{ baseRhythmLoop.bpm }}</dd>
+          </div>
+          <div>
+            <dt>{{ t("storyStage.debug.bar") }}</dt>
+            <dd>{{ baseRhythmPosition.currentBar }}</dd>
+          </div>
+          <div>
+            <dt>{{ t("storyStage.debug.beat") }}</dt>
+            <dd>{{ baseRhythmPosition.currentBeat }}</dd>
+          </div>
+          <div>
+            <dt>{{ t("storyStage.debug.audio") }}</dt>
+            <dd>{{ baseRhythmStatus }}</dd>
+          </div>
+          <div v-if="baseRhythmLoop.error">
+            <dt>{{ t("storyStage.debug.error") }}</dt>
+            <dd>{{ baseRhythmLoop.error }}</dd>
+          </div>
+        </dl>
+      </section>
     </section>
 
-    <section class="gesture-test-controls" aria-label="Gesture test controls">
+    <section
+      class="season-clock-panel"
+      :aria-label="t('story.aria.seasonClock')"
+    >
+      <SeasonClock :show-controls="false" />
+    </section>
+
+    <section
+      class="gesture-test-controls"
+      :aria-label="t('storyStage.aria.gestureTestControls')"
+    >
       <div class="story-cycle-controls__actions">
         <button
           class="btn btn--primary"
@@ -106,7 +146,11 @@
           :disabled="isStoryPlaybackControlDisabled"
           @click="storyPlaybackStore.togglePlayback"
         >
-          {{ storyPlaybackStore.isPlaying ? "Pause Story" : "Play Story" }}
+          {{
+            storyPlaybackStore.isPlaying
+              ? t("storyStage.controls.pauseStory")
+              : t("storyStage.controls.playStory")
+          }}
         </button>
         <button
           class="btn"
@@ -114,7 +158,7 @@
           :disabled="isStoryPlaybackControlDisabled"
           @click="restartStoryCycle"
         >
-          Restart
+          {{ t("storyStage.controls.restart") }}
         </button>
       </div>
 
@@ -125,7 +169,7 @@
           :disabled="isManualGestureDisabled"
           @click="startManualGesture('arrival')"
         >
-          Test Arrival Gesture
+          {{ t("storyStage.controls.testArrivalGesture") }}
         </button>
         <button
           class="btn btn--primary"
@@ -133,21 +177,21 @@
           :disabled="isManualGestureDisabled"
           @click="startManualGesture('departure')"
         >
-          Test Departure Gesture
+          {{ t("storyStage.controls.testDepartureGesture") }}
         </button>
       </div>
 
-      <dl class="gesture-debug" aria-label="Gesture debug">
+      <dl class="gesture-debug" :aria-label="t('storyStage.aria.gestureDebug')">
         <div>
-          <dt>Gesture</dt>
-          <dd>{{ activeGesture?.label ?? "None" }}</dd>
+          <dt>{{ t("storyStage.debug.gesture") }}</dt>
+          <dd>{{ activeGestureLabel }}</dd>
         </div>
         <div>
-          <dt>State</dt>
+          <dt>{{ t("storyStage.debug.state") }}</dt>
           <dd>{{ gestureState }}</dd>
         </div>
         <div>
-          <dt>Beat</dt>
+          <dt>{{ t("storyStage.debug.beat") }}</dt>
           <dd>
             {{ baseRhythmPosition.currentBar }}:{{
               baseRhythmPosition.currentBeat
@@ -155,48 +199,54 @@
           </dd>
         </div>
         <div>
-          <dt>Attempt</dt>
+          <dt>{{ t("storyStage.debug.attempt") }}</dt>
           <dd>{{ storyGestureStore.attemptCount }}</dd>
         </div>
         <div>
-          <dt>Paused</dt>
+          <dt>{{ t("storyStage.debug.paused") }}</dt>
           <dd>{{ storyPlaybackPausedLabel }}</dd>
         </div>
         <div>
-          <dt>Story</dt>
+          <dt>{{ t("storyStage.debug.story") }}</dt>
           <dd>{{ storyPlaybackDebugLabel }}</dd>
         </div>
         <div>
-          <dt>Auto</dt>
+          <dt>{{ t("storyStage.debug.auto") }}</dt>
           <dd>{{ automaticGestureDebugLabel }}</dd>
         </div>
         <div>
-          <dt>Movement</dt>
+          <dt>{{ t("storyStage.debug.movement") }}</dt>
           <dd>{{ gestureMovementStatus }}</dd>
         </div>
         <div>
-          <dt>Loaded</dt>
-          <dd>{{ storyGestureStore.movementLoaded ? "yes" : "no" }}</dd>
+          <dt>{{ t("storyStage.debug.loaded") }}</dt>
+          <dd>
+            {{
+              storyGestureStore.movementLoaded
+                ? t("common.yes")
+                : t("common.no")
+            }}
+          </dd>
         </div>
         <div>
-          <dt>Time</dt>
+          <dt>{{ t("storyStage.debug.time") }}</dt>
           <dd>{{ gestureMovementTimeLabel }}</dd>
         </div>
         <div>
-          <dt>Decision</dt>
+          <dt>{{ t("storyStage.debug.decision") }}</dt>
           <dd>{{ storyGestureStore.decision }}</dd>
         </div>
         <div>
-          <dt>Checkpoint</dt>
+          <dt>{{ t("storyStage.debug.checkpoint") }}</dt>
           <dd>{{ currentCheckpointDebugLabel }}</dd>
         </div>
         <div>
-          <dt>Done</dt>
+          <dt>{{ t("storyStage.debug.done") }}</dt>
           <dd>{{ completedCheckpointDebugLabel }}</dd>
         </div>
         <div>
-          <dt>Pose input</dt>
-          <dd>{{ hasPoseInput ? "yes" : "no" }}</dd>
+          <dt>{{ t("storyStage.debug.poseInput") }}</dt>
+          <dd>{{ hasPoseInput ? t("common.yes") : t("common.no") }}</dd>
         </div>
       </dl>
     </section>
@@ -217,7 +267,7 @@ import { loadGestureMovement } from "~/story/gestureMovements";
 import type { StoryGestureId } from "~/story/gestures";
 import {
   createStoryGestureEvents,
-  formatStoryGestureEventLabel,
+  getStoryGestureEventLabelParams,
   type StoryGestureEvent,
 } from "~/story/storyGestureEvents";
 import { useAudioStore } from "~/store/audioStore";
@@ -230,6 +280,7 @@ import { normalizeMovementRecordingToViewport } from "~/utils/movementFrames";
 import { buildPhaseSmoothedCycleTimeline } from "~/utils/storyCycle";
 import { storyCycleDefinitions } from "~/utils/storkStoryCycles";
 
+const { t } = useI18n();
 const poseLandmarks = ref<PoseLandmarkLike[] | null>(null);
 const avatarSourceMode = ref<AvatarSourceMode>("live-camera");
 const testDanceRecording = ref<MovementRecording | null>(null);
@@ -240,7 +291,7 @@ const previousAvatarSourceMode = ref<AvatarSourceMode | null>(null);
 const storyGestureEvents = ref<StoryGestureEvent[]>([]);
 const activeAutomaticGestureEventId = ref<string | null>(null);
 const isAutomaticGestureTransitioning = ref(false);
-const avatarStageAspect = 16 / 9;
+const avatarStageAspect = 1;
 const audioStore = useAudioStore();
 const storyPlaybackStore = useStoryPlaybackStore();
 const storyGestureStore = useStoryGestureStore();
@@ -251,6 +302,7 @@ const { selectedMapMode, selectedStoryCycleIds, showStoryCyclesTogether } =
 const automaticGesturePauseReason = "automatic-story-gesture";
 const baseRhythmLoop = computed(() => audioStore.baseRhythmLoop);
 const baseRhythmPosition = computed(() => audioStore.baseRhythmPosition);
+const currentDate = computed(() => storyPlaybackStore.currentDate);
 const activeGesture = computed(() => storyGestureStore.activeGesture);
 const gestureState = computed(() => storyGestureStore.state);
 const isGestureActive = computed(() => storyGestureStore.isActive);
@@ -276,10 +328,27 @@ const activeAutomaticGestureEvent = computed(() =>
     (event) => event.id === activeAutomaticGestureEventId.value,
   ),
 );
+const translateOptional = (key: string | undefined, fallback: string) =>
+  key ? t(key) : fallback;
+const getGestureLabel = (gesture: typeof activeGesture.value) =>
+  gesture
+    ? translateOptional(gesture.labelKey, gesture.label)
+    : t("gestures.fallbackLabel");
+const getGestureEventLabel = (event: StoryGestureEvent) => {
+  const { migrationKey, typeKey } = getStoryGestureEventLabelParams(event);
+
+  return t("gestures.events.label", {
+    migration: t(migrationKey),
+    type: t(typeKey),
+  });
+};
 const gestureOverlayLabel = computed(() =>
   activeAutomaticGestureEvent.value
-    ? formatStoryGestureEventLabel(activeAutomaticGestureEvent.value)
-    : (activeGesture.value?.label ?? "Gesture"),
+    ? getGestureEventLabel(activeAutomaticGestureEvent.value)
+    : getGestureLabel(activeGesture.value),
+);
+const activeGestureLabel = computed(() =>
+  activeGesture.value ? getGestureLabel(activeGesture.value) : t("common.none"),
 );
 const isStoryPlaybackControlDisabled = computed(
   () =>
@@ -299,49 +368,58 @@ const isGestureAttemptRunning = computed(() =>
   ),
 );
 const storyPlaybackPausedLabel = computed(() =>
-  storyPlaybackStore.isStoryPlaybackPaused ? "yes" : "no",
+  storyPlaybackStore.isStoryPlaybackPaused ? t("common.yes") : t("common.no"),
 );
 const gestureMovementStatus = computed(() =>
   isGestureMovementLoading.value
-    ? "loading"
+    ? t("storyStage.status.loading")
     : storyGestureStore.movementLoadError
-      ? "error"
-      : storyGestureStore.movementPlaybackSource,
+      ? t("storyStage.status.error")
+      : t(`storyStage.status.${storyGestureStore.movementPlaybackSource}`),
 );
 const hasPoseInput = computed(() => Boolean(poseLandmarks.value?.length));
 const currentGestureCheckpoint = computed(
   () => storyGestureStore.currentCheckpoint,
 );
-const gestureMovementTimeLabel = computed(
-  () =>
-    `${Math.round(storyGestureStore.currentSourceTimeMs)} / ${Math.round(
+const gestureMovementTimeLabel = computed(() =>
+  t("storyStage.timeLabel", {
+    current: Math.round(storyGestureStore.currentSourceTimeMs),
+    total: Math.round(
       activeGesture.value?.timing.successEndMs ??
         movementPlaybackDurationMs.value,
-    )} ms`,
+    ),
+  }),
 );
 const currentCheckpointDebugLabel = computed(() => {
   const checkpoint = currentGestureCheckpoint.value;
 
-  if (!checkpoint) return "none";
+  if (!checkpoint) return t("storyStage.status.none");
 
-  return `${checkpoint.label} @ ${checkpoint.targetMovementTimeMs}ms`;
+  return t("storyStage.checkpointLabel", {
+    label: translateOptional(checkpoint.labelKey, checkpoint.label),
+    time: checkpoint.targetMovementTimeMs,
+  });
 });
 const completedCheckpointDebugLabel = computed(
   () =>
     `${storyGestureStore.completedCheckpointCount}/${storyGestureStore.requiredCheckpointCount}`,
 );
-const storyPlaybackDebugLabel = computed(
-  () =>
-    `${storyPlaybackStore.isPlaying ? "playing" : "paused"} @ ${(
-      storyPlaybackStore.currentElapsedMs / 1000
-    ).toFixed(1)}s`,
+const storyPlaybackDebugLabel = computed(() =>
+  t("storyStage.storyDebugLabel", {
+    state: storyPlaybackStore.isPlaying
+      ? t("storyStage.status.playing")
+      : t("storyStage.status.paused"),
+    seconds: (storyPlaybackStore.currentElapsedMs / 1000).toFixed(1),
+  }),
 );
 const automaticGestureDebugLabel = computed(() => {
-  if (!isAutomaticGestureContextReady.value) return "disabled";
+  if (!isAutomaticGestureContextReady.value) {
+    return t("storyStage.status.disabled");
+  }
 
   const activeEvent = activeAutomaticGestureEvent.value;
 
-  if (activeEvent) return `${formatStoryGestureEventLabel(activeEvent)}`;
+  if (activeEvent) return getGestureEventLabel(activeEvent);
 
   const counts = storyGestureEvents.value.reduce(
     (summary, event) => {
@@ -354,10 +432,81 @@ const automaticGestureDebugLabel = computed(() => {
   return `${counts.completed + counts.skipped}/${storyGestureEvents.value.length}`;
 });
 const baseRhythmStatus = computed(() => {
-  if (baseRhythmLoop.value.isLoading) return "loading";
-  if (!baseRhythmLoop.value.isLoaded) return "click play";
+  if (baseRhythmLoop.value.isLoading) return t("storyStage.status.loading");
+  if (!baseRhythmLoop.value.isLoaded) return t("storyStage.status.clickPlay");
 
-  return baseRhythmLoop.value.isPlaying ? "playing" : "loaded";
+  return baseRhythmLoop.value.isPlaying
+    ? t("storyStage.status.playing")
+    : t("storyStage.status.loaded");
+});
+const gestureFeedbackText = computed(() => {
+  const gesture = activeGesture.value;
+
+  if (!gesture) return "";
+
+  if (storyGestureStore.state === "loading-movement") {
+    return t("gestures.feedback.loading");
+  }
+
+  if (storyGestureStore.state === "waiting-for-lead-in") {
+    if (storyGestureStore.leadInTransportTimeMs === null) {
+      return t("gestures.feedback.ready", {
+        gesture: getGestureLabel(gesture),
+      });
+    }
+
+    const msUntilLeadIn = Math.max(
+      storyGestureStore.leadInTransportTimeMs -
+        storyGestureStore.currentTransportTimeMs,
+      0,
+    );
+    const beatsUntilLeadIn = Math.max(
+      1,
+      Math.ceil(msUntilLeadIn / audioStore.getBeatDurationMs()),
+    );
+
+    return t("gestures.feedback.countdown", {
+      gesture: getGestureLabel(gesture),
+      count: Math.min(3, beatsUntilLeadIn),
+    });
+  }
+
+  if (
+    storyGestureStore.branchFeedbackText &&
+    storyGestureStore.currentSourceTimeMs <=
+      storyGestureStore.branchFeedbackUntilSourceMs
+  ) {
+    return t("gestures.feedback.tryAgain");
+  }
+
+  if (
+    storyGestureStore.state === "retry-scheduled" &&
+    storyGestureStore.currentSourceTimeMs >= gesture.timing.branchPointMs - 500
+  ) {
+    return t("gestures.feedback.tryAgain");
+  }
+
+  if (
+    storyGestureStore.state === "success-exit" ||
+    storyGestureStore.state === "completed"
+  ) {
+    return t("gestures.feedback.recognized");
+  }
+
+  if (
+    storyGestureStore.state === "attempt-playing" ||
+    storyGestureStore.state === "retry-scheduled"
+  ) {
+    const cue = gesture.beatCues.find(
+      (beatCue) =>
+        storyGestureStore.currentSourceTimeMs >= beatCue.sourceStartMs &&
+        storyGestureStore.currentSourceTimeMs < beatCue.sourceEndMs,
+    );
+
+    return cue ? translateOptional(cue.textKey, cue.text) : "";
+  }
+
+  return "";
 });
 const isGestureDevControlsVisible = import.meta.dev;
 const {
@@ -490,7 +639,7 @@ const runAutomaticGestureEvent = async (event: StoryGestureEvent) => {
   activeAutomaticGestureEventId.value = event.id;
   setAutomaticGestureEventStatus(event.id, "active");
 
-  const label = formatStoryGestureEventLabel(event);
+  const label = getGestureEventLabel(event);
   const shouldResumeStoryPlayback =
     storyPlaybackStore.pauseStoryPlaybackAtElapsedMs(
       event.boundaryTimeMs,
@@ -822,30 +971,43 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .story-stage-page {
+  --story-stage-bottom-bar-height: clamp(62px, 8dvh, 82px);
+  --story-stage-comparison-size: 25vw;
+  --story-stage-clock-size: clamp(220px, 17vw, 320px);
+  --story-stage-clock-overlap: clamp(110px, 8.5vw, 160px);
+
   position: relative;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
   display: grid;
-  grid-template-columns: 60% 40%;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   overflow: hidden;
   background: #edf2ef;
 }
 
 .gesture-test-controls {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 9;
+  right: 14px;
+  bottom: 0;
+  left: calc(50% + var(--story-stage-clock-overlap) + 30px);
+  z-index: 20;
   display: grid;
-  width: min(320px, calc(100% - 24px));
+  grid-template-columns: minmax(150px, 0.65fr) minmax(220px, 0.9fr) minmax(
+      0,
+      1.2fr
+    );
+  align-items: center;
   gap: 8px;
-  padding: 10px;
-  border: 1px solid rgba(31, 49, 39, 0.16);
-  border-radius: 8px;
-  background: rgba(248, 251, 247, 0.84);
+  min-width: 0;
+  height: var(--story-stage-bottom-bar-height);
+  padding: 7px 10px;
+  border-top: 1px solid rgba(31, 49, 39, 0.16);
+  border-left: 1px solid rgba(31, 49, 39, 0.12);
+  border-radius: 8px 0 0;
+  background: rgba(248, 251, 247, 0.95);
   color: #26382f;
-  box-shadow: 0 10px 28px rgba(32, 50, 40, 0.14);
+  box-shadow: 0 -10px 28px rgba(32, 50, 40, 0.12);
   backdrop-filter: blur(10px);
 }
 
@@ -853,20 +1015,22 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(31, 49, 39, 0.12);
+  min-width: 0;
 }
 
 .gesture-test-controls__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
+  min-width: 0;
 }
 
 .gesture-test-controls .btn {
-  min-height: 34px;
-  padding: 7px 9px;
-  font-size: 0.76rem;
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  white-space: normal;
 }
 
 .gesture-test-controls .btn:disabled {
@@ -875,14 +1039,17 @@ onBeforeUnmount(() => {
 }
 
 .gesture-debug {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
   gap: 6px;
   margin: 0;
-  font-size: 0.68rem;
+  min-width: 0;
+  max-height: 100%;
+  overflow: auto hidden;
+  font-size: 0.62rem;
 }
 
 .gesture-debug div {
+  flex: 0 0 76px;
   min-width: 0;
 }
 
@@ -909,6 +1076,7 @@ onBeforeUnmount(() => {
 
 .map-panel {
   position: relative;
+  grid-column: 1;
   isolation: isolate;
   overflow: hidden;
   border-right: 1px solid rgba(36, 54, 42, 0.16);
@@ -946,8 +1114,11 @@ onBeforeUnmount(() => {
 }
 
 .movement-panel {
+  grid-column: 2;
   display: grid;
-  grid-template-rows: 70% 30%;
+  grid-template-rows: var(--story-stage-comparison-size) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
   background:
     linear-gradient(
       180deg,
@@ -957,13 +1128,22 @@ onBeforeUnmount(() => {
     #eef3ef;
 }
 
-.avatar-stage {
+.comparison-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
   min-height: 0;
+  border-bottom: 1px solid rgba(36, 54, 42, 0.14);
+}
+
+.avatar-stage {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
   display: grid;
   place-items: center;
   overflow: hidden;
-  padding: 18px 20px;
-  border-bottom: 1px solid rgba(36, 54, 42, 0.14);
+  border-right: 1px solid rgba(36, 54, 42, 0.14);
 }
 
 .avatar-stage__surface {
@@ -1020,12 +1200,6 @@ onBeforeUnmount(() => {
   color: #ffffff;
 }
 
-.support-rail {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 50% 50%;
-}
-
 .season-clock-panel,
 .user-mirror-panel {
   position: relative;
@@ -1035,19 +1209,65 @@ onBeforeUnmount(() => {
 }
 
 .season-clock-panel {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--story-stage-bottom-bar-height) + 18px);
+  z-index: 12;
+  width: var(--story-stage-clock-size);
+  overflow: visible;
+  transform: translateX(-50%);
+}
+
+.story-info-panel {
   display: grid;
-  place-items: center;
-  padding: 8px;
-  border-right: 1px solid rgba(36, 54, 42, 0.14);
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 220px);
+  align-content: start;
+  align-items: start;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 24px 24px
+    calc(var(--story-stage-clock-overlap) + 30px);
+  padding-bottom: calc(var(--story-stage-bottom-bar-height) + 20px);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(232, 240, 235, 0.74),
+      rgba(249, 252, 248, 0.96) 30%
+    ),
+    #f4f8f5;
+  color: #26382f;
+}
+
+.story-info-panel__copy {
+  min-width: 0;
+}
+
+.story-info-panel__eyebrow {
+  margin: 0 0 8px;
+  color: rgba(31, 49, 39, 0.58);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.story-info-panel h1 {
+  margin: 0;
+  color: #17241c;
+  font-size: clamp(1.35rem, 2.1vw, 2.35rem);
+  line-height: 1.08;
+}
+
+.story-info-panel p {
+  max-width: 62ch;
+  margin: 10px 0 0;
+  color: rgba(31, 49, 39, 0.76);
+  font-size: clamp(0.94rem, 1vw, 1.08rem);
 }
 
 .audio-debug {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
   display: grid;
-  width: min(220px, calc(100% - 20px));
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin: 0;
@@ -1058,7 +1278,6 @@ onBeforeUnmount(() => {
   color: #26382f;
   font-size: 0.72rem;
   backdrop-filter: blur(10px);
-  pointer-events: none;
 }
 
 .audio-debug div {
@@ -1081,10 +1300,12 @@ onBeforeUnmount(() => {
 }
 
 .season-clock-panel :deep(.season-clock) {
-  width: min(94%, 320px, calc(30dvh - 44px));
+  width: 100%;
   gap: 6px;
-  padding: 9px;
-  box-shadow: none;
+  padding: 10px;
+  background: rgba(250, 253, 248, 0.86);
+  box-shadow: 0 14px 36px rgba(31, 49, 39, 0.18);
+  backdrop-filter: blur(10px);
 }
 
 .user-mirror-panel {
@@ -1093,5 +1314,69 @@ onBeforeUnmount(() => {
 
 .user-mirror-panel :deep(.container) {
   border-radius: 0;
+}
+
+.user-mirror-panel :deep(.video),
+.user-mirror-panel :deep(.canvas) {
+  object-fit: cover;
+}
+
+@media (max-width: 1180px) {
+  .story-stage-page {
+    --story-stage-comparison-size: 25vw;
+    --story-stage-clock-size: 220px;
+    --story-stage-clock-overlap: 110px;
+  }
+
+  .story-info-panel {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .audio-debug {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .gesture-test-controls {
+    left: calc(50% + var(--story-stage-clock-overlap) + 18px);
+    grid-template-columns: minmax(138px, 0.8fr) minmax(190px, 1fr);
+    overflow: auto hidden;
+  }
+}
+
+@media (max-width: 860px) {
+  .story-stage-page {
+    --story-stage-bottom-bar-height: 86px;
+    --story-stage-comparison-size: 25vw;
+    --story-stage-clock-size: 190px;
+    --story-stage-clock-overlap: 95px;
+  }
+
+  .avatar-stage__toolbar {
+    flex-wrap: wrap;
+    max-width: calc(100% - 24px);
+  }
+
+  .stage-toggle {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 0.74rem;
+  }
+
+  .story-info-panel {
+    padding: 18px 18px 18px
+      calc(var(--story-stage-clock-overlap) + 20px);
+  }
+
+  .season-clock-panel {
+    bottom: calc(var(--story-stage-bottom-bar-height) + 12px);
+  }
+
+  .gesture-test-controls {
+    left: calc(50% + var(--story-stage-clock-overlap) + 14px);
+    grid-template-columns: minmax(150px, 1fr);
+    align-content: center;
+    overflow: auto hidden;
+  }
 }
 </style>

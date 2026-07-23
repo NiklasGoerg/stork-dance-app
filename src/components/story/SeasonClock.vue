@@ -2,7 +2,7 @@
   <section
     class="season-clock"
     :style="seasonClockStyle"
-    aria-label="Story season clock"
+    :aria-label="t('seasonClock.aria.clock')"
   >
     <svg
       class="season-clock__svg"
@@ -62,14 +62,14 @@
           text-anchor="middle"
           dominant-baseline="middle"
         >
-          {{ segment.season.label }}
+          {{ getSeasonLabel(segment.season) }}
         </text>
       </g>
 
       <g class="season-clock__ticks" aria-hidden="true">
         <line
           v-for="month in monthMarkers"
-          :key="month.label"
+          :key="month.labelKey ?? month.label"
           class="season-clock__tick"
           :x1="month.tickInner.x"
           :y1="month.tickInner.y"
@@ -89,7 +89,7 @@
           text-anchor="middle"
           dominant-baseline="middle"
         >
-          {{ month.label }}
+          {{ getMonthLabel(month) }}
         </text>
       </g>
 
@@ -145,6 +145,8 @@ import {
   getSeasonBoundariesForCycle,
   getSeasonForDate,
 } from "~/utils/storyCycle";
+
+const { t } = useI18n();
 
 withDefaults(
   defineProps<{
@@ -248,10 +250,18 @@ const pointerStyle = computed(() => ({
   transform: `rotate(${displayedAngle.value}deg)`,
 }));
 
-const clockLabel = computed(
-  () =>
-    `Jahreszeitenkreis: ${activeSeason.value.label}, aktuelles Datum ${currentDate.value}`,
+const clockLabel = computed(() =>
+  t("seasonClock.aria.clockLabel", {
+    season: getSeasonLabel(activeSeason.value),
+    date: currentDate.value,
+  }),
 );
+
+const getSeasonLabel = (season: { label: string; labelKey?: string }) =>
+  season.labelKey ? t(season.labelKey) : season.label;
+
+const getMonthLabel = (month: { label: string; labelKey?: string }) =>
+  month.labelKey ? t(month.labelKey) : month.label;
 
 watch(currentDate, (date) => {
   const nextAngle = dateToAngle(date);

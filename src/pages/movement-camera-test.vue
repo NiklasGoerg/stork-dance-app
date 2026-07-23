@@ -1,11 +1,21 @@
 <template>
   <div>
     <div class="ui">
-      <button @click="mode = 'camera'">Camera</button>
-      <button @click="mode = 'avatar'">Avatar</button>
-      <button @click="mode = 'silhouette'">Silhouette</button>
+      <button @click="mode = 'camera'">
+        {{ t("movementCameraTest.camera") }}
+      </button>
+      <button @click="mode = 'avatar'">
+        {{ t("movementCameraTest.avatar") }}
+      </button>
+      <button @click="mode = 'silhouette'">
+        {{ t("movementCameraTest.silhouette") }}
+      </button>
       <button @click="showHands = !showHands">
-        {{ showHands ? "Hide Hands" : "Show Hands" }}
+        {{
+          showHands
+            ? t("movementCameraTest.hideHands")
+            : t("movementCameraTest.showHands")
+        }}
       </button>
     </div>
 
@@ -17,6 +27,7 @@
 import { ref } from "vue";
 import type { ViewMode } from "~/types/view";
 
+const { t } = useI18n();
 const mode = ref<ViewMode>("camera");
 const showHands = ref(true);
 </script>

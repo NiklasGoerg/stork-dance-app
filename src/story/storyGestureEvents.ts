@@ -115,6 +115,15 @@ export const createStoryGestureEvents = (
 };
 
 export const formatStoryGestureEventLabel = (event: StoryGestureEvent) =>
-  `${event.migration === "autumn" ? "Autumn" : "Spring"} ${
-    event.type === "departure" ? "Departure" : "Arrival"
-  }`;
+  `${event.migration} ${event.type}`;
+
+export const getStoryGestureEventLabelParams = (event: StoryGestureEvent) => ({
+  migrationKey:
+    event.migration === "autumn"
+      ? "gestures.events.autumn"
+      : "gestures.events.spring",
+  typeKey:
+    event.type === "departure"
+      ? "gestures.events.departure"
+      : "gestures.events.arrival",
+});

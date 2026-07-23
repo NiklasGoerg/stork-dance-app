@@ -1,6 +1,9 @@
 <template>
   <main class="act2-page">
-    <section class="act2-map" :aria-label="`${act.title} migration map`">
+    <section
+      class="act2-map"
+      :aria-label="t('story.aria.map', { title: actTitle })"
+    >
       <BirdMap
         :show-controls="false"
         :show-map-navigation="false"
@@ -10,45 +13,90 @@
       <StoryProgressSidebar />
     </section>
 
-    <section class="act2-stage" :aria-label="`${act.title} story stage`">
-      <section class="act2-instructor" aria-label="Instruction avatar">
-        <div class="act2-instructor__surface">
-          <div class="act2-status">
-            <span>{{ act.title }}</span>
-            <strong>Cycle {{ activeCycleNumber }} / {{ cycleCount }}</strong>
-            <span v-if="activeCycleConfig.title">
-              {{ activeCycleConfig.title }}
-            </span>
+    <section
+      class="act2-stage"
+      :aria-label="t('story.aria.stage', { title: actTitle })"
+    >
+      <section
+        class="act2-comparison"
+        :aria-label="t('story.aria.support', { title: actTitle })"
+      >
+        <section
+          class="act2-instructor"
+          :aria-label="t('story.aria.instructor')"
+        >
+          <div class="act2-instructor__surface">
+            <div class="act2-status">
+              <span>{{ actTitle }}</span>
+              <strong>
+                {{
+                  t("story.acts.act2.cycleCount", {
+                    current: activeCycleNumber,
+                    total: cycleCount,
+                  })
+                }}
+              </strong>
+              <span v-if="activeCycleConfig.title">
+                {{ activeCycleTitle }}
+              </span>
+            </div>
+
+            <MovementStage
+              :landmarks="instructorLandmarks"
+              source-mode="recorded-motion"
+              :source-aspect="instructorSourceAspect"
+              :fill-frame="true"
+            />
+
+            <div v-if="showCycleCompleted" class="act2-overlay">
+              {{ t("story.acts.act2.cycleCompleted") }}
+            </div>
+
+            <div v-if="runtimeStore.showContinueGate" class="act2-overlay">
+              <strong>
+                {{ t("story.acts.act2.actCompleted", { title: actTitle }) }}
+              </strong>
+              <button type="button" @click="continueToNextAct">
+                {{ t("common.continue") }}
+              </button>
+            </div>
           </div>
-
-          <MovementStage
-            :landmarks="instructorLandmarks"
-            source-mode="recorded-motion"
-            :source-aspect="instructorSourceAspect"
-          />
-
-          <div v-if="showCycleCompleted" class="act2-overlay">
-            Cycle completed
-          </div>
-
-          <div v-if="runtimeStore.showContinueGate" class="act2-overlay">
-            <strong>{{ act.title }} completed</strong>
-            <button type="button" @click="continueToNextAct">Continue</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="act2-support" :aria-label="`${act.title} support views`">
-        <section class="act2-clock-panel" aria-label="Season clock">
-          <SeasonClock :show-controls="false">
-            <span class="act2-clock-date">{{ currentDate }}</span>
-          </SeasonClock>
         </section>
 
-        <section class="act2-mirror" aria-label="User mirror">
+        <section class="act2-mirror" :aria-label="t('story.aria.userMirror')">
           <MovementCamera mode="camera" :fixed="false" :show-hands="false" />
         </section>
       </section>
+
+      <section class="act2-info-panel" :aria-label="activeSceneTitle">
+        <p class="act2-info-panel__eyebrow">{{ currentDate }}</p>
+        <h1>{{ activeSceneTitle }}</h1>
+        <p>{{ activeSceneNarration }}</p>
+
+        <dl class="act2-info-panel__meta">
+          <div>
+            <dt>{{ actTitle }}</dt>
+            <dd>
+              {{
+                t("story.acts.act2.cycleCount", {
+                  current: activeCycleNumber,
+                  total: cycleCount,
+                })
+              }}
+            </dd>
+          </div>
+          <div v-if="activeCycleTitle">
+            <dt>{{ t("map.storyCycles") }}</dt>
+            <dd>{{ activeCycleTitle }}</dd>
+          </div>
+        </dl>
+      </section>
+    </section>
+
+    <section class="act2-clock-panel" :aria-label="t('story.aria.seasonClock')">
+      <SeasonClock :show-controls="false">
+        <span class="act2-clock-date">{{ currentDate }}</span>
+      </SeasonClock>
     </section>
   </main>
 </template>
@@ -83,7 +131,15 @@ const props = defineProps<{
   act: StoryAct;
 }>();
 
+const {
+  t,
+  getActTitle,
+  getSceneTitle,
+  getSceneNarration,
+  getMigrationCycleTitle,
+} = useStoryTranslations();
 const act = computed(() => props.act);
+const actTitle = computed(() => getActTitle(act.value));
 const migrationCycles = computed(() => resolveMigrationActCycles(act.value));
 const cycleCount = computed(() => migrationCycles.value.length);
 const activeCycleIndex = ref(0);
@@ -97,6 +153,9 @@ const activeCycleConfig = computed(
       cycleStartYear: act.value.cycleStartYear,
       cycleDurationMs: act.value.cycleDurationMs,
     },
+);
+const activeCycleTitle = computed(() =>
+  getMigrationCycleTitle(activeCycleConfig.value),
 );
 const activeCycleDefinitions = computed(() =>
   getMigrationCycleDefinitions(activeCycleConfig.value),
@@ -157,6 +216,15 @@ const audioStore = useAudioStore();
 const runtimeStore = useStoryRuntimeStore();
 const storyPlaybackStore = useStoryPlaybackStore();
 const { currentDate } = storeToRefs(storyPlaybackStore);
+const activeScene = computed(
+  () => runtimeStore.currentScene ?? act.value.scenes[activeCycleIndex.value],
+);
+const activeSceneTitle = computed(() =>
+  activeScene.value ? getSceneTitle(activeScene.value) : actTitle.value,
+);
+const activeSceneNarration = computed(() =>
+  activeScene.value ? getSceneNarration(activeScene.value) : "",
+);
 const {
   currentFrame,
   loadRecording,
@@ -357,6 +425,11 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .act2-page {
+  --act-stage-comparison-size: 25vw;
+  --act-stage-clock-size: clamp(220px, 17vw, 320px);
+  --act-stage-clock-overlap: clamp(110px, 8.5vw, 160px);
+
+  position: relative;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
@@ -369,7 +442,8 @@ onBeforeUnmount(() => {
 .act2-map,
 .act2-stage,
 .act2-instructor,
-.act2-support,
+.act2-comparison,
+.act2-info-panel,
 .act2-clock-panel,
 .act2-mirror {
   min-width: 0;
@@ -383,7 +457,7 @@ onBeforeUnmount(() => {
 
 .act2-stage {
   display: grid;
-  grid-template-rows: 70% 30%;
+  grid-template-rows: var(--act-stage-comparison-size) minmax(0, 1fr);
   background:
     linear-gradient(
       180deg,
@@ -393,9 +467,16 @@ onBeforeUnmount(() => {
     #eef3ef;
 }
 
-.act2-instructor {
-  padding: 18px 20px;
+.act2-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border-bottom: 1px solid rgba(36, 54, 42, 0.14);
+}
+
+.act2-instructor {
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid rgba(36, 54, 42, 0.14);
 }
 
 .act2-instructor__surface {
@@ -459,11 +540,6 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.act2-support {
-  display: grid;
-  grid-template-columns: 50% 50%;
-}
-
 .act2-clock-panel,
 .act2-mirror {
   position: relative;
@@ -471,17 +547,85 @@ onBeforeUnmount(() => {
 }
 
 .act2-clock-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 12;
+  width: var(--act-stage-clock-size);
+  overflow: visible;
+  transform: translateX(-50%);
+}
+
+.act2-info-panel {
   display: grid;
-  place-items: center;
-  padding: 8px;
-  border-right: 1px solid rgba(36, 54, 42, 0.14);
+  align-content: start;
+  gap: 10px;
+  overflow: auto;
+  padding: 24px 24px 24px calc(var(--act-stage-clock-overlap) + 30px);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(232, 240, 235, 0.74),
+      rgba(249, 252, 248, 0.96) 30%
+    ),
+    #f4f8f5;
+  color: #26382f;
+}
+
+.act2-info-panel__eyebrow {
+  margin: 0;
+  color: rgba(31, 49, 39, 0.58);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.act2-info-panel h1 {
+  margin: 0;
+  color: #17241c;
+  font-size: clamp(1.35rem, 2.1vw, 2.35rem);
+  line-height: 1.08;
+}
+
+.act2-info-panel p {
+  max-width: 62ch;
+  margin: 0;
+  color: rgba(31, 49, 39, 0.76);
+  font-size: clamp(0.94rem, 1vw, 1.08rem);
+}
+
+.act2-info-panel__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  gap: 10px 18px;
+  margin: 12px 0 0;
+  font-size: 0.74rem;
+}
+
+.act2-info-panel__meta div {
+  min-width: 0;
+}
+
+.act2-info-panel__meta dt {
+  color: rgba(31, 49, 39, 0.58);
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.act2-info-panel__meta dd {
+  margin: 2px 0 0;
+  color: #26382f;
+  font-weight: 800;
 }
 
 .act2-clock-panel :deep(.season-clock) {
-  width: min(94%, 320px, calc(30dvh - 28px));
+  width: 100%;
   gap: 6px;
-  padding: 9px;
-  box-shadow: none;
+  padding: 10px;
+  background: rgba(250, 253, 248, 0.86);
+  box-shadow: 0 14px 36px rgba(31, 49, 39, 0.18);
+  backdrop-filter: blur(10px);
 }
 
 .act2-clock-date {
@@ -498,10 +642,39 @@ onBeforeUnmount(() => {
   border-radius: 0;
 }
 
+.act2-mirror :deep(.video),
+.act2-mirror :deep(.canvas) {
+  object-fit: cover;
+}
+
+@media (max-width: 1180px) {
+  .act2-page {
+    --act-stage-clock-size: 220px;
+    --act-stage-clock-overlap: 110px;
+  }
+
+  .act2-info-panel__meta {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 860px) {
   .act2-page {
-    grid-template-columns: 1fr;
-    grid-template-rows: 46% 54%;
+    --act-stage-clock-size: 190px;
+    --act-stage-clock-overlap: 95px;
+  }
+
+  .act2-status {
+    max-width: calc(100% - 24px);
+    font-size: 0.72rem;
+  }
+
+  .act2-clock-panel {
+    bottom: 12px;
+  }
+
+  .act2-info-panel {
+    padding: 18px 18px 18px calc(var(--act-stage-clock-overlap) + 20px);
   }
 }
 </style>

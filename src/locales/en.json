@@ -1,0 +1,409 @@
+{
+  "common": {
+    "dataDance": "Data Dance",
+    "start": "Start",
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "repeat": "Repeat",
+    "loading": "Loading",
+    "loadingEllipsis": "Loading...",
+    "idle": "Idle",
+    "ready": "Ready",
+    "none": "None",
+    "yes": "yes",
+    "no": "no",
+    "frames": "Frames: {count}",
+    "status": {
+      "idle": "Idle",
+      "loaded": "Loaded",
+      "playing": "Playing",
+      "paused": "Paused",
+      "stopped": "Stopped"
+    }
+  },
+  "home": {
+    "aria": {
+      "prototypeNavigation": "Prototype navigation"
+    },
+    "title": "Data Storytelling with Embodiment and Emotions",
+    "nav": {
+      "prologue": "Prologue",
+      "act2": "Act 2",
+      "act3": "Act 3",
+      "act4": "Act 4",
+      "act5": "Act 5",
+      "epilogue": "Epilogue",
+      "storyStageTest": "Story Stage Test",
+      "record": "Record",
+      "movementCameraTest": "Movement Camera Test"
+    }
+  },
+  "movementCameraTest": {
+    "camera": "Camera",
+    "avatar": "Avatar",
+    "silhouette": "Silhouette",
+    "hideHands": "Hide Hands",
+    "showHands": "Show Hands"
+  },
+  "record": {
+    "tabs": {
+      "recordWebcam": "Record Webcam",
+      "recordVideo": "Record Video",
+      "playback": "Playback"
+    },
+    "webcam": {
+      "iconTitle": "Record",
+      "title": "Record Movement",
+      "movementName": "Movement Name",
+      "movementNamePlaceholder": "e.g. arms_up",
+      "exportTitle": "Export recording",
+      "starting": "Starting...",
+      "stop": "Stop",
+      "start": "Start",
+      "recording": "Recording",
+      "startingIn": "Starting in: {count}",
+      "note": {
+        "prepare": "Prepare your movement posture.",
+        "export": "Use save icon to export latest take.",
+        "start": "Press start to capture movement."
+      }
+    },
+    "video": {
+      "iconTitle": "Record video",
+      "title": "Record Video",
+      "movementName": "Movement Name",
+      "movementNamePlaceholder": "e.g. temperature_rise",
+      "videoFile": "Video File",
+      "processing": "Processing...",
+      "analyze": "Analyze Video",
+      "status": {
+        "processing": "Processing",
+        "exported": "Exported",
+        "ready": "Ready",
+        "idle": "Idle"
+      },
+      "selectVideo": "Select a video to begin.",
+      "analysisFailed": "Video analysis failed."
+    }
+  },
+  "playback": {
+    "iconTitle": "Playback",
+    "title": "Playback Movement",
+    "movementJson": "Movement JSON",
+    "stopTitle": "Stop playback",
+    "pause": "Pause",
+    "start": "Start",
+    "note": {
+      "load": "Load a recording to start playback.",
+      "playing": "Pause anytime or use stop to reset.",
+      "paused": "Resume with start or reset with stop.",
+      "ready": "Ready to play the loaded movement."
+    }
+  },
+  "map": {
+    "aria": {
+      "mode": "Map mode"
+    },
+    "mode": {
+      "explore": "Explore",
+      "allYears": "All years",
+      "story": "Story"
+    },
+    "stork": "Stork",
+    "year": "Year",
+    "loadingMigrationData": "Loading migration data...",
+    "storyCycles": "Story cycles",
+    "compare": "Compare",
+    "visibleCount": "{count} visible",
+    "yearsCount": "{count} years",
+    "day": "Day {day}",
+    "step": "Step {step}",
+    "pointsCount": "{count} points",
+    "cycleDay": "Cycle day {day}",
+    "noCyclesSelected": "No cycles selected",
+    "storyPoint": "Step {step} - {date} - {wintering}",
+    "legendMeta": "{date} - {count} points"
+  },
+  "seasonClock": {
+    "aria": {
+      "clock": "Story season clock",
+      "clockLabel": "Season clock: {season}, current date {date}",
+      "pausePlayback": "Pause story playback",
+      "playPlayback": "Play story playback",
+      "resetDate": "Reset story date to 1 June"
+    },
+    "controls": {
+      "pause": "Pause",
+      "play": "Play",
+      "reset": "Reset"
+    },
+    "months": {
+      "jun": "Jun",
+      "jul": "Jul",
+      "aug": "Aug",
+      "sep": "Sep",
+      "oct": "Oct",
+      "nov": "Nov",
+      "dec": "Dec",
+      "jan": "Jan",
+      "feb": "Feb",
+      "mar": "Mar",
+      "apr": "Apr",
+      "may": "May"
+    },
+    "seasons": {
+      "summer": "Summer",
+      "autumn": "Autumn",
+      "winter": "Winter",
+      "spring": "Spring"
+    }
+  },
+  "story": {
+    "aria": {
+      "progress": "Story progress",
+      "pages": "Story pages",
+      "runtimeMetadata": "Act runtime metadata",
+      "runtimeControls": "Story runtime controls",
+      "gesture": "Story gesture",
+      "map": "{title} migration map",
+      "stage": "{title} story stage",
+      "instructor": "Instruction avatar",
+      "support": "{title} support views",
+      "seasonClock": "Season clock",
+      "userMirror": "User mirror"
+    },
+    "overview": {
+      "title": "Story Overview"
+    },
+    "runtime": {
+      "layout": "Layout",
+      "scene": "Scene",
+      "notStarted": "Not started",
+      "sceneCount": "{current} / {total}",
+      "startAct": "Start Act",
+      "nextScene": "Next Scene"
+    },
+    "progress": {
+      "prologue": {
+        "label": "Prologue",
+        "name": "Opening",
+        "title": "Prologue"
+      },
+      "act2": {
+        "label": "Act II",
+        "name": "Migration",
+        "title": "Act II - The Migration Cycle"
+      },
+      "act3": {
+        "label": "Act III",
+        "name": "Routes",
+        "title": "Act III - Western and Eastern Routes"
+      },
+      "act4": {
+        "label": "Act IV",
+        "name": "Route Shift",
+        "title": "Act IV - Changing Cycles"
+      },
+      "act5": {
+        "label": "Act V",
+        "name": "Climate",
+        "title": "Act V - Climate Data"
+      },
+      "epilogue": {
+        "label": "Epilogue",
+        "name": "Return",
+        "title": "Epilogue"
+      }
+    },
+    "acts": {
+      "prologue": {
+        "title": "Prologue",
+        "scenes": {
+          "arrival": {
+            "title": "A body enters the data story",
+            "narration": "Placeholder scene for introducing the embodied story."
+          },
+          "orientation": {
+            "title": "Learning to read movement as data",
+            "narration": "Placeholder scene for setting up the interaction language."
+          }
+        }
+      },
+      "act2": {
+        "title": "Act 2 - The Migration Cycle",
+        "cycleCompleted": "Cycle completed",
+        "actCompleted": "{title} completed",
+        "cycleCount": "Cycle {current} / {total}",
+        "scenes": {
+          "intro": {
+            "title": "The migration cycle begins",
+            "narration": "Follow one stork across the yearly route between Europe and Africa."
+          },
+          "cycleRepeat": {
+            "title": "Repeating the route",
+            "narration": "The route repeats as the season clock and map move through the same cycle."
+          },
+          "completion": {
+            "title": "Completing the cycle",
+            "narration": "The third cycle completes Act 2."
+          }
+        }
+      },
+      "act3": {
+        "title": "Act 3 - Western and Eastern Routes",
+        "cycles": {
+          "standard": "Standard cycle",
+          "eastern": "Bird 7347, 2020-2021"
+        },
+        "scenes": {
+          "standardCycle": {
+            "title": "The familiar route",
+            "narration": "Begin with the standard migration cycle before comparing it to an eastern route."
+          },
+          "easternRoute": {
+            "title": "The eastern route",
+            "narration": "Follow bird 7347 along its eastern migration into central Africa."
+          }
+        }
+      },
+      "act4": {
+        "title": "Act 4 - Changing Cycles",
+        "cycleTitle": "Cycle {step}: {startYear}-{endYear}",
+        "cycleNarration": "Follow the {startYear}-{endYear} {wintering} migration cycle."
+      },
+      "act5": {
+        "title": "Act 5 - Climate Act",
+        "scenes": {
+          "intro": {
+            "title": "A climate pattern enters the movement",
+            "narration": "Placeholder scene for Act 5."
+          }
+        }
+      },
+      "epilogue": {
+        "title": "Epilogue",
+        "scenes": {
+          "reflection": {
+            "title": "Returning from the data story",
+            "narration": "Placeholder scene for the closing reflection."
+          }
+        }
+      }
+    }
+  },
+  "storyStage": {
+    "aria": {
+      "map": "Story map",
+      "movementStage": "Movement stage",
+      "avatarStage": "Avatar stage",
+      "movementSource": "Movement source",
+      "baseRhythmDebug": "Base rhythm debug",
+      "playbackAndMirror": "Playback and user mirror",
+      "gestureTestControls": "Gesture test controls",
+      "gestureDebug": "Gesture debug"
+    },
+    "source": {
+      "liveCamera": "Live Camera",
+      "testDance": "Test Dance"
+    },
+    "debug": {
+      "bpm": "BPM",
+      "bar": "Bar",
+      "beat": "Beat",
+      "audio": "Audio",
+      "error": "Error",
+      "gesture": "Gesture",
+      "state": "State",
+      "attempt": "Attempt",
+      "paused": "Paused",
+      "story": "Story",
+      "auto": "Auto",
+      "movement": "Movement",
+      "loaded": "Loaded",
+      "time": "Time",
+      "decision": "Decision",
+      "checkpoint": "Checkpoint",
+      "done": "Done",
+      "poseInput": "Pose input"
+    },
+    "controls": {
+      "playStory": "Play Story",
+      "pauseStory": "Pause Story",
+      "restart": "Restart",
+      "testArrivalGesture": "Test Arrival Gesture",
+      "testDepartureGesture": "Test Departure Gesture"
+    },
+    "status": {
+      "clickPlay": "click play",
+      "disabled": "disabled",
+      "loading": "loading",
+      "playing": "playing",
+      "paused": "paused",
+      "loaded": "loaded",
+      "error": "error",
+      "none": "none",
+      "recorded": "recorded"
+    },
+    "timeLabel": "{current} / {total} ms",
+    "checkpointLabel": "{label} at {time}ms",
+    "storyDebugLabel": "{state} at {seconds}s"
+  },
+  "gestures": {
+    "fallbackLabel": "Gesture",
+    "overlay": {
+      "markRecognized": "Mark as recognized"
+    },
+    "events": {
+      "autumn": "Autumn",
+      "spring": "Spring",
+      "departure": "Departure",
+      "arrival": "Arrival",
+      "label": "{migration} {type}"
+    },
+    "feedback": {
+      "loading": "Loading",
+      "ready": "{gesture} ready",
+      "countdown": "{gesture} in {count}",
+      "tryAgain": "Try again",
+      "recognized": "Movement recognized"
+    },
+    "departure": {
+      "label": "Departure",
+      "beatCues": {
+        "crouchDown": "Crouch down",
+        "reachUp": "Reach up",
+        "guideYourArms": "Guide your arms",
+        "return": "Return"
+      },
+      "checkpoints": {
+        "crouch": {
+          "label": "Crouch",
+          "hint": "Sink low on the first beat."
+        },
+        "extend": {
+          "label": "Extend",
+          "hint": "Open into the departure shape."
+        }
+      }
+    },
+    "arrival": {
+      "label": "Arrival",
+      "beatCues": {
+        "openArms": "Open your arms",
+        "holdOpen": "Hold open",
+        "crouchDown": "Crouch down",
+        "holdCrouch": "Hold the crouch"
+      },
+      "checkpoints": {
+        "open": {
+          "label": "Open",
+          "hint": "Open your arms for arrival."
+        },
+        "crouch": {
+          "label": "Crouch",
+          "hint": "Sink into the landing shape."
+        }
+      }
+    }
+  }
+}

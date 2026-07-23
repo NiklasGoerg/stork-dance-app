@@ -1,5 +1,5 @@
 <template>
-  <nav class="story-progress" aria-label="Story progress">
+  <nav class="story-progress" :aria-label="t('story.aria.progress')">
     <button
       v-for="(act, index) in progressActs"
       :key="act.id"
@@ -11,15 +11,17 @@
         'story-progress__item--line-complete': index <= completedThroughIndex,
       }"
       :aria-current="activeActId === act.id ? 'page' : undefined"
-      :title="act.title"
+      :title="getProgressActTitle(act)"
       @click="goToAct(act.path)"
     >
       <span class="story-progress__marker" aria-hidden="true">
         <BaseIcon :path="isCompleted(index) ? mdiCheck : act.icon" :size="20" />
       </span>
       <span class="story-progress__copy">
-        <span class="story-progress__label">{{ act.label }}</span>
-        <span class="story-progress__name">{{ act.name }}</span>
+        <span class="story-progress__label">{{
+          getProgressActLabel(act)
+        }}</span>
+        <span class="story-progress__name">{{ getProgressActName(act) }}</span>
       </span>
     </button>
   </nav>
@@ -42,62 +44,63 @@ import type { StoryActId } from "~/story/types";
 
 type ProgressAct = {
   id: StoryActId;
-  label: string;
-  name: string;
-  title: string;
+  labelKey: string;
+  nameKey: string;
+  titleKey: string;
   path: string;
   icon: string;
 };
 
+const { t } = useI18n();
 const route = useRoute();
 const runtimeStore = useStoryRuntimeStore();
 
 const progressActs: ProgressAct[] = [
   {
     id: "prologue",
-    label: "Prologue",
-    name: "Opening",
-    title: "Prologue",
+    labelKey: "story.progress.prologue.label",
+    nameKey: "story.progress.prologue.name",
+    titleKey: "story.progress.prologue.title",
     path: "/story/prologue",
     icon: mdiBird,
   },
   {
     id: "act-2",
-    label: "Act II",
-    name: "Migration",
-    title: "Act II - The Migration Cycle",
+    labelKey: "story.progress.act2.label",
+    nameKey: "story.progress.act2.name",
+    titleKey: "story.progress.act2.title",
     path: "/story/act-2",
     icon: mdiMapMarkerPath,
   },
   {
     id: "act-3",
-    label: "Act III",
-    name: "Routes",
-    title: "Act III - Western and Eastern Routes",
+    labelKey: "story.progress.act3.label",
+    nameKey: "story.progress.act3.name",
+    titleKey: "story.progress.act3.title",
     path: "/story/act-3",
     icon: mdiTransitConnectionVariant,
   },
   {
     id: "act-4",
-    label: "Act IV",
-    name: "Route Shift",
-    title: "Act IV - Changing Cycles",
+    labelKey: "story.progress.act4.label",
+    nameKey: "story.progress.act4.name",
+    titleKey: "story.progress.act4.title",
     path: "/story/act-4",
     icon: mdiLeaf,
   },
   {
     id: "act-5",
-    label: "Act V",
-    name: "Climate",
-    title: "Act V - Climate Data",
+    labelKey: "story.progress.act5.label",
+    nameKey: "story.progress.act5.name",
+    titleKey: "story.progress.act5.title",
     path: "/story/act-5",
     icon: mdiThermometerLines,
   },
   {
     id: "epilogue",
-    label: "Epilogue",
-    name: "Return",
-    title: "Epilogue",
+    labelKey: "story.progress.epilogue.label",
+    nameKey: "story.progress.epilogue.name",
+    titleKey: "story.progress.epilogue.title",
     path: "/story/epilogue",
     icon: mdiHomeOutline,
   },
@@ -144,6 +147,10 @@ const isCompleted = (index: number) =>
 const goToAct = async (path: string) => {
   await navigateTo(path);
 };
+
+const getProgressActLabel = (act: ProgressAct) => t(act.labelKey);
+const getProgressActName = (act: ProgressAct) => t(act.nameKey);
+const getProgressActTitle = (act: ProgressAct) => t(act.titleKey);
 </script>
 
 <style scoped>

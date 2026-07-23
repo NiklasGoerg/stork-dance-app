@@ -1,25 +1,27 @@
 <template>
   <div class="panel card-panel">
     <h2 class="panel-title">
-      <BaseIcon :path="mdiVideoOutline" title="Record video" />
-      Record Video
+      <BaseIcon :path="mdiVideoOutline" :title="t('record.video.iconTitle')" />
+      {{ t("record.video.title") }}
     </h2>
 
     <div class="control-layout">
       <div class="field">
-        <label for="videoMovementName">Movement Name</label>
+        <label for="videoMovementName">
+          {{ t("record.video.movementName") }}
+        </label>
         <input
           id="videoMovementName"
           v-model="movementName"
           type="text"
-          placeholder="e.g. temperature_rise"
+          :placeholder="t('record.video.movementNamePlaceholder')"
           class="input-modern"
           :disabled="isProcessing"
         />
       </div>
 
       <div class="field">
-        <label for="movementVideo">Video File</label>
+        <label for="movementVideo">{{ t("record.video.videoFile") }}</label>
         <input
           id="movementVideo"
           type="file"
@@ -50,7 +52,11 @@
           <BaseIcon
             :path="isProcessing ? mdiTimerSand : mdiPlayCircleOutline"
           />
-          {{ isProcessing ? "Processing..." : "Analyze Video" }}
+          {{
+            isProcessing
+              ? t("record.video.processing")
+              : t("record.video.analyze")
+          }}
         </button>
       </div>
 
@@ -69,7 +75,11 @@
           {{ statusLabel }}
         </span>
         <span v-if="recording" class="frames-info">
-          Frames: <b>{{ recording.frames.length }}</b>
+          <i18n-t keypath="common.frames" tag="span">
+            <template #count>
+              <b>{{ recording.frames.length }}</b>
+            </template>
+          </i18n-t>
         </span>
       </div>
 
@@ -89,6 +99,7 @@ import BaseIcon from "~/components/ui/BaseIcon.vue";
 import { useMovementRecorder } from "~/composables/useMovementRecorder";
 import { usePose } from "~/composables/usePose";
 
+const { t } = useI18n();
 const movementName = ref("movement");
 const video = ref<HTMLVideoElement | null>(null);
 const videoUrl = ref("");
@@ -120,16 +131,16 @@ const canAnalyze = computed(
 );
 
 const statusLabel = computed(() => {
-  if (isProcessing.value) return "Processing";
-  if (progress.value >= 100) return "Exported";
-  if (videoUrl.value) return "Ready";
+  if (isProcessing.value) return t("record.video.status.processing");
+  if (progress.value >= 100) return t("record.video.status.exported");
+  if (videoUrl.value) return t("record.video.status.ready");
 
-  return "Idle";
+  return t("record.video.status.idle");
 });
 
 const progressLabel = computed(() => {
   if (!isProcessing.value && progress.value === 0) {
-    return "Select a video to begin.";
+    return t("record.video.selectVideo");
   }
 
   return `${Math.round(progress.value)}%`;
@@ -227,7 +238,7 @@ const analyzeVideo = async () => {
     stopRecording();
     isProcessing.value = false;
     errorMessage.value =
-      error instanceof Error ? error.message : "Video analysis failed.";
+      error instanceof Error ? error.message : t("record.video.analysisFailed");
   }
 };
 

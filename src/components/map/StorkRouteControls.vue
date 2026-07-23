@@ -1,13 +1,13 @@
 <template>
   <div class="route-controls">
-    <div class="mode-tabs" role="tablist" aria-label="Map mode">
+    <div class="mode-tabs" role="tablist" :aria-label="t('map.aria.mode')">
       <button
         class="mode-tab"
         :class="{ active: selectedMapMode === 'explore' }"
         type="button"
         @click="selectedMapMode = 'explore'"
       >
-        Explore
+        {{ t("map.mode.explore") }}
       </button>
       <button
         class="mode-tab"
@@ -15,7 +15,7 @@
         type="button"
         @click="selectedMapMode = 'all-years'"
       >
-        All years
+        {{ t("map.mode.allYears") }}
       </button>
       <button
         class="mode-tab"
@@ -23,12 +23,12 @@
         type="button"
         @click="selectedMapMode = 'story'"
       >
-        Story
+        {{ t("map.mode.story") }}
       </button>
     </div>
 
     <div v-if="selectedMapMode !== 'story'" class="field">
-      <label for="stork-tag">Stork</label>
+      <label for="stork-tag">{{ t("map.stork") }}</label>
       <select
         id="stork-tag"
         v-model="selectedTag"
@@ -42,7 +42,7 @@
     </div>
 
     <div v-if="selectedMapMode !== 'story'" class="field">
-      <label for="stork-year">Year</label>
+      <label for="stork-year">{{ t("map.year") }}</label>
       <select
         id="stork-year"
         v-model.number="selectedYear"
@@ -59,7 +59,9 @@
       </select>
     </div>
 
-    <p v-if="isLoading" class="route-status">Loading migration data...</p>
+    <p v-if="isLoading" class="route-status">
+      {{ t("map.loadingMigrationData") }}
+    </p>
     <p v-else-if="error" class="route-status route-status--error">
       {{ error }}
     </p>
@@ -67,7 +69,7 @@
     <div v-else-if="selectedMapMode === 'story'" class="route-slider">
       <div class="story-panel__header">
         <div>
-          <span class="story-panel__eyebrow">Story cycles</span>
+          <span class="story-panel__eyebrow">{{ t("map.storyCycles") }}</span>
           <strong
             >{{ selectedStoryCycleIds.length }} /
             {{ storyLegend.length }}</strong
@@ -76,12 +78,14 @@
 
         <label v-if="!singleStoryCycleMode" class="story-toggle">
           <input v-model="showStoryCyclesTogether" type="checkbox" />
-          <span>Compare</span>
+          <span>{{ t("map.compare") }}</span>
         </label>
       </div>
 
       <div class="route-slider__meta">
-        <span>{{ selectedStoryCycleIds.length }} visible</span>
+        <span>
+          {{ t("map.visibleCount", { count: selectedStoryCycleIds.length }) }}
+        </span>
         <span>{{ storyPointLabel }}</span>
       </div>
 
@@ -127,7 +131,9 @@
             :style="{ backgroundColor: cycle.color }"
           />
           <span class="year-legend__main">
-            <span class="year-legend__year">Step {{ cycle.step }}</span>
+            <span class="year-legend__year">
+              {{ t("map.step", { step: cycle.step }) }}
+            </span>
             <span class="year-legend__meta">
               {{ cycle.targetYear }} - {{ cycle.tag }} - {{ cycle.wintering }}
             </span>
@@ -139,8 +145,8 @@
 
     <div v-else-if="selectedMapMode === 'all-years'" class="route-slider">
       <div class="route-slider__meta">
-        <span>{{ yearLegend.length }} years</span>
-        <span>Day {{ selectedDayOfYear }}</span>
+        <span>{{ t("map.yearsCount", { count: yearLegend.length }) }}</span>
+        <span>{{ t("map.day", { day: selectedDayOfYear }) }}</span>
       </div>
 
       <input
@@ -165,7 +171,12 @@
           />
           <span class="year-legend__year">{{ yearItem.year }}</span>
           <span class="year-legend__meta">
-            {{ yearItem.currentDate }} - {{ yearItem.pointCount }} points
+            {{
+              t("map.legendMeta", {
+                date: yearItem.currentDate,
+                count: yearItem.pointCount,
+              })
+            }}
           </span>
         </div>
       </div>
@@ -173,7 +184,7 @@
 
     <div v-else class="route-slider">
       <div class="route-slider__meta">
-        <span>{{ pointCount }} points</span>
+        <span>{{ t("map.pointsCount", { count: pointCount }) }}</span>
         <span v-if="currentPointLabel">{{ currentPointLabel }}</span>
       </div>
 
@@ -193,6 +204,7 @@
 <script setup lang="ts">
 import type { StorkMapMode } from "~/types/stork";
 
+const { t } = useI18n();
 const selectedTag = defineModel<string>("selectedTag", { required: true });
 const selectedYear = defineModel<number | null>("selectedYear", {
   required: true,

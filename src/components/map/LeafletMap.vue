@@ -87,6 +87,7 @@ const props = withDefaults(
     singleStoryCycleMode: false,
   },
 );
+const { t } = useI18n();
 
 const activeStoryCycleDefinitions = computed(
   () => props.storyCycleDefinitions ?? defaultStoryCycleDefinitions,
@@ -167,16 +168,20 @@ const selectedStoryPointLabel = computed(() => {
   const visibleCycleCount = visibleStoryCycleRoutes.value.length;
 
   if (visibleCycleCount === 0) {
-    return "No cycles selected";
+    return t("map.noCyclesSelected");
   }
 
   if (showStoryCyclesTogether.value) {
-    return `Cycle day ${selectedStoryIndex.value + 1}`;
+    return t("map.cycleDay", { day: selectedStoryIndex.value + 1 });
   }
 
   if (!selectedStoryPoint.value) return "";
 
-  return `Step ${selectedStoryPoint.value.cycle.step} - ${selectedStoryPoint.value.point.date} - ${selectedStoryPoint.value.cycle.wintering}`;
+  return t("map.storyPoint", {
+    step: selectedStoryPoint.value.cycle.step,
+    date: selectedStoryPoint.value.point.date,
+    wintering: selectedStoryPoint.value.cycle.wintering,
+  });
 });
 
 const selectedStoryMapPoints = computed(() =>

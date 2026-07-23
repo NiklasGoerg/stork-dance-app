@@ -1,13 +1,13 @@
 <template>
   <div class="panel card-panel">
     <h2 class="panel-title">
-      <BaseIcon :path="mdiPlayCircleOutline" title="Playback" />
-      Playback Movement
+      <BaseIcon :path="mdiPlayCircleOutline" :title="t('playback.iconTitle')" />
+      {{ t("playback.title") }}
     </h2>
 
     <div class="control-layout">
       <div class="field">
-        <label for="movementFile">Movement JSON</label>
+        <label for="movementFile">{{ t("playback.movementJson") }}</label>
         <input
           id="movementFile"
           type="file"
@@ -34,7 +34,7 @@
         <button
           class="btn icon-btn"
           :disabled="!hasRecording"
-          title="Stop playback"
+          :title="t('playback.stopTitle')"
           @click="onStopPlayback"
         >
           <BaseIcon :path="mdiStop" />
@@ -70,6 +70,7 @@ import {
 import BaseIcon from "~/components/ui/BaseIcon.vue";
 import { useMovementPlayback } from "~/composables/useMovementPlayback";
 
+const { t } = useI18n();
 const {
   loadRecording,
   recording,
@@ -87,31 +88,29 @@ const status = ref<"idle" | "loaded" | "playing" | "paused" | "stopped">(
 const hasRecording = computed(() => Boolean(recording.value));
 
 const primaryActionLabel = computed(() =>
-  status.value === "playing" ? "Pause" : "Start",
+  status.value === "playing" ? t("playback.pause") : t("playback.start"),
 );
 
 const primaryActionIcon = computed(() =>
   status.value === "playing" ? mdiPause : mdiPlay,
 );
 
-const statusLabel = computed(
-  () => status.value.charAt(0).toUpperCase() + status.value.slice(1),
-);
+const statusLabel = computed(() => t(`common.status.${status.value}`));
 
 const playbackNote = computed(() => {
   if (!hasRecording.value) {
-    return "Load a recording to start playback.";
+    return t("playback.note.load");
   }
 
   if (status.value === "playing") {
-    return "Pause anytime or use stop to reset.";
+    return t("playback.note.playing");
   }
 
   if (status.value === "paused") {
-    return "Resume with start or reset with stop.";
+    return t("playback.note.paused");
   }
 
-  return "Ready to play the loaded movement.";
+  return t("playback.note.ready");
 });
 
 const onTogglePlayback = () => {

@@ -32,6 +32,7 @@ const props = withDefaults(
     showGrid?: boolean;
     showDebug?: boolean;
     sourceAspect?: number;
+    fillFrame?: boolean;
   }>(),
   {
     landmarks: null,
@@ -39,6 +40,7 @@ const props = withDefaults(
     showGrid: true,
     showDebug: false,
     sourceAspect: 4 / 3,
+    fillFrame: false,
   },
 );
 
@@ -78,6 +80,15 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
 const getCameraFrame = (): StageRect => {
+  if (props.fillFrame) {
+    return {
+      x: 0,
+      y: 0,
+      width,
+      height,
+    };
+  }
+
   const paddingX = width * 0.035;
   const paddingY = height * 0.045;
   const availableWidth = Math.max(width - paddingX * 2, 1);
@@ -397,6 +408,7 @@ watch(
       props.showGrid,
       props.sourceMode,
       props.sourceAspect,
+      props.fillFrame,
     ] as const,
   draw,
   { deep: true },

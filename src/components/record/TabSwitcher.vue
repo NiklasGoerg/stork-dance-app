@@ -6,7 +6,7 @@
       @click="$emit('update:modelValue', 'record')"
     >
       <BaseIcon :path="mdiRecordCircleOutline" />
-      Record Webcam
+      {{ t("record.tabs.recordWebcam") }}
     </button>
     <button
       :class="['tab-btn', { active: modelValue === 'record-video' }]"
@@ -14,7 +14,7 @@
       @click="$emit('update:modelValue', 'record-video')"
     >
       <BaseIcon :path="mdiVideoOutline" />
-      Record Video
+      {{ t("record.tabs.recordVideo") }}
     </button>
     <button
       :class="['tab-btn', { active: modelValue === 'playback' }]"
@@ -22,7 +22,7 @@
       @click="$emit('update:modelValue', 'playback')"
     >
       <BaseIcon :path="mdiPlayCircleOutline" />
-      Playback
+      {{ t("record.tabs.playback") }}
     </button>
   </div>
 </template>
@@ -35,6 +35,8 @@ import {
 } from "@mdi/js";
 
 import BaseIcon from "~/components/ui/BaseIcon.vue";
+
+const { t } = useI18n();
 
 type StudioMode = "record" | "record-video" | "playback";
 

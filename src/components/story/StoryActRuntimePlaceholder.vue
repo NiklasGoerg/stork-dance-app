@@ -1,34 +1,40 @@
 <template>
   <main class="story-runtime-page">
     <section class="story-runtime-panel" aria-labelledby="story-runtime-title">
-      <p class="story-runtime-eyebrow">Data Dance</p>
-      <h1 id="story-runtime-title">{{ act.title }}</h1>
+      <p class="story-runtime-eyebrow">{{ t("common.dataDance") }}</p>
+      <h1 id="story-runtime-title">{{ actTitle }}</h1>
 
-      <dl class="story-runtime-meta" aria-label="Act runtime metadata">
+      <dl
+        class="story-runtime-meta"
+        :aria-label="t('story.aria.runtimeMetadata')"
+      >
         <div>
-          <dt>Layout</dt>
+          <dt>{{ t("story.runtime.layout") }}</dt>
           <dd>{{ act.layout }}</dd>
         </div>
         <div>
-          <dt>Scene</dt>
+          <dt>{{ t("story.runtime.scene") }}</dt>
           <dd>{{ currentSceneLabel }}</dd>
         </div>
       </dl>
 
       <section v-if="runtimeStore.currentScene" class="story-runtime-scene">
-        <p>{{ runtimeStore.currentScene.title }}</p>
+        <p>{{ currentSceneTitle }}</p>
         <span v-if="runtimeStore.currentScene.narration">
-          {{ runtimeStore.currentScene.narration }}
+          {{ currentSceneNarration }}
         </span>
       </section>
 
-      <div class="story-runtime-actions" aria-label="Story runtime controls">
+      <div
+        class="story-runtime-actions"
+        :aria-label="t('story.aria.runtimeControls')"
+      >
         <button
           class="story-runtime-button"
           type="button"
           @click="storyEngine.startAct(act.id)"
         >
-          Start Act
+          {{ t("story.runtime.startAct") }}
         </button>
         <button
           class="story-runtime-button"
@@ -36,7 +42,7 @@
           :disabled="!isActiveAct || runtimeStore.showContinueGate"
           @click="storyEngine.goToNextScene()"
         >
-          Next Scene
+          {{ t("story.runtime.nextScene") }}
         </button>
         <button
           v-if="runtimeStore.showContinueGate"
@@ -44,7 +50,7 @@
           type="button"
           @click="continueToNextAct"
         >
-          Continue
+          {{ t("common.continue") }}
         </button>
       </div>
     </section>
@@ -63,13 +69,25 @@ const props = defineProps<{
 
 const runtimeStore = useStoryRuntimeStore();
 const storyEngine = useStoryEngine();
+const { t, getActTitle, getSceneTitle, getSceneNarration } =
+  useStoryTranslations();
 
 const isActiveAct = computed(() => runtimeStore.currentActId === props.act.id);
+const actTitle = computed(() => getActTitle(props.act));
+const currentSceneTitle = computed(() =>
+  runtimeStore.currentScene ? getSceneTitle(runtimeStore.currentScene) : "",
+);
+const currentSceneNarration = computed(() =>
+  runtimeStore.currentScene ? getSceneNarration(runtimeStore.currentScene) : "",
+);
 
 const currentSceneLabel = computed(() => {
-  if (!isActiveAct.value) return "Not started";
+  if (!isActiveAct.value) return t("story.runtime.notStarted");
 
-  return `${runtimeStore.currentSceneIndex + 1} / ${props.act.scenes.length}`;
+  return t("story.runtime.sceneCount", {
+    current: runtimeStore.currentSceneIndex + 1,
+    total: props.act.scenes.length,
+  });
 });
 
 const continueToNextAct = async () => {

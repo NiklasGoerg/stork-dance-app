@@ -1,24 +1,34 @@
 <template>
   <main class="home-page">
-    <nav class="home-nav" aria-label="Prototype navigation">
-      <NuxtLink to="/story/prologue">Prologue</NuxtLink>
-      <NuxtLink to="/story/act-2">Act 2</NuxtLink>
-      <NuxtLink to="/story/act-3">Act 3</NuxtLink>
-      <NuxtLink to="/story/act-4">Act 4</NuxtLink>
-      <NuxtLink to="/story/act-5">Act 5</NuxtLink>
-      <NuxtLink to="/story/epilogue">Epilogue</NuxtLink>
-      <NuxtLink to="/story/stage">Story Stage Test</NuxtLink>
-      <NuxtLink to="/record">Record</NuxtLink>
-      <NuxtLink to="/movement-camera-test">Movement Camera Test</NuxtLink>
+    <nav class="home-nav" :aria-label="t('home.aria.prototypeNavigation')">
+      <NuxtLink to="/story/prologue">{{ t("home.nav.prologue") }}</NuxtLink>
+      <NuxtLink to="/story/act-2">{{ t("home.nav.act2") }}</NuxtLink>
+      <NuxtLink to="/story/act-3">{{ t("home.nav.act3") }}</NuxtLink>
+      <NuxtLink to="/story/act-4">{{ t("home.nav.act4") }}</NuxtLink>
+      <NuxtLink to="/story/act-5">{{ t("home.nav.act5") }}</NuxtLink>
+      <NuxtLink to="/story/epilogue">{{ t("home.nav.epilogue") }}</NuxtLink>
+      <NuxtLink to="/story/stage">
+        {{ t("home.nav.storyStageTest") }}
+      </NuxtLink>
+      <NuxtLink to="/record">{{ t("home.nav.record") }}</NuxtLink>
+      <NuxtLink to="/movement-camera-test">
+        {{ t("home.nav.movementCameraTest") }}
+      </NuxtLink>
     </nav>
 
     <section class="home-hero" aria-labelledby="home-title">
-      <p class="home-eyebrow">Data Dance</p>
-      <h1 id="home-title">Data Storytelling with Embodiment and Emotions</h1>
-      <NuxtLink class="start-link" to="/story/prologue">Start</NuxtLink>
+      <p class="home-eyebrow">{{ t("common.dataDance") }}</p>
+      <h1 id="home-title">{{ t("home.title") }}</h1>
+      <NuxtLink class="start-link" to="/story/prologue">
+        {{ t("common.start") }}
+      </NuxtLink>
     </section>
   </main>
 </template>
+
+<script setup lang="ts">
+const { t } = useI18n();
+</script>
 
 <style scoped>
 .home-page {

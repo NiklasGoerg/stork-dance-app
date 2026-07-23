@@ -57,8 +57,12 @@ export type MovementRequirement = {
 export type StoryScene = {
   id: string;
   title: string;
+  titleKey?: string;
+  titleParams?: Record<string, string | number>;
   durationMs?: number;
   narration?: string;
+  narrationKey?: string;
+  narrationParams?: Record<string, string | number>;
   movementId?: string;
   audioCueId?: string;
   feedbackCueId?: string;
@@ -70,12 +74,15 @@ export type StoryMigrationCycle = {
   cycleStartYear?: number;
   cycleDurationMs?: number;
   title?: string;
+  titleKey?: string;
+  titleParams?: Record<string, string | number>;
   storyCycleDefinitions?: StorkStoryCycleDefinition[];
 };
 
 export type StoryAct = {
   id: StoryActId;
   title: string;
+  titleKey?: string;
   layout: StoryLayoutType;
   scenes: StoryScene[];
   nextActId?: StoryActId;

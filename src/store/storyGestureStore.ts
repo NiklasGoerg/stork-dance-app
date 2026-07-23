@@ -102,6 +102,16 @@ const logStoryGesture = (message: string, details?: unknown) => {
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Unknown movement load error.";
 
+const translateStoryText = (
+  key: string,
+  params: Record<string, string | number> = {},
+) => String(useNuxtApp().$i18n.t(key, params));
+
+const translateOptionalStoryText = (
+  key: string | undefined,
+  fallback: string,
+) => (key ? translateStoryText(key) : fallback);
+
 const clearScheduledLeadIn = () => {
   if (!scheduledLeadInCancel) return;
 
@@ -312,12 +322,20 @@ export const useStoryGestureStore = defineStore("storyGesture", {
       if (!state.activeGestureId) return "";
 
       const gesture = getStoryGestureDefinition(state.activeGestureId);
+      const gestureLabel = translateOptionalStoryText(
+        gesture.labelKey,
+        gesture.label,
+      );
 
-      if (state.state === "loading-movement") return "Loading";
+      if (state.state === "loading-movement") {
+        return translateStoryText("gestures.feedback.loading");
+      }
 
       if (state.state === "waiting-for-lead-in") {
         if (state.leadInTransportTimeMs === null) {
-          return `${gesture.label} ready`;
+          return translateStoryText("gestures.feedback.ready", {
+            gesture: gestureLabel,
+          });
         }
 
         const audioStore = useAudioStore();
@@ -330,17 +348,17 @@ export const useStoryGestureStore = defineStore("storyGesture", {
           Math.ceil(msUntilLeadIn / audioStore.getBeatDurationMs()),
         );
 
-        return `${gesture.label} in ${Math.min(
-          countdownMaxBeats,
-          beatsUntilLeadIn,
-        )}`;
+        return translateStoryText("gestures.feedback.countdown", {
+          gesture: gestureLabel,
+          count: Math.min(countdownMaxBeats, beatsUntilLeadIn),
+        });
       }
 
       if (
         state.branchFeedbackText &&
         state.currentSourceTimeMs <= state.branchFeedbackUntilSourceMs
       ) {
-        return state.branchFeedbackText;
+        return translateStoryText(state.branchFeedbackText);
       }
 
       if (
@@ -348,24 +366,26 @@ export const useStoryGestureStore = defineStore("storyGesture", {
         state.currentSourceTimeMs >=
           gesture.timing.branchPointMs - retryFeedbackLeadMs
       ) {
-        return "Try again";
+        return translateStoryText("gestures.feedback.tryAgain");
       }
 
       if (state.state === "success-exit" || state.state === "completed") {
-        return "Movement recognized";
+        return translateStoryText("gestures.feedback.recognized");
       }
 
       if (
         state.state === "attempt-playing" ||
         state.state === "retry-scheduled"
       ) {
-        return (
-          gesture.beatCues.find(
+        return (() => {
+          const cue = gesture.beatCues.find(
             (cue) =>
               state.currentSourceTimeMs >= cue.sourceStartMs &&
               state.currentSourceTimeMs < cue.sourceEndMs,
-          )?.text ?? ""
-        );
+          );
+
+          return cue ? translateOptionalStoryText(cue.textKey, cue.text) : "";
+        })();
       }
 
       return "";
@@ -549,7 +569,7 @@ export const useStoryGestureStore = defineStore("storyGesture", {
         }
 
         if (this.decision === "retry") {
-          this.beginAttempt(transportTimeMs, "Try again");
+          this.beginAttempt(transportTimeMs, "gestures.feedback.tryAgain");
           return;
         }
 
