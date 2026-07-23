@@ -550,7 +550,7 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 50%;
   bottom: 18px;
-  z-index: 12;
+  z-index: 760;
   width: var(--act-stage-clock-size);
   overflow: visible;
   transform: translateX(-50%);

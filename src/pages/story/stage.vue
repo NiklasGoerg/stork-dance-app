@@ -56,7 +56,8 @@
                 type="button"
                 :disabled="isTestDanceLoading || isGestureActive"
                 :class="{
-                  'stage-toggle--active': avatarSourceMode === 'recorded-motion',
+                  'stage-toggle--active':
+                    avatarSourceMode === 'recorded-motion',
                 }"
                 @click="setAvatarSourceMode('recorded-motion')"
               >
@@ -1212,7 +1213,7 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 50%;
   bottom: calc(var(--story-stage-bottom-bar-height) + 18px);
-  z-index: 12;
+  z-index: 760;
   width: var(--story-stage-clock-size);
   overflow: visible;
   transform: translateX(-50%);
@@ -1227,8 +1228,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 24px 24px 24px
-    calc(var(--story-stage-clock-overlap) + 30px);
+  padding: 24px 24px 24px calc(var(--story-stage-clock-overlap) + 30px);
   padding-bottom: calc(var(--story-stage-bottom-bar-height) + 20px);
   background:
     linear-gradient(
@@ -1364,8 +1364,7 @@ onBeforeUnmount(() => {
   }
 
   .story-info-panel {
-    padding: 18px 18px 18px
-      calc(var(--story-stage-clock-overlap) + 20px);
+    padding: 18px 18px 18px calc(var(--story-stage-clock-overlap) + 20px);
   }
 
   .season-clock-panel {
