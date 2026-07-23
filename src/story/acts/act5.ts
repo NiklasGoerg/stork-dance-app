@@ -8,9 +8,9 @@ export const act5 = {
   scenes: [
     {
       id: "intro",
-      title: "A climate pattern enters the movement",
+      title: "Movement Introduction",
       titleKey: "story.acts.act5.scenes.intro.title",
-      narration: "Placeholder scene for Act 5.",
+      narration: "Learn each seasonal movement at full intensity.",
       narrationKey: "story.acts.act5.scenes.intro.narration",
     },
   ],

@@ -11,6 +11,13 @@ let baseRhythmLoadPromise: Promise<void> | null = null;
 let baseRhythmSource: AudioBufferSourceNode | null = null;
 let baseRhythmStartedAtSeconds = 0;
 let baseRhythmStartOffsetSeconds = 0;
+let seasonalAudioSource: AudioBufferSourceNode | null = null;
+let seasonalAudioStartedAtSeconds = 0;
+let seasonalAudioStartOffsetSeconds = 0;
+let seasonalAudioDurationSeconds = 0;
+let seasonalAudioActiveCueId: string | null = null;
+const seasonalAudioBuffers = new Map<string, AudioBuffer>();
+const seasonalAudioLoadPromises = new Map<string, Promise<void>>();
 
 const baseRhythmLoopUrl = new URL(
   "../assets/audio/music/base-rhythm-60bpm-4bar.wav",
@@ -81,6 +88,23 @@ const stopBaseRhythmSource = () => {
   source.disconnect();
 };
 
+const stopSeasonalAudioSource = () => {
+  if (!seasonalAudioSource) return;
+
+  const source = seasonalAudioSource;
+
+  seasonalAudioSource = null;
+  source.onended = null;
+
+  try {
+    source.stop();
+  } catch {
+    // The node may already be stopped by the browser.
+  }
+
+  source.disconnect();
+};
+
 const getBeatDurationMs = (bpm: number) => 60_000 / bpm;
 
 const getBaseRhythmBarDurationMs = (bpm: number, beatsPerBar: number) =>
@@ -124,6 +148,15 @@ export const useAudioStore = defineStore("audio", {
       loopDurationSeconds: BASE_RHYTHM_LOOP_DURATION_SECONDS,
       expectedLoopDurationSeconds: BASE_RHYTHM_LOOP_DURATION_SECONDS,
       durationDeviationSeconds: 0,
+      error: null as string | null,
+    },
+    seasonalAudio: {
+      loadedCueIds: [] as string[],
+      activeCueId: null as string | null,
+      isLoading: false,
+      isPlaying: false,
+      currentOffsetSeconds: 0,
+      durationSeconds: 0,
       error: null as string | null,
     },
   }),
@@ -287,6 +320,54 @@ export const useAudioStore = defineStore("audio", {
 
       await baseRhythmLoadPromise;
     },
+    async loadSeasonalAudio(cue: { id: string; url: string }) {
+      if (import.meta.server || seasonalAudioBuffers.has(cue.id)) return;
+
+      const existingPromise = seasonalAudioLoadPromises.get(cue.id);
+
+      if (existingPromise) {
+        await existingPromise;
+        return;
+      }
+
+      this.seasonalAudio.isLoading = true;
+      this.seasonalAudio.error = null;
+
+      const loadPromise = (async () => {
+        try {
+          const context = getAudioContext();
+
+          if (!context) return;
+
+          const response = await fetch(cue.url);
+
+          if (!response.ok) {
+            throw new Error(`Could not load ${cue.id}.`);
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = await context.decodeAudioData(arrayBuffer);
+
+          seasonalAudioBuffers.set(cue.id, buffer);
+
+          if (!this.seasonalAudio.loadedCueIds.includes(cue.id)) {
+            this.seasonalAudio.loadedCueIds.push(cue.id);
+          }
+        } catch (error) {
+          seasonalAudioBuffers.delete(cue.id);
+          this.seasonalAudio.error = getErrorMessage(error);
+        } finally {
+          seasonalAudioLoadPromises.delete(cue.id);
+          this.seasonalAudio.isLoading = seasonalAudioLoadPromises.size > 0;
+        }
+      })();
+
+      seasonalAudioLoadPromises.set(cue.id, loadPromise);
+      await loadPromise;
+    },
+    async preloadSeasonalAudio(cues: Array<{ id: string; url: string }>) {
+      await Promise.all(cues.map((cue) => this.loadSeasonalAudio(cue)));
+    },
     syncBaseRhythmLoopOffset() {
       const context = getAudioContext();
       const loopDurationSeconds = this.baseRhythmLoop.loopDurationSeconds;
@@ -303,6 +384,22 @@ export const useAudioStore = defineStore("audio", {
       );
 
       return this.baseRhythmLoop.currentOffsetSeconds;
+    },
+    syncSeasonalAudioOffset() {
+      const context = getAudioContext();
+
+      if (!context || !this.seasonalAudio.isPlaying) {
+        return this.seasonalAudio.currentOffsetSeconds;
+      }
+
+      this.seasonalAudio.currentOffsetSeconds = Math.min(
+        seasonalAudioStartOffsetSeconds +
+          context.currentTime -
+          seasonalAudioStartedAtSeconds,
+        seasonalAudioDurationSeconds,
+      );
+
+      return this.seasonalAudio.currentOffsetSeconds;
     },
     async startBaseRhythmLoop(offsetSeconds = 0) {
       if (import.meta.server || this.baseRhythmLoop.isPlaying) return;
@@ -366,6 +463,78 @@ export const useAudioStore = defineStore("audio", {
     },
     resetBaseRhythmLoop() {
       this.stopBaseRhythmLoop();
+    },
+    async startSeasonalAudio(
+      cue: { id: string; url: string },
+      offsetSeconds = 0,
+    ) {
+      if (import.meta.server) return;
+
+      await this.loadSeasonalAudio(cue);
+
+      const context = getAudioContext();
+      const buffer = seasonalAudioBuffers.get(cue.id);
+
+      if (!context || !buffer) return;
+
+      try {
+        await context.resume();
+      } catch (error) {
+        this.seasonalAudio.error = getErrorMessage(error);
+        return;
+      }
+
+      stopSeasonalAudioSource();
+
+      const offset = Math.min(Math.max(offsetSeconds, 0), buffer.duration);
+
+      seasonalAudioDurationSeconds = buffer.duration;
+      seasonalAudioActiveCueId = cue.id;
+      this.seasonalAudio.activeCueId = cue.id;
+      this.seasonalAudio.currentOffsetSeconds = offset;
+      this.seasonalAudio.durationSeconds = buffer.duration;
+      this.seasonalAudio.error = null;
+
+      if (offset >= buffer.duration) {
+        this.seasonalAudio.isPlaying = false;
+        return;
+      }
+
+      const source = context.createBufferSource();
+
+      source.buffer = buffer;
+      source.connect(context.destination);
+      source.onended = () => {
+        if (seasonalAudioActiveCueId !== cue.id) return;
+
+        seasonalAudioSource = null;
+        this.seasonalAudio.isPlaying = false;
+        this.seasonalAudio.currentOffsetSeconds = seasonalAudioDurationSeconds;
+      };
+      source.start(0, offset);
+
+      seasonalAudioSource = source;
+      seasonalAudioStartedAtSeconds = context.currentTime;
+      seasonalAudioStartOffsetSeconds = offset;
+      this.seasonalAudio.isPlaying = true;
+    },
+    pauseSeasonalAudio() {
+      if (!this.seasonalAudio.isPlaying) return;
+
+      this.syncSeasonalAudioOffset();
+      stopSeasonalAudioSource();
+      this.seasonalAudio.isPlaying = false;
+    },
+    stopSeasonalAudio() {
+      stopSeasonalAudioSource();
+      seasonalAudioStartedAtSeconds = 0;
+      seasonalAudioStartOffsetSeconds = 0;
+      seasonalAudioDurationSeconds = 0;
+      seasonalAudioActiveCueId = null;
+      this.seasonalAudio.activeCueId = null;
+      this.seasonalAudio.isPlaying = false;
+      this.seasonalAudio.currentOffsetSeconds = 0;
+      this.seasonalAudio.durationSeconds = 0;
     },
   },
 });

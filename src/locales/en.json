@@ -166,6 +166,7 @@
       "runtimeControls": "Story runtime controls",
       "gesture": "Story gesture",
       "map": "{title} migration map",
+      "context": "{title} contextual area",
       "stage": "{title} story stage",
       "instructor": "Instruction avatar",
       "support": "{title} support views",
@@ -273,10 +274,36 @@
       },
       "act5": {
         "title": "Act 5 - Climate Act",
+        "periodEyebrow": "Reference period",
+        "periodPlaceholder": "Reference Cycle",
+        "contextPlaceholder": "100% seasonal movements",
+        "currentDate": "Current date",
+        "controls": {
+          "play": "Play",
+          "pause": "Pause",
+          "reset": "Reset"
+        },
+        "instructions": {
+          "learn": "Learn the {season} movement",
+          "countdown": "{count}",
+          "ready": "Press play to begin the movement introduction.",
+          "repeat": "Repeat the movement",
+          "transition": "Transition",
+          "paused": "Paused",
+          "completed": "Reference cycle completed"
+        },
+        "status": {
+          "state": "State",
+          "season": "Season",
+          "repetition": "Repetition",
+          "time": "Time",
+          "transition": "Transition",
+          "repetitionCount": "{current} / {total}"
+        },
         "scenes": {
           "intro": {
-            "title": "A climate pattern enters the movement",
-            "narration": "Placeholder scene for Act 5."
+            "title": "Movement Introduction",
+            "narration": "Learn each seasonal movement at full intensity."
           }
         }
       },

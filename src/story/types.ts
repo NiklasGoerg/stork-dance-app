@@ -63,6 +63,12 @@ export type StoryScene = {
   narration?: string;
   narrationKey?: string;
   narrationParams?: Record<string, string | number>;
+  periodLabel?: string;
+  periodLabelKey?: string;
+  periodLabelParams?: Record<string, string | number>;
+  periodContext?: string;
+  periodContextKey?: string;
+  periodContextParams?: Record<string, string | number>;
   movementId?: string;
   audioCueId?: string;
   feedbackCueId?: string;
