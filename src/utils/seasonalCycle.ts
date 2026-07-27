@@ -14,6 +14,9 @@ export type SeasonalCycleSeasonConfig = {
   date: string;
   movementUrl: string;
   audioUrl: string;
+  movementLoopDurationMs?: number;
+  movementPrerollMs?: number;
+  movementReplayPrerollMs?: number;
 };
 
 export type SeasonalCycleConfig = {

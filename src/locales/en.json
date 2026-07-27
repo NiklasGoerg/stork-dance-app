@@ -297,8 +297,103 @@
           "season": "Season",
           "repetition": "Repetition",
           "time": "Time",
+          "feedback": "Feedback",
           "transition": "Transition",
           "repetitionCount": "{current} / {total}"
+        },
+        "summerFeedback": {
+          "SUCCESS": "Great - you completed the summer movement.",
+          "MOVE_HANDS_TO_CENTER": "Bring your hands together in front of your chest.",
+          "RAISE_ARMS_HIGHER": "Reach both arms above your head.",
+          "STRAIGHTEN_ARMS": "Stretch your arms a little more.",
+          "STEP_WIDER": "Take a clear step to the side.",
+          "STEP_SMALLER": "Take a smaller step to the side.",
+          "OPEN_ARMS_TO_SIDES": "Open both arms to the sides.",
+          "OPEN_ARMS_LESS": "Keep the arm opening smaller.",
+          "RETURN_FEET_TO_CENTER": "Bring your feet back together.",
+          "LOWER_ARMS": "Lower your arms back to your sides.",
+          "BEND_ELBOWS_MORE": "Bend your elbows more for this movement size.",
+          "MOVEMENT_TOO_LARGE": "Make the movement smaller for this warming level.",
+          "MOVEMENT_TOO_SMALL": "Make the movement larger for this warming level.",
+          "ALTERNATE_STEP_SIDE": "Use the other leg for the next step.",
+          "FULL_BODY_NOT_VISIBLE": "Make sure your full body is visible.",
+          "TRY_AGAIN": "Let's repeat the summer movement."
+        },
+        "summerCriterion": {
+          "feet-close": "close your feet",
+          "hands-together": "hands to chest center",
+          "hand-center-between-shoulders": "hands to chest center",
+          "hands-chest-height": "hands to chest center",
+          "one-leg-stepped-side": "step to the side",
+          "alternate-step-side": "use the other side",
+          "hands-above-head": "raise both arms higher",
+          "hands-raised-from-prep": "raise both hands from the start pose",
+          "hands-stay-compact": "keep your hands centered and compact",
+          "both-arms-raised": "raise both arms higher",
+          "hand-raise-target": "match the target hand height",
+          "elbow-angle-target": "match the target arm bend",
+          "stepped-leg-remains": "keep the side step",
+          "hands-open-sides": "open your arms wider",
+          "arm-opening-target": "match the target arm opening",
+          "hands-shoulder-height": "open arms at shoulder height",
+          "feet-returned-close": "bring your feet back together",
+          "hands-lowered-sides": "lower your arms",
+          "returned-from-expansion": "return to neutral"
+        },
+        "summerCorrection": {
+          "SUCCESS": "that movement was correct.",
+          "MOVE_HANDS_TO_CENTER": "bring your hands together in front of your chest.",
+          "RAISE_ARMS_HIGHER": "reach both arms above your head.",
+          "STRAIGHTEN_ARMS": "stretch your arms a little more.",
+          "STEP_WIDER": "take a clearer step to the side.",
+          "STEP_SMALLER": "take a smaller step to the side.",
+          "OPEN_ARMS_TO_SIDES": "open your arms further to the sides.",
+          "OPEN_ARMS_LESS": "keep the arm opening smaller.",
+          "RETURN_FEET_TO_CENTER": "bring your feet back together.",
+          "LOWER_ARMS": "lower your arms back to your sides.",
+          "BEND_ELBOWS_MORE": "bend your elbows more for this movement size.",
+          "MOVEMENT_TOO_LARGE": "make the movement smaller for this warming level.",
+          "MOVEMENT_TOO_SMALL": "make the movement larger for this warming level.",
+          "ALTERNATE_STEP_SIDE": "use the other leg for the next side step.",
+          "FULL_BODY_NOT_VISIBLE": "make sure your full body is visible.",
+          "TRY_AGAIN": "try the movement again."
+        },
+        "summerCycleFeedback": {
+          "successTitle": "Great job!",
+          "tryAgainTitle": "Keep going",
+          "success": "Bravo",
+          "almostCorrect": "Good",
+          "almost": "Almost there - {feedback}",
+          "failed": "Try again - {feedback}"
+        },
+        "autumnCycleFeedback": {
+          "success": "Bravo",
+          "almostCorrect": "Good"
+        },
+        "autumnFeedback": {
+          "directionPattern": "Pattern: first two sweeps left to right, second two sweeps right to left."
+        },
+        "summerSeasonFeedback": {
+          "successTitle": "Summer completed",
+          "repeatTitle": "Repeat summer",
+          "success": "Bravo, well done. You completed the summer movement.",
+          "repeat": "It did not quite match yet. Let's repeat the summer movement."
+        },
+        "sequence": {
+          "movementValue": "Movement {value}",
+          "measure": "Movement {value} · measure {current} / {total}",
+          "feedbackBeat": "Movement {value} · feedback beat {beat} / 4",
+          "beatProblem": "Beat {beat}: {cue}",
+          "summerIntroWarming": "Movement size shows warming.",
+          "summerIntroLarger": "Larger means warmer than the reference.",
+          "summerCompleted": "Summer Sequence completed.",
+          "summerRetryNext": "Next: repeat the summer movement.",
+          "summerInterludeDefault100": "Use the same four-part summer movement.",
+          "summerInterludeDefaultScaled": "Vary the arm movement size more clearly.",
+          "autumnIntroSweep": "Autumn values show how far the sweep travels.",
+          "autumnIntroSmaller": "Smaller values stop earlier on the same arc.",
+          "autumnCompleted": "Autumn Sequence completed.",
+          "autumnNextStart": "Next: start left to right."
         },
         "scenes": {
           "intro": {
