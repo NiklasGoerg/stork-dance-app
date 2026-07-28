@@ -1,6 +1,9 @@
 import { computed, ref } from "vue";
 import type { PoseLandmarkLike } from "~/types/pose";
-import { useBeatWindowMovementRecognition } from "~/composables/useBeatWindowMovementRecognition";
+import {
+  useBeatWindowMovementRecognition,
+  type BeatWindowAttemptRules,
+} from "~/composables/useBeatWindowMovementRecognition";
 import {
   getMedianSampleValue,
   pushRollingSample,
@@ -359,15 +362,17 @@ export const useSummerMovementRecognition = () => {
     manual = false,
     keepCalibration = false,
     intensity = "100",
+    rules,
   }: {
     manual?: boolean;
     keepCalibration?: boolean;
     intensity?: SummerIntensity;
+    rules?: BeatWindowAttemptRules;
   } = {}) => {
     if (manual) retryCount.value = 0;
     if (!keepCalibration) resetCalibration();
 
-    engine.start({ value: intensity });
+    engine.start({ value: intensity, rules });
   };
 
   const markRetryConsumed = () => {

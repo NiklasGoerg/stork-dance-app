@@ -279,6 +279,8 @@
         "contextPlaceholder": "100% seasonal movements",
         "currentDate": "Current date",
         "controls": {
+          "startAct5": "Start Act 5",
+          "startAct5WithoutTutorial": "Start without tutorial",
           "play": "Play",
           "pause": "Pause",
           "reset": "Reset"
@@ -312,6 +314,59 @@
           "differenceIntro": "Movement size represents the temperature difference.",
           "referenceIntro": "First, learn the full reference movement.",
           "nextPeriod": "Next time period"
+        },
+        "tutorial": {
+          "general": {
+            "title": "Movement Tutorial",
+            "intro": "First, learn how each movement represents a value.",
+            "practice": "You will practice the largest and smallest movement for each season.",
+            "completed": "Movement tutorial completed."
+          },
+          "summer": {
+            "title": "Circle radius",
+            "explanation": "Summer uses the radius of a circle. A larger circle represents a higher value.",
+            "maximum": "Draw the largest circle with fully extended arms.",
+            "minimum": "Draw a small circle close to your body.",
+            "actionNoun": "circle radius"
+          },
+          "autumn": {
+            "title": "Horizontal arc extent",
+            "explanation": "Autumn uses the length of a horizontal sweep. A longer arc represents a higher value.",
+            "maximum": "Sweep through the full horizontal semicircle.",
+            "minimum": "Stop after a short horizontal arc.",
+            "actionNoun": "horizontal sweep"
+          },
+          "winter": {
+            "title": "Body height",
+            "explanation": "Winter uses the height of your body. A smaller body represents a lower value.",
+            "maximum": "Stay fully upright for the maximum value.",
+            "minimum": "Crouch low and protect your head.",
+            "actionNoun": "body height"
+          },
+          "spring": {
+            "title": "Vertical blooming arc",
+            "explanation": "Spring uses the length of a vertical blooming arc. A longer upward arc represents a higher value.",
+            "maximum": "Complete the full arc above your head.",
+            "minimum": "Make a short, low blooming arc.",
+            "actionNoun": "vertical bloom arc"
+          }
+        },
+        "story": {
+          "intro": {
+            "title": "Now use the movements to explore climate change over time.",
+            "reference": "We begin with the 1995-1999 reference period."
+          },
+          "preparation": {
+            "title": "{season} {interval}: prepare the {value}% movement.",
+            "referencePeriod": "Reference period",
+            "changedPeriod": "Compared with 1995-1999"
+          },
+          "temperatureComparison": {
+            "baseline": "Season temperature: {temperature}.",
+            "change": "Temperature difference: {temperature}."
+          },
+          "intervalTransition": "Next time period: {interval}",
+          "completed": "Climate data story completed."
         },
         "summerInstructions": {
           "beatCue": "{instruction}",
@@ -561,6 +616,7 @@
           "winterInterludeDefault": "Use the same four-part winter contraction."
         },
         "debug": {
+          "startAct5Tutorial": "Start Act 5 Tutorial",
           "startSeason": "Start {season}",
           "startSummerSequence": "Start Summer Sequence",
           "startAutumnSequence": "Start Autumn Sequence",

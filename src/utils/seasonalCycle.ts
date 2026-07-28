@@ -26,6 +26,7 @@ export type SeasonalCycleConfig = {
   repetitionCount: number;
   countdownDurationMs?: number;
   movementPrerollMs?: number;
+  seasonalAudioEnabled?: boolean;
 };
 
 export type SeasonalCycleProgress = {

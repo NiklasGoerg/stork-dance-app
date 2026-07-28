@@ -1,6 +1,9 @@
 import { computed } from "vue";
 import type { PoseLandmarkLike } from "~/types/pose";
-import { useBeatWindowMovementRecognition } from "~/composables/useBeatWindowMovementRecognition";
+import {
+  useBeatWindowMovementRecognition,
+  type BeatWindowAttemptRules,
+} from "~/composables/useBeatWindowMovementRecognition";
 import {
   getMedianSampleValue,
   pushRollingSample,
@@ -182,10 +185,12 @@ export const useSpringMovementRecognition = () => {
 
   const start = ({
     value = "100",
+    rules,
   }: {
     value?: SpringValue | number | string;
+    rules?: BeatWindowAttemptRules;
   } = {}) => {
-    engine.start({ value: resolveSpringValue(value) });
+    engine.start({ value: resolveSpringValue(value), rules });
   };
 
   const resultState = computed(

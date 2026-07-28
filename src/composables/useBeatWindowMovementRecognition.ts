@@ -56,6 +56,11 @@ export type MovementMeasureEvaluation<
   primaryFeedbackCode?: TFeedback;
 };
 
+export type BeatWindowAttemptRules = {
+  measuresPerValue?: number;
+  requiredSuccessfulMeasures?: number;
+};
+
 type FrameUpdate = {
   landmarks: PoseLandmarkLike[] | null;
   playbackState: "idle" | "countdown" | "playing" | "paused" | "completed";
@@ -179,11 +184,14 @@ export const useBeatWindowMovementRecognition = <
   const measureEvaluations = ref<
     MovementMeasureEvaluation<TBeatEvaluation, TFeedback>[]
   >([]);
+  const activeMeasuresPerValue = ref(options.measuresPerValue);
+  const activeRequiredSuccessfulMeasures = ref(
+    options.requiredSuccessfulMeasures ?? 2,
+  );
 
   const beatSamples = new Map<string, BeatSample<TBeatEvaluation>>();
   const measureBeatEvaluations = new Map<number, TBeatEvaluation[]>();
   const finalizedBeatKeys = new Set<string>();
-  const requiredSuccessfulMeasures = options.requiredSuccessfulMeasures ?? 2;
 
   const getBeatKey = (measureIndex: number, beat: TBeat) =>
     `${measureIndex}-${beat}`;
@@ -209,13 +217,28 @@ export const useBeatWindowMovementRecognition = <
   const reset = () => {
     phase.value = "idle";
     currentValue.value = options.defaultValue;
+    activeMeasuresPerValue.value = options.measuresPerValue;
+    activeRequiredSuccessfulMeasures.value =
+      options.requiredSuccessfulMeasures ?? 2;
     trackingActive.value = false;
     latestMetrics.value = options.createEmptyMetrics();
     resetAttemptState();
   };
 
-  const start = ({ value = options.defaultValue }: { value?: TValue } = {}) => {
+  const start = ({
+    value = options.defaultValue,
+    rules,
+  }: {
+    value?: TValue;
+    rules?: BeatWindowAttemptRules;
+  } = {}) => {
     currentValue.value = value;
+    activeMeasuresPerValue.value =
+      rules?.measuresPerValue ?? options.measuresPerValue;
+    activeRequiredSuccessfulMeasures.value =
+      rules?.requiredSuccessfulMeasures ??
+      options.requiredSuccessfulMeasures ??
+      2;
     resetAttemptState();
     phase.value = "preparing";
     trackingActive.value = true;
@@ -302,11 +325,14 @@ export const useBeatWindowMovementRecognition = <
       consecutiveSuccessfulMeasures.value = 0;
     }
 
-    if (consecutiveSuccessfulMeasures.value >= requiredSuccessfulMeasures) {
+    if (
+      consecutiveSuccessfulMeasures.value >=
+      activeRequiredSuccessfulMeasures.value
+    ) {
       hasReachedRequiredStreak.value = true;
     }
 
-    if (measureEvaluations.value.length >= options.measuresPerValue) {
+    if (measureEvaluations.value.length >= activeMeasuresPerValue.value) {
       finalizeSequence();
     }
   };
@@ -475,7 +501,7 @@ export const useBeatWindowMovementRecognition = <
 
     if (
       finalizedBeatEvaluations.value.length >=
-      options.measuresPerValue * options.beats.length
+      activeMeasuresPerValue.value * options.beats.length
     ) {
       finalizeSequence();
     }

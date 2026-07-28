@@ -1,6 +1,9 @@
 import { computed } from "vue";
 import type { PoseLandmarkLike } from "~/types/pose";
-import { useBeatWindowMovementRecognition } from "~/composables/useBeatWindowMovementRecognition";
+import {
+  useBeatWindowMovementRecognition,
+  type BeatWindowAttemptRules,
+} from "~/composables/useBeatWindowMovementRecognition";
 import {
   AUTUMN_BEAT_EVALUATION_WINDOW_MS,
   evaluateAutumnBeat,
@@ -143,10 +146,12 @@ export const useAutumnMovementRecognition = () => {
 
   const start = ({
     valueClass = "100",
+    rules,
   }: {
     valueClass?: AutumnValueClass;
+    rules?: BeatWindowAttemptRules;
   } = {}) => {
-    engine.start({ value: valueClass });
+    engine.start({ value: valueClass, rules });
   };
 
   const updateFrame = (frame: {
