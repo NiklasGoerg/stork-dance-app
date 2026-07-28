@@ -48,7 +48,7 @@ const springBeatTargetsMs: Record<SpringBeat, number> = {
   4: 3000,
 };
 
-const springExpectedMeasures = 4;
+const springExpectedMeasures = 3;
 const springVariationDurationMs = 4000;
 
 type PreparationSample = {

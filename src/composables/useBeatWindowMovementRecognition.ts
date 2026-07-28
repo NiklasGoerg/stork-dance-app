@@ -68,6 +68,7 @@ type FrameUpdate = {
   seasonElapsedMs: number;
   repetitionIndex: number | null;
   isTransition: boolean;
+  evaluationEnabled?: boolean;
   timestamp?: number;
 };
 
@@ -315,14 +316,12 @@ export const useBeatWindowMovementRecognition = <
     currentMeasureEvaluation.value = measureEvaluation;
     feedbackCode.value = measureEvaluation.primaryFeedbackCode ?? null;
 
-    const countsForSuccessfulStreak =
+    const countsForSuccessfulAttempt =
       options.isMeasureSuccessfulForStreak?.(result, evaluation) ??
       result === "success";
 
-    if (countsForSuccessfulStreak) {
+    if (countsForSuccessfulAttempt) {
       consecutiveSuccessfulMeasures.value++;
-    } else {
-      consecutiveSuccessfulMeasures.value = 0;
     }
 
     if (
@@ -446,6 +445,7 @@ export const useBeatWindowMovementRecognition = <
     seasonElapsedMs,
     repetitionIndex,
     isTransition,
+    evaluationEnabled = true,
     timestamp = performance.now(),
   }: FrameUpdate) => {
     if (seasonId !== options.seasonId) {
@@ -486,6 +486,12 @@ export const useBeatWindowMovementRecognition = <
     const beat = options.beats[beatIndex];
 
     currentBeat.value = beat;
+
+    if (!evaluationEnabled) {
+      phase.value = "preparing";
+      options.onPreparationFrame?.(landmarks);
+      return;
+    }
 
     collectBeatSample({
       landmarks,

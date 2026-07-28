@@ -43,7 +43,7 @@ const autumnBeatTargetsMs: Record<AutumnBeat, number> = {
   4: 3000,
 };
 
-const autumnExpectedMeasures = 4;
+const autumnExpectedMeasures = 3;
 const autumnVariationDurationMs = 4000;
 
 const getCycleResult = (
@@ -161,6 +161,7 @@ export const useAutumnMovementRecognition = () => {
     seasonElapsedMs: number;
     repetitionIndex: number | null;
     isTransition: boolean;
+    evaluationEnabled?: boolean;
     timestamp?: number;
   }) => {
     engine.updateFrame(frame);

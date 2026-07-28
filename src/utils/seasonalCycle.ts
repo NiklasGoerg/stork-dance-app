@@ -7,6 +7,10 @@ export type SeasonalCyclePlaybackState =
   | "paused"
   | "completed";
 
+export type SeasonalCyclePhase = "preview" | "performance" | "transition";
+
+export type SeasonalCycleMovementDirection = "A" | "B";
+
 export type SeasonalCycleSeasonConfig = {
   id: SeasonalCycleSeasonId;
   label: string;
@@ -35,6 +39,12 @@ export type SeasonalCycleProgress = {
   season: SeasonalCycleSeasonConfig;
   seasonIndex: number;
   seasonElapsedMs: number;
+  currentBar: number | null;
+  currentBeat: number | null;
+  currentRepetition: number | null;
+  phase: SeasonalCyclePhase;
+  evaluationEnabled: boolean;
+  movementDirection: SeasonalCycleMovementDirection | null;
   repetitionIndex: number | null;
   isTransition: boolean;
   isComplete: boolean;
@@ -69,6 +79,27 @@ export const getSeasonalCycleProgress = (
         Math.floor(seasonElapsedMs / config.barDurationMs),
         config.repetitionCount - 1,
       );
+  const currentBar =
+    repetitionIndex === null ? null : Math.min(repetitionIndex + 1, 4);
+  const beatDurationMs = config.barDurationMs / 4;
+  const barElapsedMs = seasonElapsedMs % config.barDurationMs;
+  const currentBeat =
+    currentBar === null
+      ? null
+      : Math.min(Math.floor(barElapsedMs / beatDurationMs) + 1, 4);
+  const phase: SeasonalCyclePhase =
+    currentBar === null
+      ? "transition"
+      : currentBar === 1
+        ? "preview"
+        : "performance";
+  const evaluationEnabled = phase === "performance";
+  const movementDirection =
+    repetitionIndex === null
+      ? null
+      : repetitionIndex === 0 || repetitionIndex === 1
+        ? "A"
+        : "B";
 
   if (!season) {
     throw new Error("Seasonal cycle needs at least one season.");
@@ -80,6 +111,12 @@ export const getSeasonalCycleProgress = (
     season,
     seasonIndex,
     seasonElapsedMs,
+    currentBar,
+    currentBeat,
+    currentRepetition: repetitionIndex,
+    phase,
+    evaluationEnabled,
+    movementDirection,
     repetitionIndex,
     isTransition,
     isComplete,

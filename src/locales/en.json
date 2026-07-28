@@ -310,6 +310,10 @@
           "tryAgain": "Let's try again.",
           "ready": "Select a sequence to begin.",
           "baselinePrep": "Learn the full reference movement.",
+          "previewBeat1": "Watch the avatar.",
+          "previewBeat2": "Follow the movement.",
+          "previewBeat3": "Get ready.",
+          "previewBeat4": "Evaluation starts next bar.",
           "timelineIntro": "We will explore temperature changes over time.",
           "differenceIntro": "Movement size represents the temperature difference.",
           "referenceIntro": "First, learn the full reference movement.",
@@ -623,7 +627,8 @@
           "showDiagnostics": "Show diagnostics",
           "hideDiagnostics": "Hide diagnostics",
           "startSpringSequence": "Start Spring Sequence",
-          "startWinterSequence": "Start Winter Sequence"
+          "startWinterSequence": "Start Winter Sequence",
+          "testSkeletonPulse": "Test Skeleton Success Pulse"
         },
         "scenes": {
           "intro": {

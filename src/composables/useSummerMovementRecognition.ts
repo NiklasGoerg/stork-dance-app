@@ -48,7 +48,7 @@ const summerBeatTargetsMs: Record<SummerBeat, number> = {
 
 const minCalibrationSamples = 6;
 const maxCalibrationSamples = 18;
-const summerExpectedMeasures = 4;
+const summerExpectedMeasures = 3;
 const summerVariationDurationMs = 4000;
 
 type CalibrationSample = {

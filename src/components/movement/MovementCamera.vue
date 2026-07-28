@@ -27,15 +27,23 @@ import { usePose } from "~/composables/usePose";
 import { useHands } from "~/composables/useHands";
 import { useMovementRecorder } from "~/composables/useMovementRecorder";
 import { useLandmarkSmoothing } from "~/composables/useLandmarkSmoothing";
+import {
+  SKELETON_VISUAL_CONFIG,
+  type SkeletonVisualMode,
+} from "~/utils/movement/skeletonVisualFeedback";
 
 const props = withDefaults(
   defineProps<{
     mode: ViewMode;
     showHands?: boolean;
     fixed?: boolean;
+    skeletonVisualMode?: SkeletonVisualMode;
+    skeletonPulseProgress?: number;
   }>(),
   {
     fixed: true,
+    skeletonVisualMode: "neutral",
+    skeletonPulseProgress: 1,
   },
 );
 
@@ -63,6 +71,23 @@ const HEIGHT = 360;
 let lastHandDetection = 0;
 const HAND_INTERVAL = 100;
 let lastHandResult: { landmarks: NormalizedLandmark[][] } | null = null;
+
+const bodyConnections: Array<[number, number]> = [
+  [11, 13],
+  [13, 15],
+  [12, 14],
+  [14, 16],
+  [11, 12],
+  [11, 23],
+  [12, 24],
+  [23, 24],
+  [23, 25],
+  [25, 27],
+  [24, 26],
+  [26, 28],
+];
+
+const bodyJointIndices = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
 
 // ==============================
 // INIT
@@ -146,6 +171,67 @@ const getPoint = (landmarks: NormalizedLandmark[], i: number) => ({
   y: (landmarks[i]?.y ?? 0) * HEIGHT,
 });
 
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const hexToRgb = (color: string) => {
+  const normalized = color.replace("#", "");
+  const value = Number.parseInt(normalized, 16);
+
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  };
+};
+
+const mixColor = (from: string, to: string, amount: number) => {
+  const start = hexToRgb(from);
+  const end = hexToRgb(to);
+  const t = clamp(amount, 0, 1);
+
+  return `rgb(${Math.round(start.r + (end.r - start.r) * t)}, ${Math.round(
+    start.g + (end.g - start.g) * t,
+  )}, ${Math.round(start.b + (end.b - start.b) * t)})`;
+};
+
+const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
+
+const getSkeletonStyle = () => {
+  const progress = clamp(props.skeletonPulseProgress, 0, 1);
+  const isSuccessPulse = props.skeletonVisualMode === "successPulse";
+  const pulseStrength = isSuccessPulse ? Math.sin(Math.PI * progress) : 0;
+  const innerColor = isSuccessPulse
+    ? mixColor(
+        SKELETON_VISUAL_CONFIG.innerSuccessColor,
+        SKELETON_VISUAL_CONFIG.innerColor,
+        easeOutCubic(progress),
+      )
+    : SKELETON_VISUAL_CONFIG.innerColor;
+
+  return {
+    innerColor,
+    outerColor: SKELETON_VISUAL_CONFIG.outerNeutralColor,
+    outerLineWidth: SKELETON_VISUAL_CONFIG.outerLineWidth,
+    innerLineWidth:
+      SKELETON_VISUAL_CONFIG.innerLineWidth +
+      pulseStrength * SKELETON_VISUAL_CONFIG.pulseAdditionalLineWidth,
+    outerJointRadius: SKELETON_VISUAL_CONFIG.outerJointRadius,
+    innerJointRadius:
+      SKELETON_VISUAL_CONFIG.innerJointRadius +
+      pulseStrength * SKELETON_VISUAL_CONFIG.pulseAdditionalJointRadius,
+    outerHeadLineWidth: SKELETON_VISUAL_CONFIG.outerHeadLineWidth,
+    innerHeadLineWidth:
+      SKELETON_VISUAL_CONFIG.innerHeadLineWidth +
+      pulseStrength * SKELETON_VISUAL_CONFIG.pulseAdditionalLineWidth,
+    glowBlur: pulseStrength * SKELETON_VISUAL_CONFIG.pulseGlowBlur,
+    opacity:
+      props.skeletonVisualMode === "trackingLimited"
+        ? SKELETON_VISUAL_CONFIG.trackingLimitedOpacity
+        : 1,
+  };
+};
+
 // ==============================
 // BODY
 // ==============================
@@ -164,20 +250,6 @@ const drawBody = (landmarks: NormalizedLandmark[]) => {
 
   context.lineCap = "round";
 
-  // ==============================
-  // STYLE
-  // ==============================
-
-  if (isSkeleton) {
-    context.strokeStyle = "lime";
-    context.lineWidth = 6;
-  }
-
-  if (isSilhouette) {
-    context.strokeStyle = "white";
-    context.lineWidth = 18;
-  }
-
   const line = (a: number, b: number) => {
     const p1 = getPoint(landmarks, a);
     const p2 = getPoint(landmarks, b);
@@ -189,30 +261,54 @@ const drawBody = (landmarks: NormalizedLandmark[]) => {
   };
 
   // ==============================
-  // BODY
+  // STYLE
   // ==============================
 
-  // Arme
-  line(11, 13);
-  line(13, 15);
+  if (isSkeleton) {
+    const style = getSkeletonStyle();
 
-  line(12, 14);
-  line(14, 16);
+    context.globalAlpha = style.opacity;
+    context.shadowColor = style.outerColor;
+    context.shadowBlur = style.glowBlur;
+    context.strokeStyle = style.outerColor;
+    context.lineWidth = style.outerLineWidth;
 
-  // Schultern
-  line(11, 12);
+    for (const [a, b] of bodyConnections) {
+      line(a, b);
+    }
 
-  // Torso
-  line(11, 23);
-  line(12, 24);
-  line(23, 24);
+    context.shadowBlur = 0;
+    context.strokeStyle = style.innerColor;
+    context.lineWidth = style.innerLineWidth;
 
-  // Beine
-  line(23, 25);
-  line(25, 27);
+    for (const [a, b] of bodyConnections) {
+      line(a, b);
+    }
 
-  line(24, 26);
-  line(26, 28);
+    for (const index of bodyJointIndices) {
+      const point = getPoint(landmarks, index);
+
+      context.fillStyle = style.outerColor;
+      context.beginPath();
+      context.arc(point.x, point.y, style.outerJointRadius, 0, Math.PI * 2);
+      context.fill();
+
+      context.fillStyle = style.innerColor;
+      context.beginPath();
+      context.arc(point.x, point.y, style.innerJointRadius, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.restore();
+    return;
+  }
+
+  if (isSilhouette) {
+    context.strokeStyle = "white";
+    context.lineWidth = 18;
+  }
+
+  bodyConnections.forEach(([a, b]) => line(a, b));
 
   context.restore();
 };
@@ -243,8 +339,38 @@ const drawHead = (landmarks: NormalizedLandmark[]) => {
   const isSilhouette = props.mode === "silhouette";
 
   if (isSkeleton) {
-    context.strokeStyle = "white";
-    context.lineWidth = 3;
+    const style = getSkeletonStyle();
+
+    context.globalAlpha = style.opacity;
+    context.shadowColor = style.outerColor;
+    context.shadowBlur = style.glowBlur;
+    context.strokeStyle = style.outerColor;
+    context.lineWidth = style.outerHeadLineWidth;
+
+    context.beginPath();
+    context.arc(nose.x, nose.y, radius, 0, Math.PI * 2);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(leftEar.x, leftEar.y);
+    context.lineTo(rightEar.x, rightEar.y);
+    context.stroke();
+
+    context.shadowBlur = 0;
+    context.strokeStyle = style.innerColor;
+    context.lineWidth = style.innerHeadLineWidth;
+
+    context.beginPath();
+    context.arc(nose.x, nose.y, radius, 0, Math.PI * 2);
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(leftEar.x, leftEar.y);
+    context.lineTo(rightEar.x, rightEar.y);
+    context.stroke();
+
+    context.restore();
+    return;
   }
 
   if (isSilhouette) {

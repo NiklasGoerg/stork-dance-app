@@ -58,6 +58,8 @@
             mode="camera"
             :fixed="false"
             :show-hands="false"
+            :skeleton-visual-mode="skeletonFeedbackState.mode"
+            :skeleton-pulse-progress="skeletonPulseProgress"
             @pose-landmarks="poseLandmarks = $event"
           />
         </section>
@@ -166,6 +168,9 @@
         <button class="btn" type="button" @click="startWinterSequence">
           {{ t("story.acts.act5.debug.startWinterSequence") }}
         </button>
+        <button class="btn" type="button" @click="triggerSkeletonPulseTest">
+          {{ t("story.acts.act5.debug.testSkeletonPulse") }}
+        </button>
       </div>
 
       <button
@@ -242,6 +247,17 @@
         <div>
           <dt>Act 5 flow completed</dt>
           <dd>{{ act5FlowCompleted ? "yes" : "no" }}</dd>
+        </div>
+        <div>
+          <dt>Skeleton feedback</dt>
+          <dd>
+            {{ skeletonFeedbackState.mode }} /
+            {{ skeletonPulseProgress.toFixed(2) }}
+          </dd>
+        </div>
+        <div>
+          <dt>Skeleton feedback source</dt>
+          <dd>{{ skeletonFeedbackState.sourceEvaluationId ?? "none" }}</dd>
         </div>
         <div>
           <dt>Mode</dt>
@@ -415,6 +431,15 @@
           <dd>{{ debugRepetitionLabel }}</dd>
         </div>
         <div>
+          <dt>Cycle timing</dt>
+          <dd>
+            bar {{ currentBar ?? "none" }} / beat {{ currentBeat ?? "none" }} /
+            {{ seasonPhase }} /
+            {{ isSeasonEvaluationEnabled ? "evaluated" : "preview" }} /
+            direction {{ movementDirection ?? "none" }}
+          </dd>
+        </div>
+        <div>
           <dt>Tracking</dt>
           <dd>{{ summerDebug.trackingActive ? "active" : "inactive" }}</dd>
         </div>
@@ -459,7 +484,7 @@
           <dd>{{ debugCycleResultsLabel }}</dd>
         </div>
         <div>
-          <dt>Current streak</dt>
+          <dt>Successful measures</dt>
           <dd>{{ summerDebug.consecutiveSuccessfulCycles }}</dd>
         </div>
         <div>
@@ -949,11 +974,19 @@ import { useSeasonalLearningCycle } from "~/composables/useSeasonalLearningCycle
 import { useSpringMovementRecognition } from "~/composables/useSpringMovementRecognition";
 import { useSummerMovementRecognition } from "~/composables/useSummerMovementRecognition";
 import { useWinterMovementRecognition } from "~/composables/useWinterMovementRecognition";
+import { useSkeletonVisualFeedback } from "~/composables/useSkeletonVisualFeedback";
 import { useStoryEngine } from "~/composables/useStoryEngine";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
 import { act5IntroCycleConfig } from "~/story/act5IntroCycle";
 import type { PoseLandmarkLike } from "~/types/pose";
-import type { MovementMeasureResult } from "~/composables/useBeatWindowMovementRecognition";
+import type {
+  MovementBeatEvaluationLike,
+  MovementMeasureResult,
+} from "~/composables/useBeatWindowMovementRecognition";
+import type {
+  BeatSkeletonFeedbackEvent,
+  BeatSkeletonFeedbackResult,
+} from "~/utils/movement/skeletonVisualFeedback";
 import {
   ACT5_SEASON_ENCODING,
   ACT5_SEASON_THEMES,
@@ -1094,13 +1127,6 @@ type MeasureFeedbackEvaluation = {
   score?: number;
   primaryFeedbackCode?: string;
 };
-
-const summerSequenceFlow = climateMovementFlowRegistry.summerSequenceDebug;
-const autumnSequenceFlow = climateMovementFlowRegistry.autumnSequenceDebug;
-const springSequenceFlow = climateMovementFlowRegistry.springSequenceDebug;
-const winterSequenceFlow = climateMovementFlowRegistry.winterSequenceDebug;
-const sequenceIntroStepDurationMs = 2_100;
-const sequenceIntroDurationMs = sequenceIntroStepDurationMs * 3;
 
 const summerMovementVariants: Record<SummerIntensity, { movementKey: string }> =
   {
@@ -1245,6 +1271,13 @@ const summerRecognition = useSummerMovementRecognition();
 const autumnRecognition = useAutumnMovementRecognition();
 const springRecognition = useSpringMovementRecognition();
 const winterRecognition = useWinterMovementRecognition();
+const {
+  skeletonFeedbackState,
+  pulseProgress: skeletonPulseProgress,
+  triggerBeatSuccess,
+  setTrackingLimited,
+  resetSkeletonFeedback,
+} = useSkeletonVisualFeedback();
 const debugDiagnosticsOpen = ref(false);
 const summerTestMode = ref<SummerTestMode>("single100");
 const autumnTestMode = ref<AutumnTestMode>("single100");
@@ -1279,6 +1312,11 @@ const summerFeedbackInterludeText = ref("");
 const autumnFeedbackInterludeText = ref("");
 const springFeedbackInterludeText = ref("");
 const winterFeedbackInterludeText = ref("");
+const summerRetryPreviewFeedbackText = ref("");
+const autumnRetryPreviewFeedbackText = ref("");
+const springRetryPreviewFeedbackText = ref("");
+const winterRetryPreviewFeedbackText = ref("");
+const act5RetryPreviewFeedbackText = ref("");
 const summerSequenceIntroStep = ref(0);
 const autumnSequenceIntroStep = ref(0);
 const springSequenceIntroStep = ref(0);
@@ -1296,6 +1334,12 @@ let autumnFeedbackInterludeTimer: ReturnType<typeof setInterval> | null = null;
 let springFeedbackInterludeTimer: ReturnType<typeof setInterval> | null = null;
 let winterFeedbackInterludeTimer: ReturnType<typeof setInterval> | null = null;
 let act5FlowAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
+const processedSkeletonBeatCounts: Record<ClimateSeason, number> = {
+  summer: 0,
+  autumn: 0,
+  winter: 0,
+  spring: 0,
+};
 const activeAct5FlowId = ref<Act5FlowId | null>(null);
 const activeAct5Phase = ref<Act5Phase | "idle">("idle");
 const activeAct5Targets = ref<Act5SequenceTarget[]>([]);
@@ -1303,31 +1347,43 @@ const activeAct5TargetIndex = ref(0);
 const activeAct5PreviewTarget = ref<Act5SequenceTarget | null>(null);
 const activeAct5PreviewTargetIndex = ref<number | null>(null);
 const activeAct5SequenceStatus = ref<
-  "idle" | "performing" | "previewingNext" | "storyIntro" | "completed"
+  | "idle"
+  | "performing"
+  | "feedbackInterlude"
+  | "previewingNext"
+  | "storyIntro"
+  | "completed"
 >("idle");
 const activeAct5AttemptNumber = ref(0);
 const handledAct5TargetEvaluationKey = ref("");
 const act5FlowCompleted = ref(false);
 const {
   currentDate,
+  currentBar,
+  currentBeat,
   currentFrame: instructorFrame,
   currentMovementSourceAspect: instructorSourceAspect,
   currentSeason,
   countdownRemaining,
   elapsedMs,
+  evaluationEnabled,
   isCountingDown,
   isCompleted,
   isTransition,
+  movementDirection,
   playbackState,
   repetitionIndex,
   seasonElapsedMs,
+  seasonPhase,
   showInstructorAvatar,
   totalDurationMs,
   cleanup,
   initialize,
   pause,
   play,
-  queueSeasonEndAction,
+  currentSeasonIndex,
+  queueSeasonIndexEndAction,
+  queueSeasonIndexRestart,
   queueSeasonRestart,
   reset,
   startCustomCycle,
@@ -1355,6 +1411,19 @@ const activeAct5MovementStep = computed(() =>
   activeAct5SequenceStatus.value === "performing"
     ? activeAct5Target.value
     : null,
+);
+const isSeasonPreviewBar = computed(
+  () =>
+    playbackState.value === "playing" &&
+    seasonPhase.value === "preview" &&
+    currentBar.value === 1 &&
+    !getActiveInterlude(),
+);
+const isSeasonEvaluationEnabled = computed(
+  () =>
+    playbackState.value === "playing" &&
+    evaluationEnabled.value &&
+    !getActiveInterlude(),
 );
 const activeAct5ClimateStep = computed(
   () => activeAct5DisplayTarget.value?.climateData ?? null,
@@ -1523,12 +1592,13 @@ const activeAct5TargetKey = computed(() =>
   getAct5MovementTargetKey(activeAct5DisplayTarget.value),
 );
 const isAct5PreparationStep = computed(
-  () =>
-    activeAct5SequenceStatus.value === "previewingNext" ||
-    activeAct5SequenceStatus.value === "storyIntro",
+  () => isAct5FinalFlowActive.value && isSeasonPreviewBar.value,
 );
 const isAct5RecognitionActive = computed(
-  () => activeAct5MovementStep.value !== null && !getActiveInterlude(),
+  () =>
+    activeAct5MovementStep.value !== null &&
+    isSeasonEvaluationEnabled.value &&
+    !getActiveInterlude(),
 );
 const isAct5AvatarPreviewActive = computed(
   () =>
@@ -1638,6 +1708,15 @@ const currentMovementValueLabel = computed(
     getMovementValueLabelFromValue(activeAct5MovementValue.value) ??
     getMovementValueLabel(activeClimateStep.value),
 );
+const getPreviewBeatCueKey = () => {
+  const beat = currentBeat.value ?? 1;
+
+  if (beat >= 4) return "story.acts.act5.movementText.previewBeat4";
+  if (beat === 3) return "story.acts.act5.movementText.previewBeat3";
+  if (beat === 2) return "story.acts.act5.movementText.previewBeat2";
+
+  return "story.acts.act5.movementText.previewBeat1";
+};
 const getCurrentMovementValue = () => {
   if (activeSeasonId.value === "summer") return currentSummerIntensity.value;
   if (activeSeasonId.value === "autumn") return currentAutumnValue.value;
@@ -1751,6 +1830,175 @@ const getActiveInterlude = () => {
   }
 
   return null;
+};
+const getActiveRetryPreviewFeedbackText = () => {
+  if (!isSeasonPreviewBar.value) return "";
+
+  if (isAct5FinalFlowActive.value) {
+    return act5RetryPreviewFeedbackText.value;
+  }
+
+  if (activeSeasonId.value === "summer") {
+    return summerRetryPreviewFeedbackText.value;
+  }
+  if (activeSeasonId.value === "autumn") {
+    return autumnRetryPreviewFeedbackText.value;
+  }
+  if (activeSeasonId.value === "spring") {
+    return springRetryPreviewFeedbackText.value;
+  }
+  if (activeSeasonId.value === "winter") {
+    return winterRetryPreviewFeedbackText.value;
+  }
+
+  return "";
+};
+type SkeletonBeatEvaluation = MovementBeatEvaluationLike<
+  number,
+  unknown,
+  string
+>;
+
+const resetProcessedSkeletonBeatCounts = () => {
+  processedSkeletonBeatCounts.summer = 0;
+  processedSkeletonBeatCounts.autumn = 0;
+  processedSkeletonBeatCounts.winter = 0;
+  processedSkeletonBeatCounts.spring = 0;
+};
+
+const resetSkeletonBeatFeedbackState = () => {
+  resetProcessedSkeletonBeatCounts();
+  resetSkeletonFeedback();
+};
+
+const getSkeletonFeedbackFlowId = (season: ClimateSeason) => {
+  if (activeAct5FlowId.value) return activeAct5FlowId.value;
+  if (season === "summer") {
+    return summerTestMode.value === "intensitySequence"
+      ? climateMovementFlowRegistry.summerSequenceDebug.id
+      : climateMovementFlowRegistry.summerSingleDebug.id;
+  }
+  if (season === "autumn") {
+    return autumnTestMode.value === "valueSequence"
+      ? climateMovementFlowRegistry.autumnSequenceDebug.id
+      : climateMovementFlowRegistry.autumnSingleDebug.id;
+  }
+  if (season === "spring") {
+    return springTestMode.value === "valueSequence"
+      ? climateMovementFlowRegistry.springSequenceDebug.id
+      : climateMovementFlowRegistry.springSingleDebug.id;
+  }
+
+  return winterTestMode.value === "valueSequence"
+    ? climateMovementFlowRegistry.winterSequenceDebug.id
+    : climateMovementFlowRegistry.winterSingleDebug.id;
+};
+
+const isSkeletonBeatFeedbackAllowed = (season: ClimateSeason) => {
+  if (playbackState.value !== "playing") return false;
+  if (getActiveInterlude()) return false;
+  if (isTransition.value || repetitionIndex.value === null) return false;
+  if (!isSeasonEvaluationEnabled.value) return false;
+
+  if (isAct5FinalFlowActive.value) {
+    return (
+      activeAct5SequenceStatus.value === "performing" &&
+      activeAct5MovementStep.value?.season === season
+    );
+  }
+
+  return currentSeason.value.id === season;
+};
+
+const getActiveSkeletonEvaluation = () => {
+  if (activeSeasonId.value === "summer") {
+    return summerRecognition.currentEvaluation.value;
+  }
+  if (activeSeasonId.value === "autumn") {
+    return autumnRecognition.currentEvaluation.value;
+  }
+  if (activeSeasonId.value === "spring") {
+    return springRecognition.currentEvaluation.value;
+  }
+  if (activeSeasonId.value === "winter") {
+    return winterRecognition.currentEvaluation.value;
+  }
+
+  return null;
+};
+
+const getBeatFeedbackResult = (
+  evaluation: SkeletonBeatEvaluation,
+): BeatSkeletonFeedbackResult => {
+  if (evaluation.trackingUnavailable) return "notEvaluable";
+
+  return evaluation.passed ? "passed" : "failed";
+};
+
+const createSkeletonFeedbackEvent = ({
+  season,
+  evaluation,
+  evaluationIndex,
+}: {
+  season: ClimateSeason;
+  evaluation: SkeletonBeatEvaluation;
+  evaluationIndex: number;
+}): BeatSkeletonFeedbackEvent => {
+  const flowId = getSkeletonFeedbackFlowId(season);
+  const flowStepId = getActiveFlowStepId();
+  const measureIndex = Math.floor(evaluationIndex / 4);
+  const beatIndex = Number(evaluation.beat);
+  const timestamp = Math.round(evaluation.timestamp);
+
+  return {
+    evaluationId: [
+      flowId,
+      flowStepId,
+      season,
+      measureIndex,
+      beatIndex,
+      timestamp,
+    ].join(":"),
+    flowId,
+    flowStepId,
+    measureIndex,
+    beatIndex,
+    result: getBeatFeedbackResult(evaluation),
+  };
+};
+
+const processSkeletonBeatEvaluations = (
+  season: ClimateSeason,
+  evaluations: readonly SkeletonBeatEvaluation[],
+) => {
+  if (evaluations.length < processedSkeletonBeatCounts[season]) {
+    processedSkeletonBeatCounts[season] = 0;
+  }
+
+  if (!isSkeletonBeatFeedbackAllowed(season)) {
+    processedSkeletonBeatCounts[season] = evaluations.length;
+    return;
+  }
+
+  for (
+    let index = processedSkeletonBeatCounts[season];
+    index < evaluations.length;
+    index++
+  ) {
+    const evaluation = evaluations[index];
+
+    if (!evaluation) continue;
+
+    triggerBeatSuccess(
+      createSkeletonFeedbackEvent({
+        season,
+        evaluation,
+        evaluationIndex: index,
+      }),
+    );
+  }
+
+  processedSkeletonBeatCounts[season] = evaluations.length;
 };
 const isVisibleSummerMeasureFeedbackCurrent = computed(
   () =>
@@ -2095,6 +2343,19 @@ const movementTextPresentation = computed<MovementTextPresentation>(() => {
     };
   }
 
+  const retryPreviewFeedbackText = getActiveRetryPreviewFeedbackText();
+
+  if (retryPreviewFeedbackText) {
+    return {
+      valueLabel,
+      message: retryPreviewFeedbackText,
+      secondaryMessage: t(getPreviewBeatCueKey()),
+      tone: "error",
+      phase: "feedbackInterlude",
+      messageSource: "feedbackInterlude",
+    };
+  }
+
   const measureFeedback = getCurrentVisibleMeasureFeedback();
 
   if (measureFeedback) {
@@ -2144,11 +2405,12 @@ const movementTextPresentation = computed<MovementTextPresentation>(() => {
         ? t("story.acts.act5.instructions.countdown", {
             count: countdownRemaining.value,
           })
-        : t(explanationKey),
+        : t(getPreviewBeatCueKey()),
       tone: "instruction",
       phase: "tutorialPreview",
       messageSource: "tutorialPreview",
       messageKey: act5Target.encoding.tutorialExplanationKey,
+      beatInstructionKey: isCountingDown.value ? undefined : explanationKey,
     };
   }
 
@@ -2184,14 +2446,16 @@ const movementTextPresentation = computed<MovementTextPresentation>(() => {
         interval: act5Target.interval,
         value: formatMovementPercent(act5Target.movementValue),
       }),
-      secondaryMessage: t(
-        act5Target.climateData.isBaseline
-          ? "story.acts.act5.story.temperatureComparison.baseline"
-          : "story.acts.act5.story.temperatureComparison.change",
-        {
-          temperature,
-        },
-      ),
+      secondaryMessage: isCountingDown.value
+        ? t(
+            act5Target.climateData.isBaseline
+              ? "story.acts.act5.story.temperatureComparison.baseline"
+              : "story.acts.act5.story.temperatureComparison.change",
+            {
+              temperature,
+            },
+          )
+        : t(getPreviewBeatCueKey()),
       tone: "instruction",
       phase: "seasonPreparation",
       messageSource: "seasonPreparation",
@@ -2243,6 +2507,18 @@ const movementTextPresentation = computed<MovementTextPresentation>(() => {
       secondaryMessage: t("story.acts.act5.instructions.countdown", {
         count: countdownRemaining.value,
       }),
+      tone: "instruction",
+      phase: "preparation",
+      messageSource: "preparation",
+      messageKey: "story.acts.act5.movementText.baselinePrep",
+    };
+  }
+
+  if (isSeasonPreviewBar.value) {
+    return {
+      valueLabel,
+      message: t("story.acts.act5.movementText.baselinePrep"),
+      secondaryMessage: t(getPreviewBeatCueKey()),
       tone: "instruction",
       phase: "preparation",
       messageSource: "preparation",
@@ -2637,6 +2913,7 @@ const resetSummerSequenceState = () => {
   isSummerFeedbackInterlude.value = false;
   summerFeedbackInterludeBeat.value = 1;
   summerFeedbackInterludeText.value = "";
+  summerRetryPreviewFeedbackText.value = "";
   summerSequenceIntroStep.value = 0;
   sequenceEvaluationHandledKey.value = "";
 };
@@ -2650,6 +2927,7 @@ const resetAutumnSequenceState = () => {
   isAutumnFeedbackInterlude.value = false;
   autumnFeedbackInterludeBeat.value = 1;
   autumnFeedbackInterludeText.value = "";
+  autumnRetryPreviewFeedbackText.value = "";
   autumnSequenceIntroStep.value = 0;
   autumnSequenceEvaluationHandledKey.value = "";
 };
@@ -2663,6 +2941,7 @@ const resetSpringSequenceState = () => {
   isSpringFeedbackInterlude.value = false;
   springFeedbackInterludeBeat.value = 1;
   springFeedbackInterludeText.value = "";
+  springRetryPreviewFeedbackText.value = "";
   springSequenceIntroStep.value = 0;
   springSequenceEvaluationHandledKey.value = "";
 };
@@ -2676,6 +2955,7 @@ const resetWinterSequenceState = () => {
   isWinterFeedbackInterlude.value = false;
   winterFeedbackInterludeBeat.value = 1;
   winterFeedbackInterludeText.value = "";
+  winterRetryPreviewFeedbackText.value = "";
   winterSequenceIntroStep.value = 0;
   winterSequenceEvaluationHandledKey.value = "";
 };
@@ -2833,26 +3113,6 @@ const getWinterInterludeFeedbackText = () => {
     : t("story.acts.act5.sequence.winterInterludeDefault");
 };
 
-const startFeedbackInterlude = (feedbackText: string) => {
-  if (summerFeedbackInterludeTimer) {
-    clearInterval(summerFeedbackInterludeTimer);
-  }
-
-  isSummerFeedbackInterlude.value = true;
-  summerSequencePhase.value = "feedbackInterlude";
-  summerFeedbackInterludeText.value = feedbackText;
-  summerFeedbackInterludeBeat.value = 1;
-
-  const startedAt = performance.now();
-
-  summerFeedbackInterludeTimer = setInterval(() => {
-    summerFeedbackInterludeBeat.value = Math.min(
-      Math.floor((performance.now() - startedAt) / 1000) + 1,
-      4,
-    );
-  }, 80);
-};
-
 const stopFeedbackInterlude = () => {
   if (summerFeedbackInterludeTimer) {
     clearInterval(summerFeedbackInterludeTimer);
@@ -2862,26 +3122,6 @@ const stopFeedbackInterlude = () => {
   isSummerFeedbackInterlude.value = false;
   summerFeedbackInterludeBeat.value = 1;
   summerFeedbackInterludeText.value = "";
-};
-
-const startAutumnFeedbackInterlude = (feedbackText: string) => {
-  if (autumnFeedbackInterludeTimer) {
-    clearInterval(autumnFeedbackInterludeTimer);
-  }
-
-  isAutumnFeedbackInterlude.value = true;
-  autumnSequencePhase.value = "feedbackInterlude";
-  autumnFeedbackInterludeText.value = feedbackText;
-  autumnFeedbackInterludeBeat.value = 1;
-
-  const startedAt = performance.now();
-
-  autumnFeedbackInterludeTimer = setInterval(() => {
-    autumnFeedbackInterludeBeat.value = Math.min(
-      Math.floor((performance.now() - startedAt) / 1000) + 1,
-      4,
-    );
-  }, 80);
 };
 
 const stopAutumnFeedbackInterlude = () => {
@@ -2895,26 +3135,6 @@ const stopAutumnFeedbackInterlude = () => {
   autumnFeedbackInterludeText.value = "";
 };
 
-const startSpringFeedbackInterlude = (feedbackText: string) => {
-  if (springFeedbackInterludeTimer) {
-    clearInterval(springFeedbackInterludeTimer);
-  }
-
-  isSpringFeedbackInterlude.value = true;
-  springSequencePhase.value = "feedbackInterlude";
-  springFeedbackInterludeText.value = feedbackText;
-  springFeedbackInterludeBeat.value = 1;
-
-  const startedAt = performance.now();
-
-  springFeedbackInterludeTimer = setInterval(() => {
-    springFeedbackInterludeBeat.value = Math.min(
-      Math.floor((performance.now() - startedAt) / 1000) + 1,
-      4,
-    );
-  }, 80);
-};
-
 const stopSpringFeedbackInterlude = () => {
   if (springFeedbackInterludeTimer) {
     clearInterval(springFeedbackInterludeTimer);
@@ -2924,26 +3144,6 @@ const stopSpringFeedbackInterlude = () => {
   isSpringFeedbackInterlude.value = false;
   springFeedbackInterludeBeat.value = 1;
   springFeedbackInterludeText.value = "";
-};
-
-const startWinterFeedbackInterlude = (feedbackText: string) => {
-  if (winterFeedbackInterludeTimer) {
-    clearInterval(winterFeedbackInterludeTimer);
-  }
-
-  isWinterFeedbackInterlude.value = true;
-  winterSequencePhase.value = "feedbackInterlude";
-  winterFeedbackInterludeText.value = feedbackText;
-  winterFeedbackInterludeBeat.value = 1;
-
-  const startedAt = performance.now();
-
-  winterFeedbackInterludeTimer = setInterval(() => {
-    winterFeedbackInterludeBeat.value = Math.min(
-      Math.floor((performance.now() - startedAt) / 1000) + 1,
-      4,
-    );
-  }, 80);
 };
 
 const stopWinterFeedbackInterlude = () => {
@@ -2965,7 +3165,7 @@ const clearAct5FlowAdvanceTimer = () => {
 };
 
 const getAct5RecognitionRules = (target: Act5SequenceTarget) => ({
-  measuresPerValue: target.rules.measuresPerStep,
+  measuresPerValue: Math.max(target.rules.measuresPerStep - 1, 1),
   requiredSuccessfulMeasures: target.rules.requiredSuccessfulMeasures,
 });
 
@@ -3004,17 +3204,16 @@ const startAct5RecognitionForTarget = (
   }
 };
 
-const buildAct5TargetCycleConfig = (
-  target: Act5SequenceTarget,
-  measuresPerStep = target.rules.measuresPerStep,
-  seasonalAudioEnabled = true,
+const buildAct5TargetsCycleConfig = (
+  targets: Act5SequenceTarget[],
 ): SeasonalCycleConfig => ({
   ...act5IntroCycleConfig,
-  seasons: [getSeasonConfig(target.season)],
-  seasonDurationMs: measuresPerStep * act5IntroCycleConfig.barDurationMs,
-  repetitionCount: measuresPerStep,
+  seasons: targets.map((target) => getSeasonConfig(target.season)),
+  seasonDurationMs:
+    act5IntroCycleConfig.repetitionCount * act5IntroCycleConfig.barDurationMs,
+  repetitionCount: act5IntroCycleConfig.repetitionCount,
   countdownDurationMs: act5IntroCycleConfig.countdownDurationMs,
-  seasonalAudioEnabled,
+  seasonalAudioEnabled: true,
 });
 
 const setAct5PhaseForTarget = (target: Act5SequenceTarget | null) => {
@@ -3038,14 +3237,12 @@ const clearAct5VisibleMeasureFeedback = () => {
   clearVisibleWinterMeasureFeedback();
 };
 
-const startAct5TargetPerformance = async (
+const startAct5TargetRecognition = (
   targetIndex: number,
   {
-    withCountdown = false,
     keepCalibration = true,
     manual = false,
   }: {
-    withCountdown?: boolean;
     keepCalibration?: boolean;
     manual?: boolean;
   } = {},
@@ -3068,8 +3265,8 @@ const startAct5TargetPerformance = async (
   setAct5PhaseForTarget(target);
   stopAct5FeedbackInterlude();
   clearAct5VisibleMeasureFeedback();
+  resetSkeletonFeedback({ clearHandledEvents: false });
   startAct5RecognitionForTarget(target, keepCalibration, manual);
-  await startCustomCycle(buildAct5TargetCycleConfig(target), withCountdown);
 };
 
 const stopAct5FeedbackInterlude = () => {
@@ -3091,7 +3288,9 @@ const resetAct5FlowState = () => {
   activeAct5AttemptNumber.value = 0;
   handledAct5TargetEvaluationKey.value = "";
   act5FlowCompleted.value = false;
+  act5RetryPreviewFeedbackText.value = "";
   stopAct5FeedbackInterlude();
+  resetSkeletonBeatFeedbackState();
 };
 
 const getAct5InterludeFeedbackText = (season: ClimateSeason) => {
@@ -3102,18 +3301,6 @@ const getAct5InterludeFeedbackText = (season: ClimateSeason) => {
   return getWinterInterludeFeedbackText();
 };
 
-const startAct5FeedbackInterlude = (
-  season: ClimateSeason,
-  feedbackText: string,
-) => {
-  stopAct5FeedbackInterlude();
-
-  if (season === "summer") startFeedbackInterlude(feedbackText);
-  if (season === "autumn") startAutumnFeedbackInterlude(feedbackText);
-  if (season === "spring") startSpringFeedbackInterlude(feedbackText);
-  if (season === "winter") startWinterFeedbackInterlude(feedbackText);
-};
-
 const completeAct5Flow = () => {
   clearAct5FlowAdvanceTimer();
   activeAct5PreviewTarget.value = null;
@@ -3121,6 +3308,7 @@ const completeAct5Flow = () => {
   activeAct5SequenceStatus.value = "completed";
   activeAct5Phase.value = "completed";
   act5FlowCompleted.value = true;
+  act5RetryPreviewFeedbackText.value = "";
   clearAct5VisibleMeasureFeedback();
   stopAct5FeedbackInterlude();
 
@@ -3130,28 +3318,6 @@ const completeAct5Flow = () => {
   ) {
     runtimeStore.completeAct();
   }
-};
-
-const startAct5TargetPreview = async (
-  targetIndex: number,
-  status: "previewingNext" | "storyIntro" = "previewingNext",
-) => {
-  clearAct5FlowAdvanceTimer();
-
-  const target = activeAct5Targets.value[targetIndex] ?? null;
-
-  if (!target) {
-    completeAct5Flow();
-    return;
-  }
-
-  activeAct5PreviewTarget.value = target;
-  activeAct5PreviewTargetIndex.value = targetIndex;
-  activeAct5SequenceStatus.value = status;
-  setAct5PhaseForTarget(target);
-  clearAct5VisibleMeasureFeedback();
-  stopAct5FeedbackInterlude();
-  await startCustomCycle(buildAct5TargetCycleConfig(target, 1, false));
 };
 
 const startCurrentSummerIntensityRecognition = ({
@@ -3164,6 +3330,7 @@ const startCurrentSummerIntensityRecognition = ({
   stopFeedbackInterlude();
   clearVisibleSummerMeasureFeedback();
   sequenceEvaluationHandledKey.value = "";
+  resetSkeletonFeedback({ clearHandledEvents: false });
   summerRecognition.start({
     manual,
     keepCalibration,
@@ -3176,6 +3343,7 @@ const startCurrentAutumnValueRecognition = () => {
   stopAutumnFeedbackInterlude();
   clearVisibleAutumnMeasureFeedback();
   autumnSequenceEvaluationHandledKey.value = "";
+  resetSkeletonFeedback({ clearHandledEvents: false });
   autumnRecognition.start({ valueClass: currentAutumnValue.value });
   autumnSequencePhase.value = "performing";
 };
@@ -3184,6 +3352,7 @@ const startCurrentSpringValueRecognition = () => {
   stopSpringFeedbackInterlude();
   clearVisibleSpringMeasureFeedback();
   springSequenceEvaluationHandledKey.value = "";
+  resetSkeletonFeedback({ clearHandledEvents: false });
   springRecognition.start({ value: currentSpringValue.value });
   springSequencePhase.value = "performing";
 };
@@ -3192,6 +3361,7 @@ const startCurrentWinterValueRecognition = () => {
   stopWinterFeedbackInterlude();
   clearVisibleWinterMeasureFeedback();
   winterSequenceEvaluationHandledKey.value = "";
+  resetSkeletonFeedback({ clearHandledEvents: false });
   winterRecognition.start({ value: currentWinterValue.value });
   winterSequencePhase.value = "performing";
 };
@@ -3251,12 +3421,14 @@ const handleSummerSequenceEvaluation = () => {
     markCurrentIntensityComplete();
 
     if (!nextSummerStep.value) {
+      summerRetryPreviewFeedbackText.value = "";
       summerSequencePhase.value = "completed";
       return;
     }
 
     summerSequencePhase.value = "transitioningToNextIntensity";
     queueSeasonRestart("summer", false, () => {
+      summerRetryPreviewFeedbackText.value = "";
       currentSummerIntensityIndex.value += 1;
       startCurrentSummerIntensityRecognition({ keepCalibration: true });
     });
@@ -3264,22 +3436,13 @@ const handleSummerSequenceEvaluation = () => {
   }
 
   summerSequencePhase.value = "evaluatingIntensity";
-  const interludeFeedbackText = getInterludeFeedbackText();
+  const retryFeedbackText = getInterludeFeedbackText();
 
-  queueSeasonRestart(
-    "summer",
-    false,
-    () => {
-      summerRecognition.markRetryConsumed();
-      startCurrentSummerIntensityRecognition({ keepCalibration: true });
-    },
-    {
-      interludeDurationMs: summerSequenceFlow.feedbackInterludeDurationMs,
-      onInterludeStart: () => {
-        startFeedbackInterlude(interludeFeedbackText);
-      },
-    },
-  );
+  queueSeasonRestart("summer", false, () => {
+    summerRetryPreviewFeedbackText.value = retryFeedbackText;
+    summerRecognition.markRetryConsumed();
+    startCurrentSummerIntensityRecognition({ keepCalibration: true });
+  });
 };
 
 const handleAutumnSequenceEvaluation = () => {
@@ -3297,12 +3460,14 @@ const handleAutumnSequenceEvaluation = () => {
     markCurrentAutumnValueComplete();
 
     if (!nextAutumnStep.value) {
+      autumnRetryPreviewFeedbackText.value = "";
       autumnSequencePhase.value = "completed";
       return;
     }
 
     autumnSequencePhase.value = "transitioningToNextIntensity";
     queueSeasonRestart("autumn", false, () => {
+      autumnRetryPreviewFeedbackText.value = "";
       currentAutumnValueIndex.value += 1;
       startCurrentAutumnValueRecognition();
     });
@@ -3310,21 +3475,12 @@ const handleAutumnSequenceEvaluation = () => {
   }
 
   autumnSequencePhase.value = "evaluatingIntensity";
-  const interludeFeedbackText = getAutumnInterludeFeedbackText();
+  const retryFeedbackText = getAutumnInterludeFeedbackText();
 
-  queueSeasonRestart(
-    "autumn",
-    false,
-    () => {
-      startCurrentAutumnValueRecognition();
-    },
-    {
-      interludeDurationMs: autumnSequenceFlow.feedbackInterludeDurationMs,
-      onInterludeStart: () => {
-        startAutumnFeedbackInterlude(interludeFeedbackText);
-      },
-    },
-  );
+  queueSeasonRestart("autumn", false, () => {
+    autumnRetryPreviewFeedbackText.value = retryFeedbackText;
+    startCurrentAutumnValueRecognition();
+  });
 };
 
 const handleSpringSequenceEvaluation = () => {
@@ -3342,12 +3498,14 @@ const handleSpringSequenceEvaluation = () => {
     markCurrentSpringValueComplete();
 
     if (!nextSpringStep.value) {
+      springRetryPreviewFeedbackText.value = "";
       springSequencePhase.value = "completed";
       return;
     }
 
     springSequencePhase.value = "transitioningToNextIntensity";
     queueSeasonRestart("spring", false, () => {
+      springRetryPreviewFeedbackText.value = "";
       currentSpringValueIndex.value += 1;
       startCurrentSpringValueRecognition();
     });
@@ -3355,21 +3513,12 @@ const handleSpringSequenceEvaluation = () => {
   }
 
   springSequencePhase.value = "evaluatingIntensity";
-  const interludeFeedbackText = getSpringInterludeFeedbackText();
+  const retryFeedbackText = getSpringInterludeFeedbackText();
 
-  queueSeasonRestart(
-    "spring",
-    false,
-    () => {
-      startCurrentSpringValueRecognition();
-    },
-    {
-      interludeDurationMs: springSequenceFlow.feedbackInterludeDurationMs,
-      onInterludeStart: () => {
-        startSpringFeedbackInterlude(interludeFeedbackText);
-      },
-    },
-  );
+  queueSeasonRestart("spring", false, () => {
+    springRetryPreviewFeedbackText.value = retryFeedbackText;
+    startCurrentSpringValueRecognition();
+  });
 };
 
 const handleWinterSequenceEvaluation = () => {
@@ -3387,12 +3536,14 @@ const handleWinterSequenceEvaluation = () => {
     markCurrentWinterValueComplete();
 
     if (!nextWinterStep.value) {
+      winterRetryPreviewFeedbackText.value = "";
       winterSequencePhase.value = "completed";
       return;
     }
 
     winterSequencePhase.value = "transitioningToNextIntensity";
     queueSeasonRestart("winter", false, () => {
+      winterRetryPreviewFeedbackText.value = "";
       currentWinterValueIndex.value += 1;
       startCurrentWinterValueRecognition();
     });
@@ -3400,63 +3551,39 @@ const handleWinterSequenceEvaluation = () => {
   }
 
   winterSequencePhase.value = "evaluatingIntensity";
-  const interludeFeedbackText = getWinterInterludeFeedbackText();
+  const retryFeedbackText = getWinterInterludeFeedbackText();
 
-  queueSeasonRestart(
-    "winter",
-    false,
-    () => {
-      startCurrentWinterValueRecognition();
-    },
-    {
-      interludeDurationMs: winterSequenceFlow.feedbackInterludeDurationMs,
-      onInterludeStart: () => {
-        startWinterFeedbackInterlude(interludeFeedbackText);
-      },
-    },
-  );
+  queueSeasonRestart("winter", false, () => {
+    winterRetryPreviewFeedbackText.value = retryFeedbackText;
+    startCurrentWinterValueRecognition();
+  });
 };
 
-const scheduleAct5SuccessTransition = (target: Act5SequenceTarget) => {
+const scheduleAct5SuccessTransition = () => {
   const nextTargetIndex = activeAct5TargetIndex.value + 1;
   const nextTarget = activeAct5Targets.value[nextTargetIndex] ?? null;
 
-  queueSeasonEndAction(target.season, () => {
-    if (!nextTarget) {
-      completeAct5Flow();
-      return;
-    }
+  if (nextTarget) {
+    act5RetryPreviewFeedbackText.value = "";
+    return;
+  }
 
-    const previewStatus =
-      target.context === "tutorial" && nextTarget.context === "climateStory"
-        ? "storyIntro"
-        : "previewingNext";
-
-    void startAct5TargetPreview(nextTargetIndex, previewStatus);
+  queueSeasonIndexEndAction(activeAct5TargetIndex.value, () => {
+    completeAct5Flow();
   });
 };
 
 const scheduleAct5Retry = (target: Act5SequenceTarget) => {
-  const interludeFeedbackText = getAct5InterludeFeedbackText(target.season);
+  const retryFeedbackText = getAct5InterludeFeedbackText(target.season);
 
-  queueSeasonRestart(
-    target.season,
-    false,
-    () => {
-      stopAct5FeedbackInterlude();
-      activeAct5SequenceStatus.value = "performing";
-      activeAct5AttemptNumber.value++;
-      handledAct5TargetEvaluationKey.value = "";
-      clearAct5VisibleMeasureFeedback();
-      startAct5RecognitionForTarget(target, true);
-    },
-    {
-      interludeDurationMs: target.rules.feedbackInterludeBeats * 1000,
-      onInterludeStart: () => {
-        startAct5FeedbackInterlude(target.season, interludeFeedbackText);
-      },
-    },
-  );
+  queueSeasonIndexRestart(activeAct5TargetIndex.value, false, () => {
+    stopAct5FeedbackInterlude();
+    act5RetryPreviewFeedbackText.value = retryFeedbackText;
+    activeAct5SequenceStatus.value = "performing";
+    startAct5TargetRecognition(activeAct5TargetIndex.value, {
+      keepCalibration: true,
+    });
+  });
 };
 
 const handleAct5TargetEvaluation = ({
@@ -3486,7 +3613,7 @@ const handleAct5TargetEvaluation = ({
   handledAct5TargetEvaluationKey.value = handledKey;
 
   if (passed) {
-    scheduleAct5SuccessTransition(target);
+    scheduleAct5SuccessTransition();
     return;
   }
 
@@ -3533,13 +3660,13 @@ const resetClimateDebugFlowState = () => {
 const startAct5FinalFlow = async (
   flowId: Act5FlowId,
   targets: Act5SequenceTarget[],
-  {
-    withStoryIntro = false,
-  }: {
-    withStoryIntro?: boolean;
-  } = {},
 ) => {
   if (!(await ensureClimateDataReady())) return;
+
+  if (!targets.length) {
+    completeAct5Flow();
+    return;
+  }
 
   storyEngine.startAct(act.value.id);
   resetAct5FlowState();
@@ -3552,16 +3679,11 @@ const startAct5FinalFlow = async (
   activeAct5AttemptNumber.value = 0;
   act5FlowCompleted.value = false;
 
-  if (withStoryIntro) {
-    void startAct5TargetPreview(0, "storyIntro");
-    return;
-  }
-
-  void startAct5TargetPerformance(0, {
-    withCountdown: true,
+  startAct5TargetRecognition(0, {
     keepCalibration: false,
     manual: true,
   });
+  await startCustomCycle(buildAct5TargetsCycleConfig(targets), true);
 };
 
 const startAct5FullFlow = async () => {
@@ -3587,9 +3709,6 @@ const startAct5WithoutTutorial = async () => {
   await startAct5FinalFlow(
     climateMovementFlowRegistry.act5Story.id,
     buildAct5ClimateStoryFlow(dataset),
-    {
-      withStoryIntro: true,
-    },
   );
 };
 
@@ -3680,24 +3799,11 @@ const startSummerSequence = async () => {
   winterRecognition.reset();
   await reset();
 
-  summerSequencePhase.value = "intro";
-  summerSequenceIntroStep.value = 0;
-
-  summerSequenceIntroTimers = [
-    setTimeout(() => {
-      summerSequenceIntroStep.value = 1;
-    }, sequenceIntroStepDurationMs),
-    setTimeout(() => {
-      summerSequenceIntroStep.value = 2;
-    }, sequenceIntroStepDurationMs * 2),
-    setTimeout(() => {
-      startCurrentSummerIntensityRecognition({
-        manual: true,
-        keepCalibration: false,
-      });
-      void startSingleSeason("summer");
-    }, sequenceIntroDurationMs),
-  ];
+  startCurrentSummerIntensityRecognition({
+    manual: true,
+    keepCalibration: false,
+  });
+  await startSingleSeason("summer");
 };
 
 const startAutumnSequence = async () => {
@@ -3718,21 +3824,8 @@ const startAutumnSequence = async () => {
   winterRecognition.reset();
   await reset();
 
-  autumnSequencePhase.value = "intro";
-  autumnSequenceIntroStep.value = 0;
-
-  autumnSequenceIntroTimers = [
-    setTimeout(() => {
-      autumnSequenceIntroStep.value = 1;
-    }, sequenceIntroStepDurationMs),
-    setTimeout(() => {
-      autumnSequenceIntroStep.value = 2;
-    }, sequenceIntroStepDurationMs * 2),
-    setTimeout(() => {
-      startCurrentAutumnValueRecognition();
-      void startSingleSeason("autumn");
-    }, sequenceIntroDurationMs),
-  ];
+  startCurrentAutumnValueRecognition();
+  await startSingleSeason("autumn");
 };
 
 const startSpringSequence = async () => {
@@ -3753,21 +3846,8 @@ const startSpringSequence = async () => {
   winterRecognition.reset();
   await reset();
 
-  springSequencePhase.value = "intro";
-  springSequenceIntroStep.value = 0;
-
-  springSequenceIntroTimers = [
-    setTimeout(() => {
-      springSequenceIntroStep.value = 1;
-    }, sequenceIntroStepDurationMs),
-    setTimeout(() => {
-      springSequenceIntroStep.value = 2;
-    }, sequenceIntroStepDurationMs * 2),
-    setTimeout(() => {
-      startCurrentSpringValueRecognition();
-      void startSingleSeason("spring");
-    }, sequenceIntroDurationMs),
-  ];
+  startCurrentSpringValueRecognition();
+  await startSingleSeason("spring");
 };
 
 const startWinterSequence = async () => {
@@ -3788,21 +3868,8 @@ const startWinterSequence = async () => {
   winterRecognition.reset();
   await reset();
 
-  winterSequencePhase.value = "intro";
-  winterSequenceIntroStep.value = 0;
-
-  winterSequenceIntroTimers = [
-    setTimeout(() => {
-      winterSequenceIntroStep.value = 1;
-    }, sequenceIntroStepDurationMs),
-    setTimeout(() => {
-      winterSequenceIntroStep.value = 2;
-    }, sequenceIntroStepDurationMs * 2),
-    setTimeout(() => {
-      startCurrentWinterValueRecognition();
-      void startSingleSeason("winter");
-    }, sequenceIntroDurationMs),
-  ];
+  startCurrentWinterValueRecognition();
+  await startSingleSeason("winter");
 };
 
 const formatDebugValue = (value: number | null | undefined) => {
@@ -3817,6 +3884,17 @@ const formatCriteria = (criteria: Array<{ id: string; label: string }>) => {
   if (!criteria.length) return "none";
 
   return criteria.map((criterion) => criterion.id).join(", ");
+};
+
+const triggerSkeletonPulseTest = () => {
+  triggerBeatSuccess({
+    evaluationId: `debug-skeleton-pulse-${Math.round(performance.now())}`,
+    flowId: "debug",
+    flowStepId: "debug-skeleton-pulse",
+    measureIndex: 0,
+    beatIndex: 1,
+    result: "passed",
+  });
 };
 
 const continueToNextAct = async () => {
@@ -3848,6 +3926,7 @@ watch(
     seasonElapsedMs,
     repetitionIndex,
     isTransition,
+    isSeasonEvaluationEnabled,
     isSummerFeedbackInterlude,
     isAutumnFeedbackInterlude,
     isSpringFeedbackInterlude,
@@ -3855,8 +3934,7 @@ watch(
   ],
   () => {
     const recognitionSuppressed =
-      activeAct5SequenceStatus.value === "previewingNext" ||
-      activeAct5SequenceStatus.value === "storyIntro";
+      activeAct5SequenceStatus.value === "feedbackInterlude";
     const recognitionPlaybackState = recognitionSuppressed
       ? "idle"
       : playbackState.value;
@@ -3879,6 +3957,7 @@ watch(
       seasonElapsedMs: seasonElapsedMs.value,
       repetitionIndex: recognitionRepetitionIndex,
       isTransition: recognitionIsTransition,
+      evaluationEnabled: isSeasonEvaluationEnabled.value,
     });
     autumnRecognition.updateFrame({
       landmarks: mirrorLandmarksHorizontally(poseLandmarks.value),
@@ -3889,6 +3968,7 @@ watch(
       seasonElapsedMs: seasonElapsedMs.value,
       repetitionIndex: recognitionRepetitionIndex,
       isTransition: recognitionIsTransition,
+      evaluationEnabled: isSeasonEvaluationEnabled.value,
     });
     springRecognition.updateFrame({
       landmarks: poseLandmarks.value,
@@ -3899,6 +3979,7 @@ watch(
       seasonElapsedMs: seasonElapsedMs.value,
       repetitionIndex: recognitionRepetitionIndex,
       isTransition: recognitionIsTransition,
+      evaluationEnabled: isSeasonEvaluationEnabled.value,
     });
     winterRecognition.updateFrame({
       landmarks: poseLandmarks.value,
@@ -3909,28 +3990,24 @@ watch(
       seasonElapsedMs: seasonElapsedMs.value,
       repetitionIndex: recognitionRepetitionIndex,
       isTransition: recognitionIsTransition,
+      evaluationEnabled: isSeasonEvaluationEnabled.value,
     });
   },
   { immediate: true },
 );
 
 watch(
-  playbackState,
-  (state) => {
-    if (!isAct5FinalFlowActive.value || state !== "completed") return;
+  currentSeasonIndex,
+  (nextIndex) => {
+    if (!isAct5FinalFlowActive.value) return;
+    if (activeAct5SequenceStatus.value !== "performing") return;
+    if (nextIndex === activeAct5TargetIndex.value) return;
 
-    if (
-      activeAct5SequenceStatus.value !== "previewingNext" &&
-      activeAct5SequenceStatus.value !== "storyIntro"
-    ) {
-      return;
-    }
+    const target = activeAct5Targets.value[nextIndex] ?? null;
 
-    const targetIndex = activeAct5PreviewTargetIndex.value;
+    if (!target) return;
 
-    if (targetIndex === null) return;
-
-    void startAct5TargetPerformance(targetIndex, {
+    startAct5TargetRecognition(nextIndex, {
       keepCalibration: true,
     });
   },
@@ -4150,6 +4227,61 @@ watch(
 
 watch(
   [
+    () => summerRecognition.finalizedBeatEvaluations.value,
+    () => autumnRecognition.finalizedBeatEvaluations.value,
+    () => springRecognition.finalizedBeatEvaluations.value,
+    () => winterRecognition.finalizedBeatEvaluations.value,
+  ],
+  ([
+    summerEvaluations,
+    autumnEvaluations,
+    springEvaluations,
+    winterEvaluations,
+  ]) => {
+    processSkeletonBeatEvaluations("summer", summerEvaluations);
+    processSkeletonBeatEvaluations("autumn", autumnEvaluations);
+    processSkeletonBeatEvaluations("spring", springEvaluations);
+    processSkeletonBeatEvaluations("winter", winterEvaluations);
+  },
+);
+
+watch(
+  [
+    poseLandmarks,
+    playbackState,
+    () => activeSeasonId.value,
+    () => activeAct5SequenceStatus.value,
+    () => activeAct5MovementStep.value?.id,
+    isTransition,
+    repetitionIndex,
+    isSummerFeedbackInterlude,
+    isAutumnFeedbackInterlude,
+    isSpringFeedbackInterlude,
+    isWinterFeedbackInterlude,
+    () => summerRecognition.currentEvaluation.value,
+    () => autumnRecognition.currentEvaluation.value,
+    () => springRecognition.currentEvaluation.value,
+    () => winterRecognition.currentEvaluation.value,
+  ],
+  () => {
+    if (!isSkeletonBeatFeedbackAllowed(activeSeasonId.value)) {
+      setTrackingLimited(false);
+      return;
+    }
+
+    if (!poseLandmarks.value?.length) {
+      setTrackingLimited(true);
+      return;
+    }
+
+    setTrackingLimited(
+      getActiveSkeletonEvaluation()?.trackingUnavailable === true,
+    );
+  },
+);
+
+watch(
+  [
     () => summerRecognition.currentEvaluation.value,
     () => summerRecognition.cycleEvaluations.value,
     () => autumnRecognition.currentEvaluation.value,
@@ -4177,6 +4309,7 @@ onBeforeUnmount(() => {
   autumnRecognition.reset();
   springRecognition.reset();
   winterRecognition.reset();
+  resetSkeletonBeatFeedbackState();
   cleanup();
   storyEngine.stopStoryEngine();
 });

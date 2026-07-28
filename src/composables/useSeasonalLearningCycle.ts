@@ -23,7 +23,8 @@ type LoadedSeasonMovement = {
 };
 
 type QueuedSeasonRestart = {
-  seasonId: SeasonalCycleSeasonConfig["id"];
+  seasonId?: SeasonalCycleSeasonConfig["id"];
+  seasonIndex?: number;
   withCountdown: boolean;
   beforeRestart?: () => void;
   interludeDurationMs?: number;
@@ -31,7 +32,8 @@ type QueuedSeasonRestart = {
 };
 
 type QueuedSeasonEndAction = {
-  seasonId: SeasonalCycleSeasonConfig["id"];
+  seasonId?: SeasonalCycleSeasonConfig["id"];
+  seasonIndex?: number;
   onSeasonEnd: () => void;
 };
 
@@ -95,6 +97,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
   let playbackStartedFromMs = 0;
   let activeMovementSeasonId: string | null = null;
   let activeAudioSeasonId: string | null = null;
+  let activeAudioSeasonIndex: number | null = null;
   let hasRestartedBaseRhythmForCycle = false;
   let queuedSeasonRestart: QueuedSeasonRestart | null = null;
   let queuedSeasonEndAction: QueuedSeasonEndAction | null = null;
@@ -110,6 +113,12 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
   const currentSeasonIndex = computed(() => progress.value.seasonIndex);
   const seasonElapsedMs = computed(() => progress.value.seasonElapsedMs);
   const repetitionIndex = computed(() => progress.value.repetitionIndex);
+  const currentBar = computed(() => progress.value.currentBar);
+  const currentBeat = computed(() => progress.value.currentBeat);
+  const currentRepetition = computed(() => progress.value.currentRepetition);
+  const seasonPhase = computed(() => progress.value.phase);
+  const evaluationEnabled = computed(() => progress.value.evaluationEnabled);
+  const movementDirection = computed(() => progress.value.movementDirection);
   const isTransition = computed(() => progress.value.isTransition);
   const isCompleted = computed(() => playbackState.value === "completed");
   const countdownRemaining = computed(() =>
@@ -187,6 +196,21 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     activeConfig.value.seasons[
       (seasonIndex + 1) % activeConfig.value.seasons.length
     ] ?? activeConfig.value.seasons[0];
+
+  const getQueuedSeasonIndex = (
+    request: Pick<QueuedSeasonRestart, "seasonId" | "seasonIndex">,
+  ) => {
+    if (typeof request.seasonIndex === "number") {
+      return request.seasonIndex >= 0 &&
+        request.seasonIndex < activeConfig.value.seasons.length
+        ? request.seasonIndex
+        : -1;
+    }
+
+    return activeConfig.value.seasons.findIndex(
+      (season) => season.id === request.seasonId,
+    );
+  };
 
   const showMovementFirstFrame = async (season: SeasonalCycleSeasonConfig) => {
     const movement = await loadSeasonMovement(season);
@@ -315,9 +339,15 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
 
     const currentProgress = progress.value;
 
-    if (activeAudioSeasonId === currentProgress.season.id) return;
+    if (
+      activeAudioSeasonId === currentProgress.season.id &&
+      activeAudioSeasonIndex === currentProgress.seasonIndex
+    ) {
+      return;
+    }
 
     activeAudioSeasonId = currentProgress.season.id;
+    activeAudioSeasonIndex = currentProgress.seasonIndex;
     await audioStore.startSeasonalAudio(
       {
         id: currentProgress.season.id,
@@ -350,6 +380,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     timelineMs.value = totalDurationMs.value;
     playbackState.value = "completed";
     activeAudioSeasonId = null;
+    activeAudioSeasonIndex = null;
     audioStore.stopSeasonalAudio();
     audioStore.resetBaseRhythmLoop();
     syncStoryClock();
@@ -368,9 +399,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
       playbackStartedFromMs + performance.now() - playbackStartedAtMs;
 
     if (queuedSeasonRestart) {
-      const seasonIndex = activeConfig.value.seasons.findIndex(
-        (season) => season.id === queuedSeasonRestart?.seasonId,
-      );
+      const seasonIndex = getQueuedSeasonIndex(queuedSeasonRestart);
       const seasonEndMs =
         seasonIndex >= 0
           ? (seasonIndex + 1) * activeConfig.value.seasonDurationMs
@@ -388,6 +417,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
           clearAnimationFrame();
           void seekToTimeline(seasonEndMs);
           activeAudioSeasonId = null;
+          activeAudioSeasonIndex = null;
           audioStore.stopSeasonalAudio();
           restartRequest.onInterludeStart?.();
           interludeRestartTimer = setTimeout(() => {
@@ -396,6 +426,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
             void restartSeason(
               restartRequest.seasonId,
               restartRequest.withCountdown,
+              restartRequest.seasonIndex,
             );
           }, restartRequest.interludeDurationMs);
         } else {
@@ -403,6 +434,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
           void restartSeason(
             restartRequest.seasonId,
             restartRequest.withCountdown,
+            restartRequest.seasonIndex,
           );
         }
         return;
@@ -410,9 +442,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     }
 
     if (queuedSeasonEndAction) {
-      const seasonIndex = activeConfig.value.seasons.findIndex(
-        (season) => season.id === queuedSeasonEndAction?.seasonId,
-      );
+      const seasonIndex = getQueuedSeasonIndex(queuedSeasonEndAction);
       const seasonEndMs =
         seasonIndex >= 0
           ? (seasonIndex + 1) * activeConfig.value.seasonDurationMs
@@ -430,6 +460,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
         void seekToTimeline(seasonEndMs);
         playbackState.value = "completed";
         activeAudioSeasonId = null;
+        activeAudioSeasonIndex = null;
         audioStore.stopSeasonalAudio();
         endAction.onSeasonEnd();
         return;
@@ -461,6 +492,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     playbackState.value = "idle";
     timelineMs.value = 0;
     activeAudioSeasonId = null;
+    activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = false;
     await loadAssets();
     audioStore.stopSeasonalAudio();
@@ -493,6 +525,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     playbackStartedAtMs = performance.now();
     playbackStartedFromMs = nextStartedFromMs;
     activeAudioSeasonId = null;
+    activeAudioSeasonIndex = null;
     await audioStore.startBaseRhythmLoop(
       timelineMs.value < 0
         ? (countdownDurationMs.value + timelineMs.value) / 1000
@@ -526,6 +559,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     timelineMs.value = 0;
     activeMovementSeasonId = null;
     activeAudioSeasonId = null;
+    activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = false;
     audioStore.stopSeasonalAudio();
     audioStore.resetBaseRhythmLoop();
@@ -561,6 +595,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     await loadAssets();
     clearAnimationFrame();
     activeAudioSeasonId = null;
+    activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = nextTimelineMs > 0;
 
     const nextStartedFromMs = withCountdown
@@ -593,6 +628,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     timelineMs.value = 0;
     activeMovementSeasonId = null;
     activeAudioSeasonId = null;
+    activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = false;
     audioStore.stopSeasonalAudio();
     audioStore.resetBaseRhythmLoop();
@@ -614,6 +650,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     timelineMs.value = 0;
     activeMovementSeasonId = null;
     activeAudioSeasonId = null;
+    activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = false;
     audioStore.stopSeasonalAudio();
     audioStore.resetBaseRhythmLoop();
@@ -623,15 +660,19 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
   };
 
   const restartSeason = async (
-    seasonId: SeasonalCycleSeasonConfig["id"],
+    seasonId?: SeasonalCycleSeasonConfig["id"],
     withCountdown = true,
+    seasonIndexOverride?: number,
   ) => {
     clearInterludeRestartTimer();
     queuedSeasonRestart = null;
     queuedSeasonEndAction = null;
-    const seasonIndex = activeConfig.value.seasons.findIndex(
-      (season) => season.id === seasonId,
-    );
+    const seasonIndex =
+      typeof seasonIndexOverride === "number"
+        ? seasonIndexOverride
+        : activeConfig.value.seasons.findIndex(
+            (season) => season.id === seasonId,
+          );
 
     if (seasonIndex < 0) return;
 
@@ -641,6 +682,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     playbackState.value = "idle";
     activeMovementSeasonId = null;
     activeAudioSeasonId = null;
+    activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = nextTimelineMs > 0;
     audioStore.stopSeasonalAudio();
     audioStore.resetBaseRhythmLoop();
@@ -670,6 +712,25 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     };
   };
 
+  const queueSeasonIndexRestart = (
+    seasonIndex: number,
+    withCountdown = false,
+    beforeRestart?: () => void,
+    options: {
+      interludeDurationMs?: number;
+      onInterludeStart?: () => void;
+    } = {},
+  ) => {
+    queuedSeasonEndAction = null;
+    queuedSeasonRestart = {
+      seasonIndex,
+      withCountdown,
+      beforeRestart,
+      interludeDurationMs: options.interludeDurationMs,
+      onInterludeStart: options.onInterludeStart,
+    };
+  };
+
   const queueSeasonEndAction = (
     seasonId: SeasonalCycleSeasonConfig["id"],
     onSeasonEnd: () => void,
@@ -681,12 +742,24 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     };
   };
 
+  const queueSeasonIndexEndAction = (
+    seasonIndex: number,
+    onSeasonEnd: () => void,
+  ) => {
+    queuedSeasonRestart = null;
+    queuedSeasonEndAction = {
+      seasonIndex,
+      onSeasonEnd,
+    };
+  };
+
   const cleanup = () => {
     clearAnimationFrame();
     clearInterludeRestartTimer();
     queuedSeasonRestart = null;
     queuedSeasonEndAction = null;
     activeAudioSeasonId = null;
+    activeAudioSeasonIndex = null;
     audioStore.stopSeasonalAudio();
     audioStore.resetBaseRhythmLoop();
     stopMovementPlayback();
@@ -697,19 +770,25 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
 
   return {
     currentDate,
+    currentBar,
+    currentBeat,
     currentFrame,
     currentMovementSourceAspect,
+    currentRepetition,
     currentSeason,
     currentSeasonIndex,
     countdownRemaining,
     elapsedMs,
+    evaluationEnabled,
     isCountingDown,
     isCompleted,
     isTransition,
+    movementDirection,
     playbackState,
     progress,
     repetitionIndex,
     seasonElapsedMs,
+    seasonPhase,
     showInstructorAvatar,
     totalDurationMs,
     initialize,
@@ -720,6 +799,8 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     restoreFullCycle,
     startCustomCycle,
     startSingleSeason,
+    queueSeasonIndexEndAction,
+    queueSeasonIndexRestart,
     queueSeasonEndAction,
     queueSeasonRestart,
     cleanup,

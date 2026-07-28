@@ -47,7 +47,7 @@ const winterBeatTargetsMs: Record<WinterBeat, number> = {
   4: 3000,
 };
 
-const winterExpectedMeasures = 4;
+const winterExpectedMeasures = 3;
 const winterVariationDurationMs = 4000;
 const maxPreparationSamples = 18;
 
