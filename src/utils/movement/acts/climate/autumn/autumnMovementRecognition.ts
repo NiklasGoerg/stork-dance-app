@@ -1,4 +1,8 @@
 import type { PoseLandmarkLike } from "~/types/pose";
+import {
+  getBeatPassState,
+  getWeightedBeatEvaluationScore,
+} from "~/utils/movement/core/criteria";
 import { extractNormalizedBodyMetrics } from "~/utils/movement/core/bodyMetrics";
 import {
   buildAutumnBeatCriteria,
@@ -538,22 +542,12 @@ export const evaluateAutumnBeat = (
     expectedDirection,
     expectedValueClass,
   });
-  const essentialCriteria = criteria.filter(
-    (item) => item.importance === "essential",
-  );
-  const evaluableEssentialCriteria = essentialCriteria.filter(
-    (item) => item.status !== "notEvaluable",
-  );
-  const passedEssentialCriteria = essentialCriteria.filter(
-    (item) => item.passed,
-  );
-  const trackingUnavailable =
-    evaluableEssentialCriteria.length < Math.ceil(essentialCriteria.length / 2);
   const score = getAutumnCriteriaScore(criteria);
-  const passed =
-    !trackingUnavailable &&
-    passedEssentialCriteria.length === essentialCriteria.length &&
-    score >= autumnMovementConfig.thresholds.beatPassScore;
+  const { passed, trackingUnavailable } = getBeatPassState({
+    criteria,
+    score,
+    passScore: autumnMovementConfig.thresholds.beatPassScore,
+  });
 
   return {
     beat,
@@ -630,16 +624,10 @@ export const getPrioritizedAutumnProblemEvaluation = (
 export const evaluateAutumnSequence = (
   beatEvaluations: AutumnBeatEvaluation[],
 ): AutumnSequenceEvaluation => {
-  const totalWeight = beatEvaluations.reduce(
-    (sum, evaluation) => sum + AUTUMN_BEAT_WEIGHTS[evaluation.beat],
-    0,
+  const totalScore = getWeightedBeatEvaluationScore(
+    beatEvaluations,
+    AUTUMN_BEAT_WEIGHTS,
   );
-  const weightedScore = beatEvaluations.reduce(
-    (sum, evaluation) =>
-      sum + evaluation.score * AUTUMN_BEAT_WEIGHTS[evaluation.beat],
-    0,
-  );
-  const totalScore = totalWeight > 0 ? weightedScore / totalWeight : 0;
   const hasTrackingUnavailable = beatEvaluations.some(
     (evaluation) => evaluation.trackingUnavailable,
   );

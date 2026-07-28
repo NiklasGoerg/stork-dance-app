@@ -1,4 +1,5 @@
 import type { PoseLandmarkLike } from "~/types/pose";
+import { getWeightedBeatEvaluationScore } from "~/utils/movement/core/criteria";
 import { getMovementRangeFitScore } from "~/utils/movement/core/range";
 import {
   buildSummerBeatCriteria,
@@ -410,16 +411,10 @@ export const evaluateSummerSequence = (
   expectedIntensity: SummerIntensity = "100",
 ): SummerSequenceEvaluation => {
   const thresholds = summerMovementConfig[expectedIntensity].thresholds;
-  const totalWeight = beatEvaluations.reduce(
-    (sum, evaluation) => sum + SUMMER_BEAT_WEIGHTS[evaluation.beat],
-    0,
+  const totalScore = getWeightedBeatEvaluationScore(
+    beatEvaluations,
+    SUMMER_BEAT_WEIGHTS,
   );
-  const weightedScore = beatEvaluations.reduce(
-    (sum, evaluation) =>
-      sum + evaluation.score * SUMMER_BEAT_WEIGHTS[evaluation.beat],
-    0,
-  );
-  const totalScore = totalWeight > 0 ? weightedScore / totalWeight : 0;
   const hasTrackingUnavailable = beatEvaluations.some(
     (evaluation) => evaluation.trackingUnavailable,
   );

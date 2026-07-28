@@ -2,6 +2,10 @@ import { computed, ref } from "vue";
 import type { PoseLandmarkLike } from "~/types/pose";
 import { useBeatWindowMovementRecognition } from "~/composables/useBeatWindowMovementRecognition";
 import {
+  getMedianSampleValue,
+  pushRollingSample,
+} from "~/utils/movement/core/calibration";
+import {
   BEAT_EVALUATION_WINDOW_MS,
   evaluateSummerBeat,
   evaluateSummerSequence,
@@ -52,17 +56,6 @@ type CalibrationSample = {
 
 const oppositeStepSide = (side: Exclude<SummerStepSide, "none" | "unknown">) =>
   side === "left" ? "right" : "left";
-
-const getMedian = (values: number[]) => {
-  if (!values.length) return null;
-
-  const sortedValues = [...values].sort((a, b) => a - b);
-  const middleIndex = Math.floor(sortedValues.length / 2);
-
-  if (sortedValues.length % 2 === 1) return sortedValues[middleIndex];
-
-  return (sortedValues[middleIndex - 1] + sortedValues[middleIndex]) / 2;
-};
 
 const isConcreteStepSide = (
   side: SummerStepSide,
@@ -134,24 +127,27 @@ export const useSummerMovementRecognition = () => {
 
     if (!leftAnkle || !rightAnkle) return;
 
-    calibrationSamples.push({
-      leftAnkleX: leftAnkle.x,
-      rightAnkleX: rightAnkle.x,
-      ankleDistance: metrics.normalizedAnkleDistance,
-    });
-
-    if (calibrationSamples.length > maxCalibrationSamples) {
-      calibrationSamples.shift();
-    }
-
-    const leftAnkleX = getMedian(
-      calibrationSamples.map((sample) => sample.leftAnkleX),
+    pushRollingSample(
+      calibrationSamples,
+      {
+        leftAnkleX: leftAnkle.x,
+        rightAnkleX: rightAnkle.x,
+        ankleDistance: metrics.normalizedAnkleDistance,
+      },
+      maxCalibrationSamples,
     );
-    const rightAnkleX = getMedian(
-      calibrationSamples.map((sample) => sample.rightAnkleX),
+
+    const leftAnkleX = getMedianSampleValue(
+      calibrationSamples,
+      (sample) => sample.leftAnkleX,
     );
-    const ankleDistance = getMedian(
-      calibrationSamples.map((sample) => sample.ankleDistance),
+    const rightAnkleX = getMedianSampleValue(
+      calibrationSamples,
+      (sample) => sample.rightAnkleX,
+    );
+    const ankleDistance = getMedianSampleValue(
+      calibrationSamples,
+      (sample) => sample.ankleDistance,
     );
 
     if (

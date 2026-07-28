@@ -65,24 +65,6 @@
         >
           {{ instructionCueText }}
         </h2>
-        <div v-if="activeSequenceVisible" class="climate-act-sequence">
-          <div class="climate-act-sequence__steps">
-            <span
-              v-for="value in activeSequenceValues"
-              :key="value"
-              :class="{
-                'climate-act-sequence__step--complete':
-                  activeCompletedSequenceValues.includes(value),
-                'climate-act-sequence__step--active':
-                  activeSequenceCurrentValue === value &&
-                  activeSequencePhase !== 'completed',
-              }"
-            >
-              {{ t("story.acts.act5.sequence.movementValue", { value }) }}
-            </span>
-          </div>
-          <p>{{ activeSequenceMetaText }}</p>
-        </div>
       </section>
     </section>
 
@@ -136,13 +118,23 @@
           type="button"
           @click="startDebugSeason(season.id)"
         >
-          Start {{ season.label }}
+          {{
+            t("story.acts.act5.debug.startSeason", {
+              season: season.labelKey ? t(season.labelKey) : season.label,
+            })
+          }}
         </button>
         <button class="btn" type="button" @click="startSummerSequence">
-          Start Summer Sequence
+          {{ t("story.acts.act5.debug.startSummerSequence") }}
         </button>
         <button class="btn" type="button" @click="startAutumnSequence">
-          Start Autumn Sequence
+          {{ t("story.acts.act5.debug.startAutumnSequence") }}
+        </button>
+        <button class="btn" type="button" @click="startSpringSequence">
+          {{ t("story.acts.act5.debug.startSpringSequence") }}
+        </button>
+        <button class="btn" type="button" @click="startWinterSequence">
+          {{ t("story.acts.act5.debug.startWinterSequence") }}
         </button>
       </div>
 
@@ -151,17 +143,27 @@
         type="button"
         @click="debugDiagnosticsOpen = !debugDiagnosticsOpen"
       >
-        {{ debugDiagnosticsOpen ? "Hide diagnostics" : "Show diagnostics" }}
+        {{
+          debugDiagnosticsOpen
+            ? t("story.acts.act5.debug.hideDiagnostics")
+            : t("story.acts.act5.debug.showDiagnostics")
+        }}
       </button>
 
       <dl v-if="debugDiagnosticsOpen" class="climate-act-debug__grid">
         <div>
           <dt>Mode</dt>
-          <dd>{{ summerTestMode }} / {{ autumnTestMode }}</dd>
+          <dd>
+            {{ summerTestMode }} / {{ autumnTestMode }} / {{ springTestMode }} /
+            {{ winterTestMode }}
+          </dd>
         </div>
         <div>
           <dt>Sequence phase</dt>
-          <dd>{{ summerSequencePhase }} / {{ autumnSequencePhase }}</dd>
+          <dd>
+            {{ summerSequencePhase }} / {{ autumnSequencePhase }} /
+            {{ springSequencePhase }} / {{ winterSequencePhase }}
+          </dd>
         </div>
         <div>
           <dt>Intensity</dt>
@@ -537,6 +539,185 @@
             }}
           </dd>
         </div>
+        <div>
+          <dt>Spring value</dt>
+          <dd>{{ currentSpringValue }}</dd>
+        </div>
+        <div>
+          <dt>Next spring value</dt>
+          <dd>{{ nextSpringValue ?? "none" }}</dd>
+        </div>
+        <div>
+          <dt>Spring beat</dt>
+          <dd>{{ springDebug.currentBeat }}</dd>
+        </div>
+        <div>
+          <dt>Spring feedback</dt>
+          <dd>{{ springDebug.feedbackCode ?? "none" }}</dd>
+        </div>
+        <div>
+          <dt>Spring cycles</dt>
+          <dd>{{ debugSpringCycleResultsLabel }}</dd>
+        </div>
+        <div>
+          <dt>Spring height region</dt>
+          <dd>{{ springDebug.detectedHandHeightRegion }}</dd>
+        </div>
+        <div>
+          <dt>Spring height range</dt>
+          <dd>
+            {{ formatDebugValue(springDebug.metrics.expectedHandHeightMin) }}..
+            {{ formatDebugValue(springDebug.metrics.expectedHandHeightMax) }}
+          </dd>
+        </div>
+        <div>
+          <dt>Spring hands H</dt>
+          <dd>
+            L {{ formatDebugValue(springDebug.metrics.leftHandHeight) }} / R
+            {{ formatDebugValue(springDebug.metrics.rightHandHeight) }}
+          </dd>
+        </div>
+        <div>
+          <dt>Spring avg/low H</dt>
+          <dd>
+            {{ formatDebugValue(springDebug.metrics.averageHandHeight) }} /
+            {{ formatDebugValue(springDebug.metrics.lowerHandHeight) }}
+          </dd>
+        </div>
+        <div>
+          <dt>Spring arm opening</dt>
+          <dd>{{ formatDebugValue(springDebug.metrics.handOpeningWidth) }}</dd>
+        </div>
+        <div>
+          <dt>Spring wrist outside</dt>
+          <dd>
+            L
+            {{ formatDebugValue(springDebug.metrics.leftWristOutsideShoulder) }}
+            / R
+            {{
+              formatDebugValue(springDebug.metrics.rightWristOutsideShoulder)
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>Spring elbows</dt>
+          <dd>{{ formatDebugValue(springDebug.metrics.averageElbowAngle) }}</dd>
+        </div>
+        <div>
+          <dt>Spring knee</dt>
+          <dd>
+            {{ springDebug.expectedKneeSide }} /
+            {{ springDebug.detectedKneeSide }}
+          </dd>
+        </div>
+        <div>
+          <dt>Spring essential missing</dt>
+          <dd>{{ formatCriteria(springDebug.essentialFailed) }}</dd>
+        </div>
+        <div>
+          <dt>Winter value</dt>
+          <dd>{{ currentWinterValue }}</dd>
+        </div>
+        <div>
+          <dt>Next winter value</dt>
+          <dd>{{ nextWinterValue ?? "none" }}</dd>
+        </div>
+        <div>
+          <dt>Winter beat</dt>
+          <dd>{{ winterDebug.currentBeat }}</dd>
+        </div>
+        <div>
+          <dt>Winter feedback</dt>
+          <dd>{{ winterDebug.feedbackCode ?? "none" }}</dd>
+        </div>
+        <div>
+          <dt>Winter cycles</dt>
+          <dd>{{ debugWinterCycleResultsLabel }}</dd>
+        </div>
+        <div>
+          <dt>Winter contraction</dt>
+          <dd>
+            {{ winterDebug.expectedContractionClass }} /
+            {{ winterDebug.detectedContractionClass }}
+          </dd>
+        </div>
+        <div>
+          <dt>Compactness</dt>
+          <dd>
+            {{ formatDebugValue(winterDebug.metrics.compactnessScore) }}
+          </dd>
+        </div>
+        <div>
+          <dt>Shoulder/hip drop</dt>
+          <dd>
+            H {{ formatDebugValue(winterDebug.metrics.headDrop) }} / S
+            {{ formatDebugValue(winterDebug.metrics.shoulderDrop) }} / hip
+            {{ formatDebugValue(winterDebug.metrics.hipDrop) }}
+          </dd>
+        </div>
+        <div>
+          <dt>Body ratio</dt>
+          <dd>{{ formatDebugValue(winterDebug.metrics.bodyHeightRatio) }}</dd>
+        </div>
+        <div>
+          <dt>Winter knees</dt>
+          <dd>
+            L {{ formatDebugValue(winterDebug.metrics.leftKneeAngle) }} / R
+            {{ formatDebugValue(winterDebug.metrics.rightKneeAngle) }} / avg
+            {{ formatDebugValue(winterDebug.metrics.averageKneeAngle) }}
+          </dd>
+        </div>
+        <div>
+          <dt>Winter hands</dt>
+          <dd>
+            open {{ formatDebugValue(winterDebug.metrics.handOpeningWidth) }} /
+            dist
+            {{ formatDebugValue(winterDebug.metrics.normalizedHandDistance) }}
+          </dd>
+        </div>
+        <div>
+          <dt>Winter arms</dt>
+          <dd>
+            open {{ winterDebug.metrics.armsOpenSideways }} / hug
+            {{ winterDebug.metrics.selfHugDetected }} / head
+            {{ winterDebug.metrics.headProtectionDetected }}
+          </dd>
+        </div>
+        <div>
+          <dt>Winter hug signals</dt>
+          <dd>
+            centered {{ winterDebug.metrics.handsCenteredForHug }} / compact
+            {{ winterDebug.metrics.handsCompactForHug }}
+          </dd>
+        </div>
+        <div>
+          <dt>Winter return</dt>
+          <dd>
+            {{ winterDebug.metrics.returnToUprightDetected }} / released
+            {{ winterDebug.metrics.armsReleased }}
+          </dd>
+        </div>
+        <div>
+          <dt>Winter neutral</dt>
+          <dd>
+            {{
+              winterDebug.neutralReference
+                ? `${winterDebug.neutralReference.sampleCount} samples`
+                : "pending"
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>Winter feedback measure</dt>
+          <dd>
+            {{ repetitionIndex }} /
+            {{ visibleWinterMeasureFeedback?.measureIndex ?? "none" }}
+          </dd>
+        </div>
+        <div>
+          <dt>Winter essential missing</dt>
+          <dd>{{ formatCriteria(winterDebug.essentialFailed) }}</dd>
+        </div>
       </dl>
     </section>
   </main>
@@ -550,7 +731,9 @@ import SeasonClock from "~/components/story/SeasonClock.vue";
 import StoryProgressSidebar from "~/components/story/StoryProgressSidebar.vue";
 import { useAutumnMovementRecognition } from "~/composables/useAutumnMovementRecognition";
 import { useSeasonalLearningCycle } from "~/composables/useSeasonalLearningCycle";
+import { useSpringMovementRecognition } from "~/composables/useSpringMovementRecognition";
 import { useSummerMovementRecognition } from "~/composables/useSummerMovementRecognition";
+import { useWinterMovementRecognition } from "~/composables/useWinterMovementRecognition";
 import { useStoryEngine } from "~/composables/useStoryEngine";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
 import { act5IntroCycleConfig } from "~/story/act5IntroCycle";
@@ -561,12 +744,27 @@ import {
   getAutumnDirectionForRepetition,
   getPrioritizedAutumnProblemEvaluation,
 } from "~/utils/movement/acts/climate/autumn/autumnMovementRecognition";
+import {
+  SPRING_MOVEMENT_REFERENCE,
+  getPrioritizedSpringProblemEvaluation,
+} from "~/utils/movement/acts/climate/spring/springMovementRecognition";
+import { getPrioritizedWinterProblemEvaluation } from "~/utils/movement/acts/climate/winter/winterMovementRecognition";
 import type {
   AutumnDirection,
   AutumnFeedbackCode,
   AutumnRecognitionMetrics,
   AutumnValueClass,
 } from "~/utils/movement/acts/climate/autumn/autumnMovementRecognition";
+import type {
+  SpringFeedbackCode,
+  SpringRecognitionMetrics,
+  SpringValue,
+} from "~/utils/movement/acts/climate/spring/springMovementRecognition";
+import type {
+  WinterFeedbackCode,
+  WinterRecognitionMetrics,
+  WinterValue,
+} from "~/utils/movement/acts/climate/winter/winterMovementRecognition";
 import type {
   SummerFeedbackCode,
   SummerIntensity,
@@ -580,6 +778,8 @@ const props = defineProps<{
 
 type SummerTestMode = "single100" | "intensitySequence";
 type AutumnTestMode = "single100" | "valueSequence";
+type SpringTestMode = "single100" | "valueSequence";
+type WinterTestMode = "single100" | "valueSequence";
 type ValueSequencePhase =
   | "idle"
   | "intro"
@@ -593,11 +793,19 @@ type VisibleMeasureFeedback = {
   text: string;
   tone: "success" | "error";
 };
+type MeasureFeedbackEvaluation = {
+  measureIndex: number;
+  result: string;
+};
 
 const summerSequenceFlow = climateMovementFlowRegistry.summerSequenceDebug;
 const autumnSequenceFlow = climateMovementFlowRegistry.autumnSequenceDebug;
+const springSequenceFlow = climateMovementFlowRegistry.springSequenceDebug;
+const winterSequenceFlow = climateMovementFlowRegistry.winterSequenceDebug;
 const summerIntensityOrder = summerSequenceFlow.values;
 const autumnValueOrder = autumnSequenceFlow.values;
+const springValueOrder = springSequenceFlow.values;
+const winterValueOrder = winterSequenceFlow.values;
 const sequenceIntroDurationMs = 4_200;
 
 const summerMovementVariants: Record<SummerIntensity, { movementKey: string }> =
@@ -611,132 +819,167 @@ const summerMovementVariants: Record<SummerIntensity, { movementKey: string }> =
 const summerIntensityGuidance: Record<
   SummerIntensity,
   {
-    warmingLabel: string;
-    movementLabel: string;
-    beatInstructions: Record<number, string>;
+    warmingLabelKey: string;
+    beatInstructionKeys: Record<number, string>;
   }
 > = {
   "100": {
-    warmingLabel: "Much warmer",
-    movementLabel: "Full movement",
-    beatInstructions: {
-      1: "Hands together",
-      2: "Side step · Reach fully",
-      3: "Open fully",
-      4: "Return to neutral",
+    warmingLabelKey: "story.acts.act5.summerInstructions.warming.100",
+    beatInstructionKeys: {
+      1: "story.acts.act5.summerInstructions.beats.1",
+      2: "story.acts.act5.summerInstructions.beats.100.2",
+      3: "story.acts.act5.summerInstructions.beats.100.3",
+      4: "story.acts.act5.summerInstructions.beats.4",
     },
   },
   "60": {
-    warmingLabel: "Warmer",
-    movementLabel: "Medium movement",
-    beatInstructions: {
-      1: "Hands together",
-      2: "Side step · Reach up",
-      3: "Open moderately",
-      4: "Return to neutral",
+    warmingLabelKey: "story.acts.act5.summerInstructions.warming.60",
+    beatInstructionKeys: {
+      1: "story.acts.act5.summerInstructions.beats.1",
+      2: "story.acts.act5.summerInstructions.beats.60.2",
+      3: "story.acts.act5.summerInstructions.beats.60.3",
+      4: "story.acts.act5.summerInstructions.beats.4",
     },
   },
   "30": {
-    warmingLabel: "Slightly warmer",
-    movementLabel: "Small movement",
-    beatInstructions: {
-      1: "Hands together",
-      2: "Side step · Bent arms",
-      3: "Open slightly",
-      4: "Return to neutral",
+    warmingLabelKey: "story.acts.act5.summerInstructions.warming.30",
+    beatInstructionKeys: {
+      1: "story.acts.act5.summerInstructions.beats.1",
+      2: "story.acts.act5.summerInstructions.beats.30.2",
+      3: "story.acts.act5.summerInstructions.beats.30.3",
+      4: "story.acts.act5.summerInstructions.beats.4",
     },
   },
   "10": {
-    warmingLabel: "Near reference",
-    movementLabel: "Minimal movement",
-    beatInstructions: {
-      1: "Hands together",
-      2: "Side step · Stay compact",
-      3: "Small opening",
-      4: "Return to neutral",
+    warmingLabelKey: "story.acts.act5.summerInstructions.warming.10",
+    beatInstructionKeys: {
+      1: "story.acts.act5.summerInstructions.beats.1",
+      2: "story.acts.act5.summerInstructions.beats.10.2",
+      3: "story.acts.act5.summerInstructions.beats.10.3",
+      4: "story.acts.act5.summerInstructions.beats.4",
     },
   },
 };
 
 const summerBeatFallbackInstructions: Record<number, string> = {
-  1: "Hands to chest center.",
-  2: "Arms overhead, step to the side.",
-  3: "Open your arms in a wide circle.",
-  4: "Return to neutral.",
+  1: "story.acts.act5.summerInstructions.fallback.1",
+  2: "story.acts.act5.summerInstructions.fallback.2",
+  3: "story.acts.act5.summerInstructions.fallback.3",
+  4: "story.acts.act5.summerInstructions.fallback.4",
 };
 
 const autumnBeatInstructions: Record<number, string> = {
-  1: "Hands to the starting side.",
-  2: "Sweep through the semicircle.",
-  3: "Reach the value endpoint.",
-  4: "Return hands to chest center.",
+  1: "story.acts.act5.autumnInstructions.beats.1",
+  2: "story.acts.act5.autumnInstructions.beats.2",
+  3: "story.acts.act5.autumnInstructions.beats.3",
+  4: "story.acts.act5.autumnInstructions.beats.4",
 };
 
-const autumnFeedbackCueText: Record<AutumnFeedbackCode, string> = {
-  SUCCESS: "Great job. That autumn sweep was correct.",
-  FULL_BODY_NOT_VISIBLE: "make sure your full body is visible",
-  HANDS_NOT_VISIBLE: "make sure both hands are visible",
-  START_LEFT: "start with your hands on the left side",
-  START_RIGHT: "start with your hands on the right side",
-  WRONG_SWEEP_DIRECTION: "sweep in the other direction",
-  INSUFFICIENT_PROGRESS: "move a little farther from the starting pose",
-  SWEEP_RIGHT: "sweep toward the right side",
-  SWEEP_LEFT: "sweep toward the left side",
-  ENDPOINT_TOO_SHORT: "sweep farther toward the endpoint",
-  ENDPOINT_TOO_FAR: "use a shorter sweep",
-  ENDPOINT_REACHED_TOO_LATE: "reach the endpoint by beat three",
-  ENDPOINT_UNSTABLE: "hold the endpoint briefly",
-  END_AT_DESTINATION_SIDE: "end clearly on the destination side",
-  END_AT_FAR_DESTINATION_SIDE: "end at your maximum comfortable reach",
-  END_AT_CENTER: "end with your hands in front",
-  END_BEFORE_CENTER: "stay just before the center",
-  END_AT_START_SIDE_DIAGONAL: "move diagonally toward the front",
-  ALIGN_BOTH_ARMS: "point both arms toward the endpoint",
-  EXTEND_OUTER_ARM: "extend the outer arm toward the endpoint",
-  KEEP_HANDS_AT_CHEST_HEIGHT: "keep your hands at chest or shoulder height",
-  KEEP_CHEST_FORWARD: "keep your chest facing forward",
-  RETURN_HANDS_TO_CENTER: "return your hands to chest center",
-  RETURN_FEET_TOGETHER: "bring your feet close together",
-  TRY_AGAIN: "use the same smooth autumn sweep",
-  START_ON_LEFT: "start with your hands on the left side",
-  START_ON_RIGHT: "start with your hands on the right side",
-  MOVE_HANDS_TOGETHER: "keep both hands together",
-  KEEP_HANDS_CHEST_HEIGHT: "keep your hands at chest or shoulder height",
-  SWEEP_FARTHER: "sweep farther around your body",
-  SWEEP_LESS: "use a shorter sweep",
+const springBeatInstructions: Record<number, string> = {
+  1: "story.acts.act5.springInstructions.beat1",
+  2: "story.acts.act5.springInstructions.beat2",
+  3: "story.acts.act5.springInstructions.beat3",
+  4: "story.acts.act5.springInstructions.beat4",
 };
+
+const winterBeatInstructions: Record<number, string> = {
+  1: "story.acts.act5.winterInstructions.beat1",
+  2: "story.acts.act5.winterInstructions.beat2",
+  3: "story.acts.act5.winterInstructions.beat3",
+  4: "story.acts.act5.winterInstructions.beat4",
+};
+
 const { t, translate, getActTitle, getSceneTitle } = useStoryTranslations();
+const getAutumnFeedbackCueText = (feedbackCode: AutumnFeedbackCode) =>
+  t(`story.acts.act5.autumnFeedback.${feedbackCode}`);
+const getSpringFeedbackCueText = (feedbackCode: SpringFeedbackCode) =>
+  t(`story.acts.act5.springFeedback.${feedbackCode}`);
+const getWinterFeedbackCueText = (feedbackCode: WinterFeedbackCode) =>
+  t(`story.acts.act5.winterFeedback.${feedbackCode}`);
+const getVisibleMeasureFeedback = (
+  evaluation: MeasureFeedbackEvaluation,
+  cycleFeedbackKey: string,
+  getProblemCue: () => string,
+): VisibleMeasureFeedback => {
+  if (evaluation.result === "success") {
+    return {
+      measureIndex: evaluation.measureIndex,
+      text: t(`${cycleFeedbackKey}.success`),
+      tone: "success",
+    };
+  }
+
+  if (evaluation.result === "almostCorrect") {
+    return {
+      measureIndex: evaluation.measureIndex,
+      text: t(`${cycleFeedbackKey}.almostCorrect`),
+      tone: "success",
+    };
+  }
+
+  return {
+    measureIndex: evaluation.measureIndex,
+    text: getProblemCue(),
+    tone: "error",
+  };
+};
 const storyEngine = useStoryEngine();
 const runtimeStore = useStoryRuntimeStore();
 const route = useRoute();
 const poseLandmarks = ref<PoseLandmarkLike[] | null>(null);
 const summerRecognition = useSummerMovementRecognition();
 const autumnRecognition = useAutumnMovementRecognition();
+const springRecognition = useSpringMovementRecognition();
+const winterRecognition = useWinterMovementRecognition();
 const debugDiagnosticsOpen = ref(false);
 const summerTestMode = ref<SummerTestMode>("single100");
 const autumnTestMode = ref<AutumnTestMode>("single100");
+const springTestMode = ref<SpringTestMode>("single100");
+const winterTestMode = ref<WinterTestMode>("single100");
 const summerSequencePhase = ref<ValueSequencePhase>("idle");
 const autumnSequencePhase = ref<ValueSequencePhase>("idle");
+const springSequencePhase = ref<ValueSequencePhase>("idle");
+const winterSequencePhase = ref<ValueSequencePhase>("idle");
 const currentSummerIntensityIndex = ref(0);
 const currentAutumnValueIndex = ref(0);
+const currentSpringValueIndex = ref(0);
+const currentWinterValueIndex = ref(0);
 const completedSummerIntensities = ref<SummerIntensity[]>([]);
 const completedAutumnValues = ref<AutumnValueClass[]>([]);
+const completedSpringValues = ref<SpringValue[]>([]);
+const completedWinterValues = ref<WinterValue[]>([]);
 const isSummerFeedbackInterlude = ref(false);
 const isAutumnFeedbackInterlude = ref(false);
+const isSpringFeedbackInterlude = ref(false);
+const isWinterFeedbackInterlude = ref(false);
 const visibleSummerMeasureFeedback = ref<VisibleMeasureFeedback | null>(null);
 const visibleAutumnMeasureFeedback = ref<VisibleMeasureFeedback | null>(null);
+const visibleSpringMeasureFeedback = ref<VisibleMeasureFeedback | null>(null);
+const visibleWinterMeasureFeedback = ref<VisibleMeasureFeedback | null>(null);
 const summerFeedbackInterludeBeat = ref(1);
 const autumnFeedbackInterludeBeat = ref(1);
+const springFeedbackInterludeBeat = ref(1);
+const winterFeedbackInterludeBeat = ref(1);
 const summerFeedbackInterludeText = ref("");
 const autumnFeedbackInterludeText = ref("");
+const springFeedbackInterludeText = ref("");
+const winterFeedbackInterludeText = ref("");
 const summerSequenceIntroStep = ref(0);
 const autumnSequenceIntroStep = ref(0);
+const springSequenceIntroStep = ref(0);
+const winterSequenceIntroStep = ref(0);
 const sequenceEvaluationHandledKey = ref("");
 const autumnSequenceEvaluationHandledKey = ref("");
+const springSequenceEvaluationHandledKey = ref("");
+const winterSequenceEvaluationHandledKey = ref("");
 let summerSequenceIntroTimers: Array<ReturnType<typeof setTimeout>> = [];
 let autumnSequenceIntroTimers: Array<ReturnType<typeof setTimeout>> = [];
+let springSequenceIntroTimers: Array<ReturnType<typeof setTimeout>> = [];
+let winterSequenceIntroTimers: Array<ReturnType<typeof setTimeout>> = [];
 let summerFeedbackInterludeTimer: ReturnType<typeof setInterval> | null = null;
 let autumnFeedbackInterludeTimer: ReturnType<typeof setInterval> | null = null;
+let springFeedbackInterludeTimer: ReturnType<typeof setInterval> | null = null;
+let winterFeedbackInterludeTimer: ReturnType<typeof setInterval> | null = null;
 const {
   currentDate,
   currentFrame: instructorFrame,
@@ -788,91 +1031,20 @@ const currentAutumnValue = computed<AutumnValueClass>(
 const nextAutumnValue = computed<AutumnValueClass | null>(
   () => autumnValueOrder[currentAutumnValueIndex.value + 1] ?? null,
 );
-const currentSummerIntensityConfig = computed(
-  () => summerIntensityGuidance[currentSummerIntensity.value],
+const currentSpringValue = computed<SpringValue>(
+  () => springValueOrder[currentSpringValueIndex.value] ?? "100",
+);
+const nextSpringValue = computed<SpringValue | null>(
+  () => springValueOrder[currentSpringValueIndex.value + 1] ?? null,
+);
+const currentWinterValue = computed<WinterValue>(
+  () => winterValueOrder[currentWinterValueIndex.value] ?? "100",
+);
+const nextWinterValue = computed<WinterValue | null>(
+  () => winterValueOrder[currentWinterValueIndex.value + 1] ?? null,
 );
 const currentSummerMovementVariant = computed(
   () => summerMovementVariants[currentSummerIntensity.value],
-);
-const summerSequenceVisible = computed(
-  () =>
-    summerTestMode.value === "intensitySequence" &&
-    summerSequencePhase.value !== "idle",
-);
-const autumnSequenceVisible = computed(
-  () =>
-    autumnTestMode.value === "valueSequence" &&
-    autumnSequencePhase.value !== "idle",
-);
-const summerSequenceMetaText = computed(() => {
-  if (summerSequencePhase.value === "intro") {
-    return summerSequenceIntroStep.value === 0
-      ? t("story.acts.act5.sequence.summerIntroWarming")
-      : t("story.acts.act5.sequence.summerIntroLarger");
-  }
-  if (summerSequencePhase.value === "completed") {
-    return t("story.acts.act5.sequence.summerCompleted");
-  }
-  if (isSummerFeedbackInterlude.value) {
-    return t("story.acts.act5.sequence.feedbackBeat", {
-      value: currentSummerIntensity.value,
-      beat: summerFeedbackInterludeBeat.value,
-    });
-  }
-
-  return t("story.acts.act5.sequence.measure", {
-    value: currentSummerIntensity.value,
-    current: (repetitionIndex.value ?? 0) + 1,
-    total: 4,
-  });
-});
-const autumnSequenceMetaText = computed(() => {
-  if (autumnSequencePhase.value === "intro") {
-    return autumnSequenceIntroStep.value === 0
-      ? t("story.acts.act5.sequence.autumnIntroSweep")
-      : t("story.acts.act5.sequence.autumnIntroSmaller");
-  }
-  if (autumnSequencePhase.value === "completed") {
-    return t("story.acts.act5.sequence.autumnCompleted");
-  }
-  if (isAutumnFeedbackInterlude.value) {
-    return t("story.acts.act5.sequence.feedbackBeat", {
-      value: currentAutumnValue.value,
-      beat: autumnFeedbackInterludeBeat.value,
-    });
-  }
-
-  return t("story.acts.act5.sequence.measure", {
-    value: currentAutumnValue.value,
-    current: (repetitionIndex.value ?? 0) + 1,
-    total: 4,
-  });
-});
-const activeSequenceVisible = computed(
-  () => summerSequenceVisible.value || autumnSequenceVisible.value,
-);
-const activeSequenceValues = computed<readonly string[]>(() =>
-  autumnSequenceVisible.value ? autumnValueOrder : summerIntensityOrder,
-);
-const activeCompletedSequenceValues = computed<readonly string[]>(() =>
-  autumnSequenceVisible.value
-    ? completedAutumnValues.value
-    : completedSummerIntensities.value,
-);
-const activeSequenceCurrentValue = computed(() =>
-  autumnSequenceVisible.value
-    ? currentAutumnValue.value
-    : currentSummerIntensity.value,
-);
-const activeSequencePhase = computed(() =>
-  autumnSequenceVisible.value
-    ? autumnSequencePhase.value
-    : summerSequencePhase.value,
-);
-const activeSequenceMetaText = computed(() =>
-  autumnSequenceVisible.value
-    ? autumnSequenceMetaText.value
-    : summerSequenceMetaText.value,
 );
 const isDebugMode = computed(() => route.query.debug === "true");
 const debugSeasonConfigs = computed(() =>
@@ -885,6 +1057,8 @@ const debugSeasonConfigs = computed(() =>
     ),
 );
 const summerDebug = computed(() => summerRecognition.debugSnapshot.value);
+const springDebug = computed(() => springRecognition.debugSnapshot.value);
+const winterDebug = computed(() => winterRecognition.debugSnapshot.value);
 const getVisibleAutumnDirectionForRepetition = (
   currentRepetitionIndex: number | null,
 ): AutumnDirection =>
@@ -912,29 +1086,78 @@ const autumnExpectedEndpointRegion = computed(
     AUTUMN_MOVEMENT_REFERENCE[autumnRecognition.expectedValueClass.value]
       .endpointRegion,
 );
+const springExpectedMaxBeat = computed(
+  () =>
+    SPRING_MOVEMENT_REFERENCE[springRecognition.expectedValue.value].maxBeat,
+);
 const isSummerActive = computed(() => currentSeason.value.id === "summer");
 const isAutumnActive = computed(() => currentSeason.value.id === "autumn");
+const isSpringActive = computed(() => currentSeason.value.id === "spring");
+const isWinterActive = computed(() => currentSeason.value.id === "winter");
+const getSummerCueText = (
+  instruction: string,
+  intensity: SummerIntensity = currentSummerIntensity.value,
+) => {
+  const config = summerIntensityGuidance[intensity];
+
+  return t("story.acts.act5.summerInstructions.beatCue", {
+    value: intensity,
+    warming: t(config.warmingLabelKey),
+    instruction,
+  });
+};
 const getSummerBeatInstruction = (beat: number) =>
-  summerTestMode.value === "intensitySequence"
-    ? `${currentSummerIntensityConfig.value.warmingLabel} · Movement ${currentSummerIntensity.value} · ${
-        currentSummerIntensityConfig.value.beatInstructions[beat] ??
-        summerBeatFallbackInstructions[beat] ??
-        summerBeatFallbackInstructions[1]
-      }`
-    : (summerIntensityGuidance["100"].beatInstructions[beat] ??
-      summerBeatFallbackInstructions[beat] ??
-      summerBeatFallbackInstructions[1]);
-const getAutumnBeatInstruction = (beat: number) => {
+  (() => {
+    const intensity =
+      summerTestMode.value === "intensitySequence"
+        ? currentSummerIntensity.value
+        : "100";
+    const config = summerIntensityGuidance[intensity];
+
+    return getSummerCueText(
+      t(
+        config.beatInstructionKeys[beat] ??
+          summerBeatFallbackInstructions[beat] ??
+          summerBeatFallbackInstructions[1],
+      ),
+      intensity,
+    );
+  })();
+const getAutumnCueText = (instruction: string) => {
   const expectedDirection = getVisibleAutumnDirectionForRepetition(
     repetitionIndex.value,
   );
-  const direction =
-    expectedDirection === "leftToRight" ? "left to right" : "right to left";
 
-  return `Autumn ${autumnRecognition.expectedValueClass.value}% | ${direction} | ${
-    autumnBeatInstructions[beat] ?? autumnBeatInstructions[1]
-  }`;
+  return t("story.acts.act5.autumnInstructions.beatCue", {
+    value: autumnRecognition.expectedValueClass.value,
+    direction: t(
+      `story.acts.act5.autumnInstructions.direction.${expectedDirection}`,
+    ),
+    instruction,
+  });
 };
+const getAutumnBeatInstruction = (beat: number) =>
+  getAutumnCueText(
+    t(autumnBeatInstructions[beat] ?? autumnBeatInstructions[1]),
+  );
+const getSpringCueText = (instruction: string) =>
+  t("story.acts.act5.springInstructions.beatCue", {
+    value: springRecognition.expectedValue.value,
+    instruction,
+  });
+const getSpringBeatInstruction = (beat: number) =>
+  getSpringCueText(
+    t(springBeatInstructions[beat] ?? springBeatInstructions[1]),
+  );
+const getWinterCueText = (instruction: string) =>
+  t("story.acts.act5.winterInstructions.beatCue", {
+    value: winterRecognition.expectedValue.value,
+    instruction,
+  });
+const getWinterBeatInstruction = (beat: number) =>
+  getWinterCueText(
+    t(winterBeatInstructions[beat] ?? winterBeatInstructions[1]),
+  );
 const isVisibleSummerMeasureFeedbackCurrent = computed(
   () =>
     isSummerActive.value &&
@@ -954,6 +1177,26 @@ const isVisibleAutumnMeasureFeedbackCurrent = computed(
 );
 const isAutumnFeedbackVisible = computed(
   () => isVisibleAutumnMeasureFeedbackCurrent.value,
+);
+const isVisibleSpringMeasureFeedbackCurrent = computed(
+  () =>
+    isSpringActive.value &&
+    visibleSpringMeasureFeedback.value !== null &&
+    visibleSpringMeasureFeedback.value.measureIndex === repetitionIndex.value &&
+    springRecognition.currentBeat.value === 4,
+);
+const isSpringFeedbackVisible = computed(
+  () => isVisibleSpringMeasureFeedbackCurrent.value,
+);
+const isVisibleWinterMeasureFeedbackCurrent = computed(
+  () =>
+    isWinterActive.value &&
+    visibleWinterMeasureFeedback.value !== null &&
+    visibleWinterMeasureFeedback.value.measureIndex === repetitionIndex.value &&
+    winterRecognition.currentBeat.value === 4,
+);
+const isWinterFeedbackVisible = computed(
+  () => isVisibleWinterMeasureFeedbackCurrent.value,
 );
 const getBeatProblemCue = (
   beatEvaluation: NonNullable<typeof summerRecognition.currentEvaluation.value>,
@@ -1001,29 +1244,12 @@ const getSummerMeasureFeedback = (
   cycleEvaluation: NonNullable<
     typeof summerRecognition.currentCycleEvaluation.value
   >,
-): VisibleMeasureFeedback => {
-  if (cycleEvaluation.result === "success") {
-    return {
-      measureIndex: cycleEvaluation.measureIndex,
-      text: t("story.acts.act5.summerCycleFeedback.success"),
-      tone: "success",
-    };
-  }
-
-  if (cycleEvaluation.result === "almostCorrect") {
-    return {
-      measureIndex: cycleEvaluation.measureIndex,
-      text: t("story.acts.act5.summerCycleFeedback.almostCorrect"),
-      tone: "success",
-    };
-  }
-
-  return {
-    measureIndex: cycleEvaluation.measureIndex,
-    text: getCycleProblemCue(cycleEvaluation),
-    tone: "error",
-  };
-};
+): VisibleMeasureFeedback =>
+  getVisibleMeasureFeedback(
+    cycleEvaluation,
+    "story.acts.act5.summerCycleFeedback",
+    () => getCycleProblemCue(cycleEvaluation),
+  );
 
 const clearVisibleSummerMeasureFeedback = () => {
   visibleSummerMeasureFeedback.value = null;
@@ -1043,7 +1269,7 @@ const getAutumnCycleProblemCue = (
     cycleEvaluation.beatEvaluations,
   );
 
-  if (!firstProblem) return autumnFeedbackCueText.TRY_AGAIN;
+  if (!firstProblem) return getAutumnFeedbackCueText("TRY_AGAIN");
 
   if (
     firstProblem.feedbackCode === "START_LEFT" ||
@@ -1060,38 +1286,21 @@ const getAutumnCycleProblemCue = (
   return firstProblem.feedbackCode
     ? t("story.acts.act5.sequence.beatProblem", {
         beat: firstProblem.beat,
-        cue: autumnFeedbackCueText[firstProblem.feedbackCode],
+        cue: getAutumnFeedbackCueText(firstProblem.feedbackCode),
       })
-    : autumnFeedbackCueText.TRY_AGAIN;
+    : getAutumnFeedbackCueText("TRY_AGAIN");
 };
 
 const getAutumnMeasureFeedback = (
   cycleEvaluation: NonNullable<
     typeof autumnRecognition.currentCycleEvaluation.value
   >,
-): VisibleMeasureFeedback => {
-  if (cycleEvaluation.result === "success") {
-    return {
-      measureIndex: cycleEvaluation.measureIndex,
-      text: t("story.acts.act5.autumnCycleFeedback.success"),
-      tone: "success",
-    };
-  }
-
-  if (cycleEvaluation.result === "almostCorrect") {
-    return {
-      measureIndex: cycleEvaluation.measureIndex,
-      text: t("story.acts.act5.autumnCycleFeedback.almostCorrect"),
-      tone: "success",
-    };
-  }
-
-  return {
-    measureIndex: cycleEvaluation.measureIndex,
-    text: getAutumnCycleProblemCue(cycleEvaluation),
-    tone: "error",
-  };
-};
+): VisibleMeasureFeedback =>
+  getVisibleMeasureFeedback(
+    cycleEvaluation,
+    "story.acts.act5.autumnCycleFeedback",
+    () => getAutumnCycleProblemCue(cycleEvaluation),
+  );
 
 const clearVisibleAutumnMeasureFeedback = () => {
   visibleAutumnMeasureFeedback.value = null;
@@ -1101,6 +1310,84 @@ const autumnFeedbackText = computed(() => {
   if (!isAutumnFeedbackVisible.value) return "";
 
   return visibleAutumnMeasureFeedback.value?.text ?? "";
+});
+const getSpringCycleProblemCue = (
+  cycleEvaluation: NonNullable<
+    typeof springRecognition.currentCycleEvaluation.value
+  >,
+) => {
+  const firstProblem = getPrioritizedSpringProblemEvaluation(
+    cycleEvaluation.beatEvaluations,
+  );
+
+  if (!firstProblem) return getSpringFeedbackCueText("TRY_AGAIN");
+
+  return firstProblem.feedbackCode
+    ? t("story.acts.act5.sequence.beatProblem", {
+        beat: firstProblem.beat,
+        cue: getSpringFeedbackCueText(firstProblem.feedbackCode),
+      })
+    : getSpringFeedbackCueText("TRY_AGAIN");
+};
+
+const getSpringMeasureFeedback = (
+  cycleEvaluation: NonNullable<
+    typeof springRecognition.currentCycleEvaluation.value
+  >,
+): VisibleMeasureFeedback =>
+  getVisibleMeasureFeedback(
+    cycleEvaluation,
+    "story.acts.act5.springCycleFeedback",
+    () => getSpringCycleProblemCue(cycleEvaluation),
+  );
+
+const clearVisibleSpringMeasureFeedback = () => {
+  visibleSpringMeasureFeedback.value = null;
+};
+
+const springFeedbackText = computed(() => {
+  if (!isSpringFeedbackVisible.value) return "";
+
+  return visibleSpringMeasureFeedback.value?.text ?? "";
+});
+const getWinterCycleProblemCue = (
+  cycleEvaluation: NonNullable<
+    typeof winterRecognition.currentCycleEvaluation.value
+  >,
+) => {
+  const firstProblem = getPrioritizedWinterProblemEvaluation(
+    cycleEvaluation.beatEvaluations,
+  );
+
+  if (!firstProblem) return getWinterFeedbackCueText("TRY_AGAIN");
+
+  return firstProblem.feedbackCode
+    ? t("story.acts.act5.sequence.beatProblem", {
+        beat: firstProblem.beat,
+        cue: getWinterFeedbackCueText(firstProblem.feedbackCode),
+      })
+    : getWinterFeedbackCueText("TRY_AGAIN");
+};
+
+const getWinterMeasureFeedback = (
+  cycleEvaluation: NonNullable<
+    typeof winterRecognition.currentCycleEvaluation.value
+  >,
+): VisibleMeasureFeedback =>
+  getVisibleMeasureFeedback(
+    cycleEvaluation,
+    "story.acts.act5.winterCycleFeedback",
+    () => getWinterCycleProblemCue(cycleEvaluation),
+  );
+
+const clearVisibleWinterMeasureFeedback = () => {
+  visibleWinterMeasureFeedback.value = null;
+};
+
+const winterFeedbackText = computed(() => {
+  if (!isWinterFeedbackVisible.value) return "";
+
+  return visibleWinterMeasureFeedback.value?.text ?? "";
 });
 const periodLabel = computed(() => {
   const scene = activeScene.value;
@@ -1155,30 +1442,64 @@ const playbackToggleLabel = computed(() =>
 );
 const instructionCueText = computed(() => {
   if (summerSequencePhase.value === "intro") {
-    return summerSequenceIntroStep.value === 0
-      ? t("story.acts.act5.sequence.summerIntroWarming")
-      : t("story.acts.act5.sequence.summerIntroLarger");
+    return getSummerCueText(
+      summerSequenceIntroStep.value === 0
+        ? t("story.acts.act5.sequence.summerIntroWarming")
+        : t("story.acts.act5.sequence.summerIntroLarger"),
+    );
   }
   if (autumnSequencePhase.value === "intro") {
-    return autumnSequenceIntroStep.value === 0
-      ? t("story.acts.act5.sequence.autumnIntroSweep")
-      : t("story.acts.act5.sequence.autumnIntroSmaller");
+    return getAutumnCueText(
+      autumnSequenceIntroStep.value === 0
+        ? t("story.acts.act5.sequence.autumnIntroSweep")
+        : t("story.acts.act5.sequence.autumnIntroSmaller"),
+    );
+  }
+  if (springSequencePhase.value === "intro") {
+    return getSpringCueText(
+      springSequenceIntroStep.value === 0
+        ? t("story.acts.act5.sequence.springIntroBloom")
+        : t("story.acts.act5.sequence.springIntroValues"),
+    );
+  }
+  if (winterSequencePhase.value === "intro") {
+    return getWinterCueText(
+      winterSequenceIntroStep.value === 0
+        ? t("story.acts.act5.sequence.winterIntroCold")
+        : t("story.acts.act5.sequence.winterIntroContract"),
+    );
   }
   if (isSummerFeedbackInterlude.value) {
     return summerFeedbackInterludeBeat.value >= 4
-      ? t("story.acts.act5.sequence.summerRetryNext")
+      ? getSummerCueText(t("story.acts.act5.sequence.summerRetryNext"))
       : summerFeedbackInterludeText.value;
   }
   if (isAutumnFeedbackInterlude.value) {
     return autumnFeedbackInterludeBeat.value >= 4
-      ? t("story.acts.act5.sequence.autumnNextStart")
+      ? getAutumnCueText(t("story.acts.act5.sequence.autumnNextStart"))
       : autumnFeedbackInterludeText.value;
+  }
+  if (isSpringFeedbackInterlude.value) {
+    return springFeedbackInterludeBeat.value >= 4
+      ? getSpringCueText(t("story.acts.act5.sequence.springRetryNext"))
+      : springFeedbackInterludeText.value;
+  }
+  if (isWinterFeedbackInterlude.value) {
+    return winterFeedbackInterludeBeat.value >= 4
+      ? getWinterCueText(t("story.acts.act5.sequence.winterRetryNext"))
+      : winterFeedbackInterludeText.value;
   }
   if (summerSequencePhase.value === "completed") {
     return t("story.acts.act5.sequence.summerCompleted");
   }
   if (autumnSequencePhase.value === "completed") {
     return t("story.acts.act5.sequence.autumnCompleted");
+  }
+  if (springSequencePhase.value === "completed") {
+    return t("story.acts.act5.sequence.springCompleted");
+  }
+  if (winterSequencePhase.value === "completed") {
+    return t("story.acts.act5.sequence.winterCompleted");
   }
   if (isCompleted.value) return t("story.acts.act5.instructions.completed");
   if (isCountingDown.value) {
@@ -1198,6 +1519,18 @@ const instructionCueText = computed(() => {
   if (isAutumnActive.value) {
     return getAutumnBeatInstruction(autumnDebug.value.currentBeat);
   }
+  if (isSpringActive.value && springFeedbackText.value) {
+    return springFeedbackText.value;
+  }
+  if (isSpringActive.value) {
+    return getSpringBeatInstruction(springDebug.value.currentBeat);
+  }
+  if (isWinterActive.value && winterFeedbackText.value) {
+    return winterFeedbackText.value;
+  }
+  if (isWinterActive.value) {
+    return getWinterBeatInstruction(winterDebug.value.currentBeat);
+  }
 
   if (isTransition.value) return t("story.acts.act5.instructions.transition");
   if (playbackState.value === "idle") {
@@ -1210,12 +1543,19 @@ const instructionCueText = computed(() => {
   return t("story.acts.act5.instructions.repeat");
 });
 const instructionCueTone = computed(() => {
-  if (isSummerFeedbackInterlude.value || isAutumnFeedbackInterlude.value) {
+  if (
+    isSummerFeedbackInterlude.value ||
+    isAutumnFeedbackInterlude.value ||
+    isSpringFeedbackInterlude.value ||
+    isWinterFeedbackInterlude.value
+  ) {
     return "error";
   }
   if (
     summerSequencePhase.value === "completed" ||
-    autumnSequencePhase.value === "completed"
+    autumnSequencePhase.value === "completed" ||
+    springSequencePhase.value === "completed" ||
+    winterSequencePhase.value === "completed"
   ) {
     return "success";
   }
@@ -1225,7 +1565,12 @@ const instructionCueTone = computed(() => {
   if (isSummerActive.value && summerFeedbackText.value) {
     return visibleSummerMeasureFeedback.value?.tone ?? "error";
   }
-  if (!isSummerActive.value || !summerFeedbackText.value) return "instruction";
+  if (isSpringActive.value && springFeedbackText.value) {
+    return visibleSpringMeasureFeedback.value?.tone ?? "error";
+  }
+  if (isWinterActive.value && winterFeedbackText.value) {
+    return visibleWinterMeasureFeedback.value?.tone ?? "error";
+  }
   return "instruction";
 });
 const repetitionLabel = computed(() =>
@@ -1269,6 +1614,30 @@ const debugAutumnCycleResultsLabel = computed(() => {
 
   return results.join(" | ");
 });
+const debugSpringCycleResultsLabel = computed(() => {
+  const results = Array.from({
+    length: act5IntroCycleConfig.repetitionCount,
+  }).map(
+    (_, index) =>
+      springRecognition.cycleEvaluations.value.find(
+        (evaluation) => evaluation.cycleIndex === index,
+      )?.result ?? "pending",
+  );
+
+  return results.join(" | ");
+});
+const debugWinterCycleResultsLabel = computed(() => {
+  const results = Array.from({
+    length: act5IntroCycleConfig.repetitionCount,
+  }).map(
+    (_, index) =>
+      winterRecognition.cycleEvaluations.value.find(
+        (evaluation) => evaluation.cycleIndex === index,
+      )?.result ?? "pending",
+  );
+
+  return results.join(" | ");
+});
 const debugSummerDecisionLabel = computed(() => {
   const sequenceEvaluation = summerRecognition.sequenceEvaluation.value;
 
@@ -1291,6 +1660,22 @@ const getDebugAutumnCycleResults = () =>
   Array.from({ length: act5IntroCycleConfig.repetitionCount }).map(
     (_, index) =>
       autumnRecognition.cycleEvaluations.value.find(
+        (evaluation) => evaluation.cycleIndex === index,
+      )?.result ?? "pending",
+  );
+
+const getDebugSpringCycleResults = () =>
+  Array.from({ length: act5IntroCycleConfig.repetitionCount }).map(
+    (_, index) =>
+      springRecognition.cycleEvaluations.value.find(
+        (evaluation) => evaluation.cycleIndex === index,
+      )?.result ?? "pending",
+  );
+
+const getDebugWinterCycleResults = () =>
+  Array.from({ length: act5IntroCycleConfig.repetitionCount }).map(
+    (_, index) =>
+      winterRecognition.cycleEvaluations.value.find(
         (evaluation) => evaluation.cycleIndex === index,
       )?.result ?? "pending",
   );
@@ -1369,6 +1754,90 @@ const logAutumnDebugSnapshot = () => {
   });
 };
 
+const logSpringDebugSnapshot = () => {
+  if (!isDebugMode.value || currentSeason.value.id !== "spring") return;
+
+  const snapshot = springDebug.value;
+  const metrics = snapshot.metrics as SpringRecognitionMetrics;
+
+  console.info("[Act 5 Spring Recognition]", {
+    "essential:missing": getDebugCriteriaIds(snapshot.essentialFailed),
+    "essential:ok": getDebugCriteriaIds(snapshot.essentialPassed),
+    cycle_results: getDebugSpringCycleResults(),
+    beat: snapshot.currentBeat,
+    expected_value: snapshot.expectedValue,
+    expected_max_beat: springExpectedMaxBeat.value,
+    expected_knee: snapshot.expectedKneeSide,
+    detected_knee: snapshot.detectedKneeSide,
+    detected_hand_height_region: snapshot.detectedHandHeightRegion,
+    expected_hand_height_range: [
+      metrics.expectedHandHeightMin,
+      metrics.expectedHandHeightMax,
+    ],
+    average_hand_height: metrics.averageHandHeight,
+    lower_hand_height: metrics.lowerHandHeight,
+    left_hand_height: metrics.leftHandHeight,
+    right_hand_height: metrics.rightHandHeight,
+    hand_height_difference: metrics.handHeightDifference,
+    hand_opening_width: metrics.handOpeningWidth,
+    left_wrist_outside_shoulder: metrics.leftWristOutsideShoulder,
+    right_wrist_outside_shoulder: metrics.rightWristOutsideShoulder,
+    average_elbow_angle: metrics.averageElbowAngle,
+    hands_gathered: metrics.handsGathered,
+    hands_open: metrics.handsOpen,
+    opening_impulse: metrics.openingImpulse,
+    current_measure_index: repetitionIndex.value,
+    visible_feedback_measure_index:
+      visibleSpringMeasureFeedback.value?.measureIndex ?? null,
+    feedback_code: snapshot.feedbackCode,
+    primary_feedback: snapshot.feedbackCode,
+  });
+};
+
+const logWinterDebugSnapshot = () => {
+  if (!isDebugMode.value || currentSeason.value.id !== "winter") return;
+
+  const snapshot = winterDebug.value;
+  const metrics = snapshot.metrics as WinterRecognitionMetrics;
+
+  console.info("[Act 5 Winter Recognition]", {
+    "essential:missing": getDebugCriteriaIds(snapshot.essentialFailed),
+    "essential:ok": getDebugCriteriaIds(snapshot.essentialPassed),
+    cycle_results: getDebugWinterCycleResults(),
+    beat: snapshot.currentBeat,
+    expected_value: snapshot.expectedValue,
+    expected_contraction_class: snapshot.expectedContractionClass,
+    detected_contraction_class: snapshot.detectedContractionClass,
+    compactness_score: metrics.compactnessScore,
+    head_y: metrics.headY,
+    neutral_head_y: metrics.neutralHeadY,
+    head_drop: metrics.headDrop,
+    shoulder_drop: metrics.shoulderDrop,
+    hip_drop: metrics.hipDrop,
+    body_height_ratio: metrics.bodyHeightRatio,
+    average_knee_angle: metrics.averageKneeAngle,
+    torso_forward_lean: metrics.torsoForwardLean,
+    hand_opening_width: metrics.handOpeningWidth,
+    hands_at_shoulder_height: metrics.handsAtShoulderHeight,
+    arms_open_sideways: metrics.armsOpenSideways,
+    self_hug_detected: metrics.selfHugDetected,
+    hands_centered_for_hug: metrics.handsCenteredForHug,
+    hands_compact_for_hug: metrics.handsCompactForHug,
+    hands_near_opposite_shoulders: metrics.handsNearOppositeShoulders,
+    head_protection_expected: metrics.headProtectionExpected,
+    head_protection_detected: metrics.headProtectionDetected,
+    return_to_upright: metrics.returnToUprightDetected,
+    arms_released: metrics.armsReleased,
+    feet_stable: metrics.feetStable,
+    neutral_reference_samples: snapshot.neutralReference?.sampleCount ?? 0,
+    current_measure_index: repetitionIndex.value,
+    visible_feedback_measure_index:
+      visibleWinterMeasureFeedback.value?.measureIndex ?? null,
+    feedback_code: snapshot.feedbackCode,
+    primary_feedback: snapshot.feedbackCode,
+  });
+};
+
 const clearSummerSequenceTimers = () => {
   summerSequenceIntroTimers.forEach((timer) => clearTimeout(timer));
   summerSequenceIntroTimers = [];
@@ -1386,6 +1855,26 @@ const clearAutumnSequenceTimers = () => {
   if (autumnFeedbackInterludeTimer) {
     clearInterval(autumnFeedbackInterludeTimer);
     autumnFeedbackInterludeTimer = null;
+  }
+};
+
+const clearSpringSequenceTimers = () => {
+  springSequenceIntroTimers.forEach((timer) => clearTimeout(timer));
+  springSequenceIntroTimers = [];
+
+  if (springFeedbackInterludeTimer) {
+    clearInterval(springFeedbackInterludeTimer);
+    springFeedbackInterludeTimer = null;
+  }
+};
+
+const clearWinterSequenceTimers = () => {
+  winterSequenceIntroTimers.forEach((timer) => clearTimeout(timer));
+  winterSequenceIntroTimers = [];
+
+  if (winterFeedbackInterludeTimer) {
+    clearInterval(winterFeedbackInterludeTimer);
+    winterFeedbackInterludeTimer = null;
   }
 };
 
@@ -1413,6 +1902,32 @@ const resetAutumnSequenceState = () => {
   autumnFeedbackInterludeText.value = "";
   autumnSequenceIntroStep.value = 0;
   autumnSequenceEvaluationHandledKey.value = "";
+};
+
+const resetSpringSequenceState = () => {
+  clearSpringSequenceTimers();
+  clearVisibleSpringMeasureFeedback();
+  springSequencePhase.value = "idle";
+  currentSpringValueIndex.value = 0;
+  completedSpringValues.value = [];
+  isSpringFeedbackInterlude.value = false;
+  springFeedbackInterludeBeat.value = 1;
+  springFeedbackInterludeText.value = "";
+  springSequenceIntroStep.value = 0;
+  springSequenceEvaluationHandledKey.value = "";
+};
+
+const resetWinterSequenceState = () => {
+  clearWinterSequenceTimers();
+  clearVisibleWinterMeasureFeedback();
+  winterSequencePhase.value = "idle";
+  currentWinterValueIndex.value = 0;
+  completedWinterValues.value = [];
+  isWinterFeedbackInterlude.value = false;
+  winterFeedbackInterludeBeat.value = 1;
+  winterFeedbackInterludeText.value = "";
+  winterSequenceIntroStep.value = 0;
+  winterSequenceEvaluationHandledKey.value = "";
 };
 
 const getInterludeFeedbackText = () => {
@@ -1464,7 +1979,7 @@ const getAutumnInterludeFeedbackText = () => {
       ),
     )
   ) {
-    return autumnFeedbackCueText.FULL_BODY_NOT_VISIBLE;
+    return getAutumnFeedbackCueText("FULL_BODY_NOT_VISIBLE");
   }
 
   const feedbackCounts = new Map<AutumnFeedbackCode, number>();
@@ -1494,8 +2009,78 @@ const getAutumnInterludeFeedbackText = () => {
   }
 
   return mostFrequentFeedback
-    ? autumnFeedbackCueText[mostFrequentFeedback]
-    : autumnFeedbackCueText.TRY_AGAIN;
+    ? getAutumnFeedbackCueText(mostFrequentFeedback)
+    : getAutumnFeedbackCueText("TRY_AGAIN");
+};
+
+const getSpringInterludeFeedbackText = () => {
+  const cycleEvaluations = springRecognition.cycleEvaluations.value;
+
+  if (
+    cycleEvaluations.some((cycleEvaluation) =>
+      cycleEvaluation.beatEvaluations.some(
+        (beatEvaluation) => beatEvaluation.trackingUnavailable,
+      ),
+    )
+  ) {
+    return getSpringFeedbackCueText("FULL_BODY_NOT_VISIBLE");
+  }
+
+  const feedbackCounts = new Map<SpringFeedbackCode, number>();
+
+  cycleEvaluations.forEach((cycleEvaluation) => {
+    const feedbackCode = cycleEvaluation.primaryFeedbackCode;
+
+    if (!feedbackCode || feedbackCode === "SUCCESS") return;
+
+    feedbackCounts.set(
+      feedbackCode,
+      (feedbackCounts.get(feedbackCode) ?? 0) + 1,
+    );
+  });
+
+  const mostFrequentFeedback = [...feedbackCounts.entries()].sort(
+    (a, b) => b[1] - a[1],
+  )[0]?.[0];
+
+  return mostFrequentFeedback
+    ? getSpringFeedbackCueText(mostFrequentFeedback)
+    : t("story.acts.act5.sequence.springInterludeDefault");
+};
+
+const getWinterInterludeFeedbackText = () => {
+  const cycleEvaluations = winterRecognition.cycleEvaluations.value;
+
+  if (
+    cycleEvaluations.some((cycleEvaluation) =>
+      cycleEvaluation.beatEvaluations.some(
+        (beatEvaluation) => beatEvaluation.trackingUnavailable,
+      ),
+    )
+  ) {
+    return getWinterFeedbackCueText("FULL_BODY_NOT_VISIBLE");
+  }
+
+  const feedbackCounts = new Map<WinterFeedbackCode, number>();
+
+  cycleEvaluations.forEach((cycleEvaluation) => {
+    const feedbackCode = cycleEvaluation.primaryFeedbackCode;
+
+    if (!feedbackCode || feedbackCode === "SUCCESS") return;
+
+    feedbackCounts.set(
+      feedbackCode,
+      (feedbackCounts.get(feedbackCode) ?? 0) + 1,
+    );
+  });
+
+  const mostFrequentFeedback = [...feedbackCounts.entries()].sort(
+    (a, b) => b[1] - a[1],
+  )[0]?.[0];
+
+  return mostFrequentFeedback
+    ? getWinterFeedbackCueText(mostFrequentFeedback)
+    : t("story.acts.act5.sequence.winterInterludeDefault");
 };
 
 const startFeedbackInterlude = (feedbackText: string) => {
@@ -1559,6 +2144,68 @@ const stopAutumnFeedbackInterlude = () => {
   autumnFeedbackInterludeBeat.value = 1;
 };
 
+const startSpringFeedbackInterlude = (feedbackText: string) => {
+  if (springFeedbackInterludeTimer) {
+    clearInterval(springFeedbackInterludeTimer);
+  }
+
+  isSpringFeedbackInterlude.value = true;
+  springSequencePhase.value = "feedbackInterlude";
+  springFeedbackInterludeText.value = feedbackText;
+  springFeedbackInterludeBeat.value = 1;
+
+  const startedAt = performance.now();
+
+  springFeedbackInterludeTimer = setInterval(() => {
+    springFeedbackInterludeBeat.value = Math.min(
+      Math.floor((performance.now() - startedAt) / 1000) + 1,
+      4,
+    );
+  }, 80);
+};
+
+const stopSpringFeedbackInterlude = () => {
+  if (springFeedbackInterludeTimer) {
+    clearInterval(springFeedbackInterludeTimer);
+    springFeedbackInterludeTimer = null;
+  }
+
+  isSpringFeedbackInterlude.value = false;
+  springFeedbackInterludeBeat.value = 1;
+  springFeedbackInterludeText.value = "";
+};
+
+const startWinterFeedbackInterlude = (feedbackText: string) => {
+  if (winterFeedbackInterludeTimer) {
+    clearInterval(winterFeedbackInterludeTimer);
+  }
+
+  isWinterFeedbackInterlude.value = true;
+  winterSequencePhase.value = "feedbackInterlude";
+  winterFeedbackInterludeText.value = feedbackText;
+  winterFeedbackInterludeBeat.value = 1;
+
+  const startedAt = performance.now();
+
+  winterFeedbackInterludeTimer = setInterval(() => {
+    winterFeedbackInterludeBeat.value = Math.min(
+      Math.floor((performance.now() - startedAt) / 1000) + 1,
+      4,
+    );
+  }, 80);
+};
+
+const stopWinterFeedbackInterlude = () => {
+  if (winterFeedbackInterludeTimer) {
+    clearInterval(winterFeedbackInterludeTimer);
+    winterFeedbackInterludeTimer = null;
+  }
+
+  isWinterFeedbackInterlude.value = false;
+  winterFeedbackInterludeBeat.value = 1;
+  winterFeedbackInterludeText.value = "";
+};
+
 const startCurrentSummerIntensityRecognition = ({
   manual = false,
   keepCalibration = true,
@@ -1585,6 +2232,22 @@ const startCurrentAutumnValueRecognition = () => {
   autumnSequencePhase.value = "performing";
 };
 
+const startCurrentSpringValueRecognition = () => {
+  stopSpringFeedbackInterlude();
+  clearVisibleSpringMeasureFeedback();
+  springSequenceEvaluationHandledKey.value = "";
+  springRecognition.start({ value: currentSpringValue.value });
+  springSequencePhase.value = "performing";
+};
+
+const startCurrentWinterValueRecognition = () => {
+  stopWinterFeedbackInterlude();
+  clearVisibleWinterMeasureFeedback();
+  winterSequenceEvaluationHandledKey.value = "";
+  winterRecognition.start({ value: currentWinterValue.value });
+  winterSequencePhase.value = "performing";
+};
+
 const markCurrentIntensityComplete = () => {
   if (completedSummerIntensities.value.includes(currentSummerIntensity.value)) {
     return;
@@ -1604,6 +2267,28 @@ const markCurrentAutumnValueComplete = () => {
   completedAutumnValues.value = [
     ...completedAutumnValues.value,
     currentAutumnValue.value,
+  ];
+};
+
+const markCurrentSpringValueComplete = () => {
+  if (completedSpringValues.value.includes(currentSpringValue.value)) {
+    return;
+  }
+
+  completedSpringValues.value = [
+    ...completedSpringValues.value,
+    currentSpringValue.value,
+  ];
+};
+
+const markCurrentWinterValueComplete = () => {
+  if (completedWinterValues.value.includes(currentWinterValue.value)) {
+    return;
+  }
+
+  completedWinterValues.value = [
+    ...completedWinterValues.value,
+    currentWinterValue.value,
   ];
 };
 
@@ -1698,6 +2383,96 @@ const handleAutumnSequenceEvaluation = () => {
   );
 };
 
+const handleSpringSequenceEvaluation = () => {
+  const evaluation = springRecognition.sequenceEvaluation.value;
+
+  if (!evaluation || springTestMode.value !== "valueSequence") return;
+
+  const handledKey = `${currentSpringValue.value}-${evaluation.resultState}-${evaluation.totalScore.toFixed(1)}`;
+
+  if (springSequenceEvaluationHandledKey.value === handledKey) return;
+
+  springSequenceEvaluationHandledKey.value = handledKey;
+
+  if (evaluation.passed) {
+    markCurrentSpringValueComplete();
+
+    if (!nextSpringValue.value) {
+      springSequencePhase.value = "completed";
+      return;
+    }
+
+    springSequencePhase.value = "transitioningToNextIntensity";
+    queueSeasonRestart("spring", false, () => {
+      currentSpringValueIndex.value += 1;
+      startCurrentSpringValueRecognition();
+    });
+    return;
+  }
+
+  springSequencePhase.value = "evaluatingIntensity";
+  const interludeFeedbackText = getSpringInterludeFeedbackText();
+
+  queueSeasonRestart(
+    "spring",
+    false,
+    () => {
+      startCurrentSpringValueRecognition();
+    },
+    {
+      interludeDurationMs: springSequenceFlow.feedbackInterludeDurationMs,
+      onInterludeStart: () => {
+        startSpringFeedbackInterlude(interludeFeedbackText);
+      },
+    },
+  );
+};
+
+const handleWinterSequenceEvaluation = () => {
+  const evaluation = winterRecognition.sequenceEvaluation.value;
+
+  if (!evaluation || winterTestMode.value !== "valueSequence") return;
+
+  const handledKey = `${currentWinterValue.value}-${evaluation.resultState}-${evaluation.totalScore.toFixed(1)}`;
+
+  if (winterSequenceEvaluationHandledKey.value === handledKey) return;
+
+  winterSequenceEvaluationHandledKey.value = handledKey;
+
+  if (evaluation.passed) {
+    markCurrentWinterValueComplete();
+
+    if (!nextWinterValue.value) {
+      winterSequencePhase.value = "completed";
+      return;
+    }
+
+    winterSequencePhase.value = "transitioningToNextIntensity";
+    queueSeasonRestart("winter", false, () => {
+      currentWinterValueIndex.value += 1;
+      startCurrentWinterValueRecognition();
+    });
+    return;
+  }
+
+  winterSequencePhase.value = "evaluatingIntensity";
+  const interludeFeedbackText = getWinterInterludeFeedbackText();
+
+  queueSeasonRestart(
+    "winter",
+    false,
+    () => {
+      startCurrentWinterValueRecognition();
+    },
+    {
+      interludeDurationMs: winterSequenceFlow.feedbackInterludeDurationMs,
+      onInterludeStart: () => {
+        startWinterFeedbackInterlude(interludeFeedbackText);
+      },
+    },
+  );
+};
+
 const togglePlayback = async () => {
   if (
     playbackState.value === "playing" ||
@@ -1712,26 +2487,44 @@ const togglePlayback = async () => {
 const resetCycle = async () => {
   summerTestMode.value = "single100";
   autumnTestMode.value = "single100";
+  springTestMode.value = "single100";
+  winterTestMode.value = "single100";
   resetSummerSequenceState();
   resetAutumnSequenceState();
+  resetSpringSequenceState();
+  resetWinterSequenceState();
   summerRecognition.reset();
   autumnRecognition.reset();
+  springRecognition.reset();
+  winterRecognition.reset();
   await reset();
 };
 
 const startDebugSeason = async (seasonId: SeasonalCycleSeasonId) => {
   summerTestMode.value = "single100";
   autumnTestMode.value = "single100";
+  springTestMode.value = "single100";
+  winterTestMode.value = "single100";
   resetSummerSequenceState();
   resetAutumnSequenceState();
+  resetSpringSequenceState();
+  resetWinterSequenceState();
   summerRecognition.reset();
   autumnRecognition.reset();
+  springRecognition.reset();
+  winterRecognition.reset();
 
   if (seasonId === "summer") {
     summerRecognition.start({ manual: true, intensity: "100" });
   }
   if (seasonId === "autumn") {
     autumnRecognition.start({ valueClass: "100" });
+  }
+  if (seasonId === "spring") {
+    springRecognition.start({ value: "100" });
+  }
+  if (seasonId === "winter") {
+    winterRecognition.start({ value: "100" });
   }
 
   await startSingleSeason(seasonId);
@@ -1740,10 +2533,16 @@ const startDebugSeason = async (seasonId: SeasonalCycleSeasonId) => {
 const startSummerSequence = async () => {
   summerTestMode.value = "intensitySequence";
   autumnTestMode.value = "single100";
+  springTestMode.value = "single100";
+  winterTestMode.value = "single100";
   resetSummerSequenceState();
   resetAutumnSequenceState();
+  resetSpringSequenceState();
+  resetWinterSequenceState();
   summerRecognition.reset();
   autumnRecognition.reset();
+  springRecognition.reset();
+  winterRecognition.reset();
   await reset();
 
   summerSequencePhase.value = "intro";
@@ -1769,10 +2568,16 @@ const startSummerSequence = async () => {
 const startAutumnSequence = async () => {
   summerTestMode.value = "single100";
   autumnTestMode.value = "valueSequence";
+  springTestMode.value = "single100";
+  winterTestMode.value = "single100";
   resetSummerSequenceState();
   resetAutumnSequenceState();
+  resetSpringSequenceState();
+  resetWinterSequenceState();
   summerRecognition.reset();
   autumnRecognition.reset();
+  springRecognition.reset();
+  winterRecognition.reset();
   await reset();
 
   autumnSequencePhase.value = "intro";
@@ -1788,6 +2593,70 @@ const startAutumnSequence = async () => {
     setTimeout(() => {
       startCurrentAutumnValueRecognition();
       void startSingleSeason("autumn");
+    }, sequenceIntroDurationMs),
+  ];
+};
+
+const startSpringSequence = async () => {
+  summerTestMode.value = "single100";
+  autumnTestMode.value = "single100";
+  springTestMode.value = "valueSequence";
+  winterTestMode.value = "single100";
+  resetSummerSequenceState();
+  resetAutumnSequenceState();
+  resetSpringSequenceState();
+  resetWinterSequenceState();
+  summerRecognition.reset();
+  autumnRecognition.reset();
+  springRecognition.reset();
+  winterRecognition.reset();
+  await reset();
+
+  springSequencePhase.value = "intro";
+  springSequenceIntroStep.value = 0;
+
+  springSequenceIntroTimers = [
+    setTimeout(
+      () => {
+        springSequenceIntroStep.value = 1;
+      },
+      Math.floor(sequenceIntroDurationMs / 2),
+    ),
+    setTimeout(() => {
+      startCurrentSpringValueRecognition();
+      void startSingleSeason("spring");
+    }, sequenceIntroDurationMs),
+  ];
+};
+
+const startWinterSequence = async () => {
+  summerTestMode.value = "single100";
+  autumnTestMode.value = "single100";
+  springTestMode.value = "single100";
+  winterTestMode.value = "valueSequence";
+  resetSummerSequenceState();
+  resetAutumnSequenceState();
+  resetSpringSequenceState();
+  resetWinterSequenceState();
+  summerRecognition.reset();
+  autumnRecognition.reset();
+  springRecognition.reset();
+  winterRecognition.reset();
+  await reset();
+
+  winterSequencePhase.value = "intro";
+  winterSequenceIntroStep.value = 0;
+
+  winterSequenceIntroTimers = [
+    setTimeout(
+      () => {
+        winterSequenceIntroStep.value = 1;
+      },
+      Math.floor(sequenceIntroDurationMs / 2),
+    ),
+    setTimeout(() => {
+      startCurrentWinterValueRecognition();
+      void startSingleSeason("winter");
     }, sequenceIntroDurationMs),
   ];
 };
@@ -1831,6 +2700,8 @@ watch(
     isTransition,
     isSummerFeedbackInterlude,
     isAutumnFeedbackInterlude,
+    isSpringFeedbackInterlude,
+    isWinterFeedbackInterlude,
   ],
   () => {
     summerRecognition.updateFrame({
@@ -1848,6 +2719,26 @@ watch(
       playbackState: playbackState.value,
       seasonId: isAutumnFeedbackInterlude.value
         ? "autumn-feedback-interlude"
+        : currentSeason.value.id,
+      seasonElapsedMs: seasonElapsedMs.value,
+      repetitionIndex: repetitionIndex.value,
+      isTransition: isTransition.value,
+    });
+    springRecognition.updateFrame({
+      landmarks: poseLandmarks.value,
+      playbackState: playbackState.value,
+      seasonId: isSpringFeedbackInterlude.value
+        ? "spring-feedback-interlude"
+        : currentSeason.value.id,
+      seasonElapsedMs: seasonElapsedMs.value,
+      repetitionIndex: repetitionIndex.value,
+      isTransition: isTransition.value,
+    });
+    winterRecognition.updateFrame({
+      landmarks: poseLandmarks.value,
+      playbackState: playbackState.value,
+      seasonId: isWinterFeedbackInterlude.value
+        ? "winter-feedback-interlude"
         : currentSeason.value.id,
       seasonElapsedMs: seasonElapsedMs.value,
       repetitionIndex: repetitionIndex.value,
@@ -1887,6 +2778,26 @@ watch(
 );
 
 watch(
+  () => springRecognition.sequenceEvaluation.value,
+  (evaluation) => {
+    if (!evaluation) return;
+    if (springTestMode.value === "valueSequence") {
+      handleSpringSequenceEvaluation();
+    }
+  },
+);
+
+watch(
+  () => winterRecognition.sequenceEvaluation.value,
+  (evaluation) => {
+    if (!evaluation) return;
+    if (winterTestMode.value === "valueSequence") {
+      handleWinterSequenceEvaluation();
+    }
+  },
+);
+
+watch(
   () => summerRecognition.currentCycleEvaluation.value,
   (cycleEvaluation) => {
     if (!cycleEvaluation) {
@@ -1913,12 +2824,42 @@ watch(
 );
 
 watch(
+  () => springRecognition.currentCycleEvaluation.value,
+  (cycleEvaluation) => {
+    if (!cycleEvaluation) {
+      clearVisibleSpringMeasureFeedback();
+      return;
+    }
+
+    visibleSpringMeasureFeedback.value =
+      getSpringMeasureFeedback(cycleEvaluation);
+  },
+);
+
+watch(
+  () => winterRecognition.currentCycleEvaluation.value,
+  (cycleEvaluation) => {
+    if (!cycleEvaluation) {
+      clearVisibleWinterMeasureFeedback();
+      return;
+    }
+
+    visibleWinterMeasureFeedback.value =
+      getWinterMeasureFeedback(cycleEvaluation);
+  },
+);
+
+watch(
   [() => currentSeason.value.id, repetitionIndex],
   ([seasonId, currentMeasureIndex]) => {
     const summerFeedbackMeasureIndex =
       visibleSummerMeasureFeedback.value?.measureIndex ?? null;
     const feedbackMeasureIndex =
       visibleAutumnMeasureFeedback.value?.measureIndex ?? null;
+    const springFeedbackMeasureIndex =
+      visibleSpringMeasureFeedback.value?.measureIndex ?? null;
+    const winterFeedbackMeasureIndex =
+      visibleWinterMeasureFeedback.value?.measureIndex ?? null;
 
     if (
       seasonId !== "summer" ||
@@ -1935,6 +2876,22 @@ watch(
     ) {
       clearVisibleAutumnMeasureFeedback();
     }
+
+    if (
+      seasonId !== "spring" ||
+      springFeedbackMeasureIndex === null ||
+      springFeedbackMeasureIndex !== currentMeasureIndex
+    ) {
+      clearVisibleSpringMeasureFeedback();
+    }
+
+    if (
+      seasonId !== "winter" ||
+      winterFeedbackMeasureIndex === null ||
+      winterFeedbackMeasureIndex !== currentMeasureIndex
+    ) {
+      clearVisibleWinterMeasureFeedback();
+    }
   },
 );
 
@@ -1944,18 +2901,28 @@ watch(
     () => summerRecognition.cycleEvaluations.value,
     () => autumnRecognition.currentEvaluation.value,
     () => autumnRecognition.cycleEvaluations.value,
+    () => springRecognition.currentEvaluation.value,
+    () => springRecognition.cycleEvaluations.value,
+    () => winterRecognition.currentEvaluation.value,
+    () => winterRecognition.cycleEvaluations.value,
   ],
   () => {
     logSummerDebugSnapshot();
     logAutumnDebugSnapshot();
+    logSpringDebugSnapshot();
+    logWinterDebugSnapshot();
   },
 );
 
 onBeforeUnmount(() => {
   clearSummerSequenceTimers();
   clearAutumnSequenceTimers();
+  clearSpringSequenceTimers();
+  clearWinterSequenceTimers();
   summerRecognition.reset();
   autumnRecognition.reset();
+  springRecognition.reset();
+  winterRecognition.reset();
   cleanup();
   storyEngine.stopStoryEngine();
 });

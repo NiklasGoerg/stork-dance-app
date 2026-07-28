@@ -66,7 +66,7 @@ export const act5IntroCycleConfig = {
       ).href,
       audioUrl: new URL("../assets/audio/music/spring.wav", import.meta.url)
         .href,
-      movementLoopDurationMs: 4_000,
+      movementLoopDurationMs: 8_000,
       movementPrerollMs,
       movementReplayPrerollMs,
     },

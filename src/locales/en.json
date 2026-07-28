@@ -301,6 +301,54 @@
           "transition": "Transition",
           "repetitionCount": "{current} / {total}"
         },
+        "summerInstructions": {
+          "beatCue": "Summer {value}% | {warming} | {instruction}",
+          "warming": {
+            "100": "Much warmer",
+            "60": "Warmer",
+            "30": "Slightly warmer",
+            "10": "Near reference"
+          },
+          "beats": {
+            "1": "Hands together",
+            "4": "Return to neutral",
+            "100": {
+              "2": "Side step and reach fully",
+              "3": "Open fully"
+            },
+            "60": {
+              "2": "Side step and reach up",
+              "3": "Open moderately"
+            },
+            "30": {
+              "2": "Side step with bent arms",
+              "3": "Open slightly"
+            },
+            "10": {
+              "2": "Side step and stay compact",
+              "3": "Small opening"
+            }
+          },
+          "fallback": {
+            "1": "Hands to chest center.",
+            "2": "Arms overhead, step to the side.",
+            "3": "Open your arms in a wide circle.",
+            "4": "Return to neutral."
+          }
+        },
+        "autumnInstructions": {
+          "beatCue": "Autumn {value}% | {direction} | {instruction}",
+          "direction": {
+            "leftToRight": "left to right",
+            "rightToLeft": "right to left"
+          },
+          "beats": {
+            "1": "Hands to the starting side.",
+            "2": "Sweep through the semicircle.",
+            "3": "Reach the value endpoint.",
+            "4": "Return hands to chest center."
+          }
+        },
         "summerFeedback": {
           "SUCCESS": "Great - you completed the summer movement.",
           "MOVE_HANDS_TO_CENTER": "Bring your hands together in front of your chest.",
@@ -370,8 +418,98 @@
           "success": "Bravo",
           "almostCorrect": "Good"
         },
+        "springCycleFeedback": {
+          "success": "Bravo",
+          "almostCorrect": "Good"
+        },
+        "winterCycleFeedback": {
+          "success": "Bravo",
+          "almostCorrect": "Good"
+        },
         "autumnFeedback": {
-          "directionPattern": "Pattern: first two sweeps left to right, second two sweeps right to left."
+          "directionPattern": "Pattern: first two sweeps left to right, second two sweeps right to left.",
+          "SUCCESS": "Bravo",
+          "FULL_BODY_NOT_VISIBLE": "Make sure your full body is visible.",
+          "HANDS_NOT_VISIBLE": "Make sure both hands are visible.",
+          "START_LEFT": "Start with your hands on the left side.",
+          "START_RIGHT": "Start with your hands on the right side.",
+          "WRONG_SWEEP_DIRECTION": "Sweep in the other direction.",
+          "INSUFFICIENT_PROGRESS": "Move a little farther from the starting pose.",
+          "SWEEP_RIGHT": "Sweep toward the right side.",
+          "SWEEP_LEFT": "Sweep toward the left side.",
+          "ENDPOINT_TOO_SHORT": "Sweep farther toward the endpoint.",
+          "ENDPOINT_TOO_FAR": "Use a shorter sweep.",
+          "ENDPOINT_REACHED_TOO_LATE": "Reach the endpoint by beat three.",
+          "ENDPOINT_UNSTABLE": "Hold the endpoint briefly.",
+          "END_AT_DESTINATION_SIDE": "End clearly on the destination side.",
+          "END_AT_FAR_DESTINATION_SIDE": "End at your maximum comfortable reach.",
+          "END_AT_CENTER": "End with your hands in front.",
+          "END_BEFORE_CENTER": "Stay just before the center.",
+          "END_AT_START_SIDE_DIAGONAL": "Move diagonally toward the front.",
+          "ALIGN_BOTH_ARMS": "Point both arms toward the endpoint.",
+          "EXTEND_OUTER_ARM": "Extend the outer arm toward the endpoint.",
+          "KEEP_HANDS_AT_CHEST_HEIGHT": "Keep your hands at chest or shoulder height.",
+          "KEEP_CHEST_FORWARD": "Keep your chest facing forward.",
+          "RETURN_HANDS_TO_CENTER": "Return your hands to chest center.",
+          "RETURN_FEET_TOGETHER": "Bring your feet close together.",
+          "TRY_AGAIN": "Use the same smooth autumn sweep.",
+          "START_ON_LEFT": "Start with your hands on the left side.",
+          "START_ON_RIGHT": "Start with your hands on the right side.",
+          "MOVE_HANDS_TOGETHER": "Keep both hands together.",
+          "KEEP_HANDS_CHEST_HEIGHT": "Keep your hands at chest or shoulder height.",
+          "SWEEP_FARTHER": "Sweep farther around your body.",
+          "SWEEP_LESS": "Use a shorter sweep."
+        },
+        "springInstructions": {
+          "beatCue": "Spring {value}% | {instruction}",
+          "beat1": "Hands low and close to your body.",
+          "beat2": "Move along the bloom arc.",
+          "beat3": "Reach the value endpoint.",
+          "beat4": "Bring your hands together in front of your chest."
+        },
+        "springFeedback": {
+          "SUCCESS": "Good bloom.",
+          "FULL_BODY_NOT_VISIBLE": "Make sure your full body is visible.",
+          "OPEN_ARMS_TO_BEGIN": "Open both arms away from the start pose.",
+          "START_HANDS_LOW": "Start with your hands low.",
+          "KEEP_HANDS_CLOSE_TO_BODY": "Keep your hands close to your body.",
+          "OPEN_ARMS_HIGHER": "Lift the bloom higher.",
+          "KEEP_BLOOM_LOWER": "Keep the bloom lower.",
+          "REACH_ABOVE_HEAD": "Bring both hands together above your head.",
+          "GATHER_HANDS_IN_FRONT": "Gather your hands in front of your body.",
+          "LOWER_AND_RETURN": "Bring your hands together in front of your chest.",
+          "LIFT_OTHER_KNEE": "Use the other knee for this measure.",
+          "MATCH_BOTH_HANDS": "Move both hands to a similar height.",
+          "TRY_AGAIN": "Let's repeat the spring bloom."
+        },
+        "winterInstructions": {
+          "beatCue": "Winter {value}% | {instruction}",
+          "beat1": "Open both arms wide at shoulder height.",
+          "beat2": "Cross your arms into a self-hug.",
+          "beat3": "Show the cold contraction value.",
+          "beat4": "Return upright and release your arms."
+        },
+        "winterFeedback": {
+          "SUCCESS": "Bravo",
+          "FULL_BODY_NOT_VISIBLE": "Make sure your full body is visible.",
+          "UPPER_BODY_NOT_VISIBLE": "Make sure your upper body and hands are visible.",
+          "LOWER_BODY_NOT_VISIBLE": "Keep your feet visible and stable.",
+          "OPEN_ARMS_WIDER": "Open both arms wider.",
+          "RAISE_ARMS_TO_SHOULDERS": "Keep your hands around shoulder height.",
+          "STRAIGHTEN_ARMS_MORE": "Stretch your elbows more.",
+          "CROSS_ARMS_IN_FRONT": "Cross your arms in front of your chest.",
+          "REACH_OPPOSITE_SHOULDERS": "Reach toward your opposite shoulders.",
+          "KEEP_ARMS_CROSSED": "Keep your arms crossed.",
+          "STAY_UPRIGHT": "Stay upright for this value.",
+          "BEND_KNEES_MORE": "Bend your knees more.",
+          "STAY_HIGHER": "Stay a little higher.",
+          "CONTRACT_MORE": "Contract your body more.",
+          "KEEP_BODY_COMPACT": "Keep your body compact.",
+          "PROTECT_HEAD": "Protect your head with your hands.",
+          "LOWER_BODY_AND_PROTECT_HEAD": "Contract lower and protect your head.",
+          "RETURN_TO_UPRIGHT": "Return upright.",
+          "LOWER_ARMS": "Release your arms.",
+          "TRY_AGAIN": "Let's repeat the winter movement."
         },
         "summerSeasonFeedback": {
           "successTitle": "Summer completed",
@@ -381,8 +519,8 @@
         },
         "sequence": {
           "movementValue": "Movement {value}",
-          "measure": "Movement {value} · measure {current} / {total}",
-          "feedbackBeat": "Movement {value} · feedback beat {beat} / 4",
+          "measure": "Movement {value} | measure {current} / {total}",
+          "feedbackBeat": "Movement {value} | feedback beat {beat} / 4",
           "beatProblem": "Beat {beat}: {cue}",
           "summerIntroWarming": "Movement size shows warming.",
           "summerIntroLarger": "Larger means warmer than the reference.",
@@ -393,7 +531,26 @@
           "autumnIntroSweep": "Autumn values show how far the sweep travels.",
           "autumnIntroSmaller": "Smaller values stop earlier on the same arc.",
           "autumnCompleted": "Autumn Sequence completed.",
-          "autumnNextStart": "Next: start left to right."
+          "autumnNextStart": "Next: start left to right.",
+          "springIntroBloom": "Spring values show how high the bloom reaches.",
+          "springIntroValues": "Smaller values stop lower on the same arc.",
+          "springCompleted": "Spring Sequence completed.",
+          "springRetryNext": "Next: repeat this spring movement.",
+          "springInterludeDefault": "Use the same four-part spring bloom.",
+          "winterIntroCold": "Winter values show how strongly the body contracts.",
+          "winterIntroContract": "Lower values mean a deeper cold contraction.",
+          "winterCompleted": "Winter Sequence completed.",
+          "winterRetryNext": "Next: repeat this winter movement.",
+          "winterInterludeDefault": "Use the same four-part winter contraction."
+        },
+        "debug": {
+          "startSeason": "Start {season}",
+          "startSummerSequence": "Start Summer Sequence",
+          "startAutumnSequence": "Start Autumn Sequence",
+          "showDiagnostics": "Show diagnostics",
+          "hideDiagnostics": "Hide diagnostics",
+          "startSpringSequence": "Start Spring Sequence",
+          "startWinterSequence": "Start Winter Sequence"
         },
         "scenes": {
           "intro": {

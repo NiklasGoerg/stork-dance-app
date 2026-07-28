@@ -46,6 +46,24 @@ const getRecordingDurationMs = (recording: MovementRecording) => {
   return Math.max(lastFrameTime - firstFrameTime, 1);
 };
 
+const normalizeRecordingTimingToFps = (
+  recording: MovementRecording,
+): MovementRecording => {
+  if (!recording.fps || !Number.isFinite(recording.fps) || recording.fps <= 0) {
+    return recording;
+  }
+
+  const frameDurationMs = 1000 / recording.fps;
+
+  return {
+    ...recording,
+    frames: recording.frames.map((frame, index) => ({
+      ...frame,
+      time: index * frameDurationMs,
+    })),
+  };
+};
+
 const getSeasonMovementPrerollMs = (
   season: SeasonalCycleSeasonConfig,
   fallbackPrerollMs: number,
@@ -158,7 +176,9 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
       throw new Error(`Could not load ${season.id} movement.`);
     }
 
-    const recording = (await response.json()) as MovementRecording;
+    const recording = normalizeRecordingTimingToFps(
+      (await response.json()) as MovementRecording,
+    );
     const movement = {
       recording,
       durationMs: getRecordingDurationMs(recording),
@@ -263,10 +283,6 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
       getSeasonMovementPrerollMs(currentProgress.season, movementPrerollMs),
       movement.durationMs,
     );
-    const movementDurationMs = Math.max(
-      movement.durationMs - movementStartMs,
-      1,
-    );
     const movementLoopDurationMs = getSeasonMovementLoopDurationMs(
       currentProgress.season,
       config.barDurationMs,
@@ -279,11 +295,10 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
       movementStartMs > 0 &&
       movementElapsedMs >= movementLoopDurationMs - replayPrerollMs;
     const movementTimeMs = isReplayPreroll
-      ? ((movementElapsedMs - (movementLoopDurationMs - replayPrerollMs)) /
-          replayPrerollMs) *
-        movementStartMs
-      : movementStartMs +
-        (movementElapsedMs / movementLoopDurationMs) * movementDurationMs;
+      ? Math.max(movementStartMs - replayPrerollMs, 0) +
+        movementElapsedMs -
+        (movementLoopDurationMs - replayPrerollMs)
+      : Math.min(movementStartMs + movementElapsedMs, movement.durationMs);
 
     seekToTime(movementTimeMs);
   };

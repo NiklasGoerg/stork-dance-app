@@ -54,3 +54,47 @@ export const getEssentialCriteriaStats = <
     passedCount: passedEssentialCriteria.length,
   };
 };
+
+export const getBeatPassState = <
+  TCriterion extends MovementCriterionScoringInput,
+>({
+  criteria,
+  score,
+  passScore,
+}: {
+  criteria: TCriterion[];
+  score: number;
+  passScore: number;
+}) => {
+  const essentialStats = getEssentialCriteriaStats(criteria);
+  const trackingUnavailable =
+    essentialStats.evaluableCount < Math.ceil(essentialStats.totalCount / 2);
+  const passed =
+    !trackingUnavailable &&
+    essentialStats.passedCount === essentialStats.totalCount &&
+    score >= passScore;
+
+  return {
+    trackingUnavailable,
+    passed,
+  };
+};
+
+export const getWeightedBeatEvaluationScore = <
+  TBeat extends number | string,
+  TEvaluation extends { beat: TBeat; score: number },
+>(
+  beatEvaluations: TEvaluation[],
+  beatWeights: Record<TBeat, number>,
+) => {
+  const totalWeight = beatEvaluations.reduce(
+    (sum, evaluation) => sum + beatWeights[evaluation.beat],
+    0,
+  );
+  const weightedScore = beatEvaluations.reduce(
+    (sum, evaluation) => sum + evaluation.score * beatWeights[evaluation.beat],
+    0,
+  );
+
+  return totalWeight > 0 ? weightedScore / totalWeight : 0;
+};

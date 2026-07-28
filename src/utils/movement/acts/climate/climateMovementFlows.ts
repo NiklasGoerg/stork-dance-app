@@ -1,5 +1,7 @@
 import type { AutumnValueClass } from "~/utils/movement/acts/climate/autumn/autumnMovementRecognition";
+import type { SpringValue } from "~/utils/movement/acts/climate/spring/springMovementRecognition";
 import type { SummerIntensity } from "~/utils/movement/acts/climate/summer/summerMovementRecognition";
+import type { WinterValue } from "~/utils/movement/acts/climate/winter/winterMovementRecognition";
 import type { SeasonalCycleSeasonId } from "~/utils/seasonalCycle";
 
 export type ClimateMovementFamilyId = Extract<
@@ -9,11 +11,13 @@ export type ClimateMovementFamilyId = Extract<
 
 export type ClimateMovementFlowId =
   | "springSingleDebug"
+  | "springSequenceDebug"
   | "summerSingleDebug"
   | "summerSequenceDebug"
   | "autumnSingleDebug"
   | "autumnSequenceDebug"
   | "winterSingleDebug"
+  | "winterSequenceDebug"
   | "act5Story";
 
 export type ClimateMovementFlow<TValue extends string = string> = {
@@ -56,8 +60,18 @@ export const climateMovementFlowRegistry = {
     familyId: "spring",
     label: "Spring",
     value: "100",
-    recognitionEnabled: false,
+    recognitionEnabled: true,
   }),
+  springSequenceDebug: {
+    id: "springSequenceDebug",
+    familyId: "spring",
+    label: "Spring Sequence",
+    values: ["100", "40", "30", "20"],
+    measuresPerValue: 4,
+    requiredSuccessfulMeasures: 2,
+    feedbackInterludeDurationMs: 4_000,
+    recognitionEnabled: true,
+  } satisfies ClimateMovementFlow<SpringValue>,
   summerSingleDebug: createSingleDebugFlow<SummerIntensity>({
     id: "summerSingleDebug",
     familyId: "summer",
@@ -92,13 +106,23 @@ export const climateMovementFlowRegistry = {
     feedbackInterludeDurationMs: 4_000,
     recognitionEnabled: true,
   } satisfies ClimateMovementFlow<AutumnValueClass>,
-  winterSingleDebug: createSingleDebugFlow({
+  winterSingleDebug: createSingleDebugFlow<WinterValue>({
     id: "winterSingleDebug",
     familyId: "winter",
     label: "Winter",
     value: "100",
-    recognitionEnabled: false,
+    recognitionEnabled: true,
   }),
+  winterSequenceDebug: {
+    id: "winterSequenceDebug",
+    familyId: "winter",
+    label: "Winter Sequence",
+    values: ["100", "50", "20", "-10"],
+    measuresPerValue: 4,
+    requiredSuccessfulMeasures: 2,
+    feedbackInterludeDurationMs: 4_000,
+    recognitionEnabled: true,
+  } satisfies ClimateMovementFlow<WinterValue>,
   act5Story: {
     id: "act5Story",
     familyId: "summer",
@@ -112,6 +136,8 @@ export const climateMovementFlowRegistry = {
 } as const;
 
 export const climateSequenceFlows = [
+  climateMovementFlowRegistry.springSequenceDebug,
   climateMovementFlowRegistry.summerSequenceDebug,
   climateMovementFlowRegistry.autumnSequenceDebug,
+  climateMovementFlowRegistry.winterSequenceDebug,
 ] as const;
