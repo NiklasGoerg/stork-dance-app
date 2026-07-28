@@ -1,7 +1,7 @@
-import type { AutumnValueClass } from "~/utils/movement/acts/climate/autumn/autumnMovementRecognition";
-import type { SpringValue } from "~/utils/movement/acts/climate/spring/springMovementRecognition";
-import type { SummerIntensity } from "~/utils/movement/acts/climate/summer/summerMovementRecognition";
-import type { WinterValue } from "~/utils/movement/acts/climate/winter/winterMovementRecognition";
+import {
+  climateDataSourceId,
+  type ClimateSeason,
+} from "~/utils/movement/acts/climate/climateSeasonData";
 import type { SeasonalCycleSeasonId } from "~/utils/seasonalCycle";
 
 export type ClimateMovementFamilyId = Extract<
@@ -20,34 +20,43 @@ export type ClimateMovementFlowId =
   | "winterSequenceDebug"
   | "act5Story";
 
-export type ClimateMovementFlow<TValue extends string = string> = {
+export type ClimateMovementFlowKind =
+  | "single-baseline"
+  | "season-timeline"
+  | "story";
+
+export type ClimateMovementFlow = {
   id: ClimateMovementFlowId;
   familyId: ClimateMovementFamilyId;
   label: string;
-  values: readonly TValue[];
+  kind: ClimateMovementFlowKind;
+  season: ClimateSeason;
+  dataSource: typeof climateDataSourceId;
   measuresPerValue: number;
   requiredSuccessfulMeasures: number;
   feedbackInterludeDurationMs: number;
   recognitionEnabled: boolean;
 };
 
-const createSingleDebugFlow = <TValue extends string>({
+const createFlow = ({
   id,
   familyId,
   label,
-  value,
+  kind,
   recognitionEnabled,
 }: {
   id: ClimateMovementFlowId;
   familyId: ClimateMovementFamilyId;
   label: string;
-  value: TValue;
+  kind: ClimateMovementFlowKind;
   recognitionEnabled: boolean;
-}): ClimateMovementFlow<TValue> => ({
+}): ClimateMovementFlow => ({
   id,
   familyId,
   label,
-  values: [value],
+  kind,
+  season: familyId,
+  dataSource: climateDataSourceId,
   measuresPerValue: 4,
   requiredSuccessfulMeasures: 2,
   feedbackInterludeDurationMs: 4_000,
@@ -55,84 +64,69 @@ const createSingleDebugFlow = <TValue extends string>({
 });
 
 export const climateMovementFlowRegistry = {
-  springSingleDebug: createSingleDebugFlow({
+  springSingleDebug: createFlow({
     id: "springSingleDebug",
     familyId: "spring",
     label: "Spring",
-    value: "100",
+    kind: "single-baseline",
     recognitionEnabled: true,
   }),
-  springSequenceDebug: {
+  springSequenceDebug: createFlow({
     id: "springSequenceDebug",
     familyId: "spring",
-    label: "Spring Sequence",
-    values: ["100", "40", "30", "20"],
-    measuresPerValue: 4,
-    requiredSuccessfulMeasures: 2,
-    feedbackInterludeDurationMs: 4_000,
+    label: "Spring Timeline",
+    kind: "season-timeline",
     recognitionEnabled: true,
-  } satisfies ClimateMovementFlow<SpringValue>,
-  summerSingleDebug: createSingleDebugFlow<SummerIntensity>({
+  }),
+  summerSingleDebug: createFlow({
     id: "summerSingleDebug",
     familyId: "summer",
     label: "Summer",
-    value: "100",
+    kind: "single-baseline",
     recognitionEnabled: true,
   }),
-  summerSequenceDebug: {
+  summerSequenceDebug: createFlow({
     id: "summerSequenceDebug",
     familyId: "summer",
-    label: "Summer Sequence",
-    values: ["100", "60", "30", "10"],
-    measuresPerValue: 4,
-    requiredSuccessfulMeasures: 2,
-    feedbackInterludeDurationMs: 4_000,
+    label: "Summer Timeline",
+    kind: "season-timeline",
     recognitionEnabled: true,
-  } satisfies ClimateMovementFlow<SummerIntensity>,
-  autumnSingleDebug: createSingleDebugFlow<AutumnValueClass>({
+  }),
+  autumnSingleDebug: createFlow({
     id: "autumnSingleDebug",
     familyId: "autumn",
     label: "Autumn",
-    value: "100",
+    kind: "single-baseline",
     recognitionEnabled: true,
   }),
-  autumnSequenceDebug: {
+  autumnSequenceDebug: createFlow({
     id: "autumnSequenceDebug",
     familyId: "autumn",
-    label: "Autumn Sequence",
-    values: ["100", "80", "50", "40", "25"],
-    measuresPerValue: 4,
-    requiredSuccessfulMeasures: 2,
-    feedbackInterludeDurationMs: 4_000,
+    label: "Autumn Timeline",
+    kind: "season-timeline",
     recognitionEnabled: true,
-  } satisfies ClimateMovementFlow<AutumnValueClass>,
-  winterSingleDebug: createSingleDebugFlow<WinterValue>({
+  }),
+  winterSingleDebug: createFlow({
     id: "winterSingleDebug",
     familyId: "winter",
     label: "Winter",
-    value: "100",
+    kind: "single-baseline",
     recognitionEnabled: true,
   }),
-  winterSequenceDebug: {
+  winterSequenceDebug: createFlow({
     id: "winterSequenceDebug",
     familyId: "winter",
-    label: "Winter Sequence",
-    values: ["100", "50", "20", "-10"],
-    measuresPerValue: 4,
-    requiredSuccessfulMeasures: 2,
-    feedbackInterludeDurationMs: 4_000,
+    label: "Winter Timeline",
+    kind: "season-timeline",
     recognitionEnabled: true,
-  } satisfies ClimateMovementFlow<WinterValue>,
-  act5Story: {
+  }),
+  act5Story: createFlow({
     id: "act5Story",
     familyId: "summer",
     label: "Act 5 story",
-    values: [],
-    measuresPerValue: 4,
-    requiredSuccessfulMeasures: 2,
-    feedbackInterludeDurationMs: 4_000,
+    kind: "story",
     recognitionEnabled: false,
-  } satisfies ClimateMovementFlow,
+  }),
 } as const;
 
 export const climateSequenceFlows = [

@@ -301,14 +301,20 @@
           "transition": "Transition",
           "repetitionCount": "{current} / {total}"
         },
+        "movementText": {
+          "valueLabel": "{value}% movement",
+          "bravo": "Bravo!",
+          "good": "Good!",
+          "tryAgain": "Let's try again.",
+          "ready": "Select a sequence to begin.",
+          "baselinePrep": "Learn the full reference movement.",
+          "timelineIntro": "We will explore temperature changes over time.",
+          "differenceIntro": "Movement size represents the temperature difference.",
+          "referenceIntro": "First, learn the full reference movement.",
+          "nextPeriod": "Next time period"
+        },
         "summerInstructions": {
-          "beatCue": "Summer {value}% | {warming} | {instruction}",
-          "warming": {
-            "100": "Much warmer",
-            "60": "Warmer",
-            "30": "Slightly warmer",
-            "10": "Near reference"
-          },
+          "beatCue": "{instruction}",
           "beats": {
             "1": "Hands together",
             "4": "Return to neutral",
@@ -337,7 +343,7 @@
           }
         },
         "autumnInstructions": {
-          "beatCue": "Autumn {value}% | {direction} | {instruction}",
+          "beatCue": "{instruction}",
           "direction": {
             "leftToRight": "left to right",
             "rightToLeft": "right to left"
@@ -426,6 +432,15 @@
           "success": "Bravo",
           "almostCorrect": "Good"
         },
+        "climateData": {
+          "loadError": "Climate data could not be loaded."
+        },
+        "climateInfo": {
+          "eyebrow": "Climate period",
+          "referencePeriod": "Reference period",
+          "vsBaseline": "vs. 1995-1999",
+          "periodProgress": "Period {current} of {total}"
+        },
         "autumnFeedback": {
           "directionPattern": "Pattern: first two sweeps left to right, second two sweeps right to left.",
           "SUCCESS": "Bravo",
@@ -461,7 +476,7 @@
           "SWEEP_LESS": "Use a shorter sweep."
         },
         "springInstructions": {
-          "beatCue": "Spring {value}% | {instruction}",
+          "beatCue": "{instruction}",
           "beat1": "Hands low and close to your body.",
           "beat2": "Move along the bloom arc.",
           "beat3": "Reach the value endpoint.",
@@ -483,7 +498,7 @@
           "TRY_AGAIN": "Let's repeat the spring bloom."
         },
         "winterInstructions": {
-          "beatCue": "Winter {value}% | {instruction}",
+          "beatCue": "{instruction}",
           "beat1": "Open both arms wide at shoulder height.",
           "beat2": "Cross your arms into a self-hug.",
           "beat3": "Show the cold contraction value.",
@@ -522,6 +537,8 @@
           "measure": "Movement {value} | measure {current} / {total}",
           "feedbackBeat": "Movement {value} | feedback beat {beat} / 4",
           "beatProblem": "Beat {beat}: {cue}",
+          "climateIntroBaseline": "We turn {season} climate data from {from} to {to} into movement. Start with the {value}% reference movement.",
+          "climateIntroDifferences": "After that, each period shows its difference from {reference} as the movement percentage.",
           "summerIntroWarming": "Movement size shows warming.",
           "summerIntroLarger": "Larger means warmer than the reference.",
           "summerCompleted": "Summer Sequence completed.",

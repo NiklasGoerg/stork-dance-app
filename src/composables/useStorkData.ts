@@ -1,5 +1,6 @@
 import { computed, ref, unref, watch, type MaybeRef } from "vue";
 import storkDataUrl from "~/assets/storkdata/daily_stork_data.csv?url";
+import { parseCsvLine } from "~/utils/csv";
 import type {
   StorkDataPoint,
   StorkMapMode,
@@ -80,26 +81,6 @@ const getClosestPointForStoryDate = (
 
     return candidateDistance < closestDistance ? pointCandidate : closestPoint;
   });
-};
-
-const parseCsvLine = (line: string) => {
-  const values: string[] = [];
-  let current = "";
-  let isQuoted = false;
-
-  for (const char of line) {
-    if (char === '"') {
-      isQuoted = !isQuoted;
-    } else if (char === "," && !isQuoted) {
-      values.push(current.trim());
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-
-  values.push(current.trim());
-  return values;
 };
 
 const parseStorkCsv = (csv: string) => {

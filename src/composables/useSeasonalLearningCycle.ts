@@ -46,24 +46,6 @@ const getRecordingDurationMs = (recording: MovementRecording) => {
   return Math.max(lastFrameTime - firstFrameTime, 1);
 };
 
-const normalizeRecordingTimingToFps = (
-  recording: MovementRecording,
-): MovementRecording => {
-  if (!recording.fps || !Number.isFinite(recording.fps) || recording.fps <= 0) {
-    return recording;
-  }
-
-  const frameDurationMs = 1000 / recording.fps;
-
-  return {
-    ...recording,
-    frames: recording.frames.map((frame, index) => ({
-      ...frame,
-      time: index * frameDurationMs,
-    })),
-  };
-};
-
 const getSeasonMovementPrerollMs = (
   season: SeasonalCycleSeasonConfig,
   fallbackPrerollMs: number,
@@ -176,9 +158,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
       throw new Error(`Could not load ${season.id} movement.`);
     }
 
-    const recording = normalizeRecordingTimingToFps(
-      (await response.json()) as MovementRecording,
-    );
+    const recording = (await response.json()) as MovementRecording;
     const movement = {
       recording,
       durationMs: getRecordingDurationMs(recording),

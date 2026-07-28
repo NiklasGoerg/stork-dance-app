@@ -1,7 +1,9 @@
 import type { SeasonalCycleConfig } from "~/utils/seasonalCycle";
 
 const movementPrerollMs = 1_000;
-const movementReplayPrerollMs = 500;
+// Every seasonal avatar JSON includes the approach into Beat 1. Repeat from
+// JSON start one second before the next musical bar so Beat 1 lands on time.
+const movementReplayPrerollMs = 1_000;
 
 export const act5IntroCycleConfig = {
   seasonDurationMs: 16_000,

@@ -4,9 +4,14 @@ export const getMedianValue = (values: number[]) => {
   const sortedValues = [...values].sort((a, b) => a - b);
   const middleIndex = Math.floor(sortedValues.length / 2);
 
-  if (sortedValues.length % 2 === 1) return sortedValues[middleIndex];
+  if (sortedValues.length % 2 === 1) return sortedValues[middleIndex] ?? null;
 
-  return (sortedValues[middleIndex - 1] + sortedValues[middleIndex]) / 2;
+  const leftValue = sortedValues[middleIndex - 1];
+  const rightValue = sortedValues[middleIndex];
+
+  return leftValue !== undefined && rightValue !== undefined
+    ? (leftValue + rightValue) / 2
+    : null;
 };
 
 export const pushRollingSample = <TSample>(
