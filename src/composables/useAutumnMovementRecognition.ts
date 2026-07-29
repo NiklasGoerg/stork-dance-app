@@ -22,10 +22,7 @@ import {
 } from "~/utils/movement/acts/climate/autumn/autumnMovementRecognition";
 
 export type AutumnCycleResult =
-  | "success"
-  | "almostCorrect"
-  | "failed"
-  | "trackingUnavailable";
+  "success" | "almostCorrect" | "failed" | "trackingUnavailable";
 
 export type AutumnCycleEvaluation = {
   cycleIndex: number;
@@ -162,6 +159,7 @@ export const useAutumnMovementRecognition = () => {
     repetitionIndex: number | null;
     isTransition: boolean;
     evaluationEnabled?: boolean;
+    autoProgressEnabled?: boolean;
     timestamp?: number;
   }) => {
     engine.updateFrame(frame);

@@ -14,6 +14,55 @@
   --color-warning: #c97b00;
   --color-danger: #c92a2a;
 
+  --act5-color-text: #26382f;
+  --act5-color-text-strong: #062d23;
+  --act5-color-text-soft: #0b3429;
+  --act5-color-text-muted: rgba(31, 49, 39, 0.58);
+  --act5-color-border: rgba(31, 49, 39, 0.14);
+  --act5-color-border-strong: rgba(31, 49, 39, 0.16);
+  --act5-color-surface: rgba(248, 251, 247, 0.94);
+  --act5-color-surface-strong: rgba(248, 251, 247, 0.96);
+  --act5-color-card: rgba(255, 253, 246, 0.9);
+  --act5-color-card-muted: rgba(246, 248, 244, 0.94);
+  --act5-color-temperature-difference: #1f62db;
+
+  --act5-season-winter-background: #95dcff;
+  --act5-season-winter-surface: #e0f2ff;
+  --act5-season-spring-background: #c0ff9c;
+  --act5-season-spring-surface: #f2ffde;
+  --act5-season-summer-background: #ffe28c;
+  --act5-season-summer-surface: #fff8ce;
+  --act5-season-autumn-background: #ec9570;
+  --act5-season-autumn-surface: #f8d4bd;
+  --act5-season-transition-background: #f1eee6;
+  --act5-season-transition-surface: #fffdf7;
+
+  --act5-chart-winter: #2f80c0;
+  --act5-chart-spring: #2f9f5b;
+  --act5-chart-summer: #d85335;
+  --act5-chart-autumn: #b8841d;
+
+  --act5-feedback-neutral-border: rgba(6, 45, 35, 0.14);
+  --act5-feedback-neutral-background: rgba(246, 248, 244, 0.94);
+  --act5-feedback-neutral-text: #20362d;
+  --act5-feedback-success-border: rgba(59, 172, 101, 0.28);
+  --act5-feedback-success-background: rgba(205, 239, 215, 0.94);
+  --act5-feedback-success-text: #158348;
+  --act5-feedback-warning-border: rgba(181, 117, 31, 0.26);
+  --act5-feedback-warning-background: rgba(255, 238, 196, 0.95);
+  --act5-feedback-warning-text: #8a510b;
+  --act5-instruction-muted-text: rgba(6, 45, 35, 0.5);
+  --act5-instruction-beat-muted-text: rgba(6, 45, 35, 0.58);
+  --act5-instruction-active-border: rgba(55, 158, 91, 0.26);
+  --act5-instruction-active-background: rgba(219, 242, 225, 0.82);
+  --act5-instruction-active-accent: #45b06f;
+  --act5-transition-arrow: rgba(6, 45, 35, 0.42);
+
+  --act5-shadow-panel: 0 18px 48px rgba(85, 69, 26, 0.1);
+  --act5-shadow-instruction: 0 10px 24px rgba(36, 117, 70, 0.1);
+  --act5-shadow-feedback: 0 18px 36px rgba(62, 55, 35, 0.11);
+  --act5-shadow-bottom-bar: 0 -10px 28px rgba(32, 50, 40, 0.1);
+
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;

@@ -5,15 +5,9 @@ export type AutumnValueClass = "100" | "80" | "50" | "40" | "25";
 export type AutumnDirection = "leftToRight" | "rightToLeft";
 export type AutumnSide = "left" | "right" | "center" | "unknown";
 export type AutumnDirectionResult =
-  | "matched"
-  | "negativeProgress"
-  | "insufficientProgress"
-  | "unknown";
+  "matched" | "negativeProgress" | "insufficientProgress" | "unknown";
 export type AutumnDirectionFailureReason =
-  | "wrongStartSide"
-  | "negativeProgress"
-  | "notDirectionFailure"
-  | "unknown";
+  "wrongStartSide" | "negativeProgress" | "notDirectionFailure" | "unknown";
 export type AutumnEndpointRegion =
   | "startSide"
   | "startSideDiagonal"
@@ -23,18 +17,9 @@ export type AutumnEndpointRegion =
   | "farDestinationSide"
   | "unknown";
 export type AutumnEndpointErrorKind =
-  | "matched"
-  | "tooShort"
-  | "tooFar"
-  | "wrongRegion"
-  | "timing"
-  | "unknown";
+  "matched" | "tooShort" | "tooFar" | "wrongRegion" | "timing" | "unknown";
 export type AutumnArmExtensionClass =
-  | "maximum"
-  | "large"
-  | "forward"
-  | "compact"
-  | "unknown";
+  "maximum" | "large" | "forward" | "compact" | "unknown";
 export type AutumnCriterionImportance = "essential" | "supporting";
 export type AutumnCriterionStatus = "passed" | "failed" | "notEvaluable";
 export type AutumnFeedbackCode =
@@ -73,10 +58,7 @@ export type AutumnFeedbackCode =
   | "SWEEP_LESS";
 
 export type AutumnRecognitionResultState =
-  | "success"
-  | "almostCorrect"
-  | "retryRequired"
-  | "trackingUnavailable";
+  "success" | "almostCorrect" | "retryRequired" | "trackingUnavailable";
 
 export type AutumnMovementReference = {
   valueClass: AutumnValueClass;

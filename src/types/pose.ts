@@ -10,9 +10,7 @@ export type PoseFeatureName =
   | "wristsAboveHead";
 
 export type PoseConditionOperator =
-  | "lessThanOrEqual"
-  | "greaterThanOrEqual"
-  | "between";
+  "lessThanOrEqual" | "greaterThanOrEqual" | "between";
 
 export type PoseConditionDefinition = {
   id: string;

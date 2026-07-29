@@ -23,11 +23,7 @@ export type ClimateMovementFlowId =
   | "act5Story";
 
 export type ClimateMovementFlowKind =
-  | "full-act"
-  | "tutorial"
-  | "single-baseline"
-  | "season-timeline"
-  | "story";
+  "full-act" | "tutorial" | "single-baseline" | "season-timeline" | "story";
 
 export type ClimateMovementFlow = {
   id: ClimateMovementFlowId;

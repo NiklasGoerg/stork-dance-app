@@ -127,9 +127,10 @@ export const useLeafletStorkRoute = () => {
     const allLatLngs: LatLng[] = [];
 
     for (const route of routes) {
-      const latLngs = route.points.map(
-        (point): LatLng => [point.lat, point.lng],
-      );
+      const latLngs = route.points.map((point): LatLng => [
+        point.lat,
+        point.lng,
+      ]);
 
       if (!latLngs.length) continue;
 

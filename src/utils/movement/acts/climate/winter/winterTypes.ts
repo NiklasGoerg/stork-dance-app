@@ -3,11 +3,7 @@ import type { MovementRange } from "~/utils/movement/core/range";
 export type WinterBeat = 1 | 2 | 3 | 4;
 export type WinterValue = "100" | "50" | "20" | "-10";
 export type WinterContractionClass =
-  | "upright"
-  | "medium"
-  | "deep"
-  | "extreme"
-  | "unknown";
+  "upright" | "medium" | "deep" | "extreme" | "unknown";
 export type WinterCriterionImportance = "essential" | "supporting";
 export type WinterCriterionStatus = "passed" | "failed" | "notEvaluable";
 export type WinterFeedbackCode =
@@ -33,10 +29,7 @@ export type WinterFeedbackCode =
   | "TRY_AGAIN";
 
 export type WinterRecognitionResultState =
-  | "success"
-  | "almostCorrect"
-  | "retryRequired"
-  | "trackingUnavailable";
+  "success" | "almostCorrect" | "retryRequired" | "trackingUnavailable";
 
 export type WinterNeutralReference = {
   headY: number | null;

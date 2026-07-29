@@ -1,25 +1,13 @@
 import type { StorkStoryCycleDefinition } from "~/types/stork";
 
 export type StoryActId =
-  | "prologue"
-  | "act-2"
-  | "act-3"
-  | "act-4"
-  | "act-5"
-  | "epilogue";
+  "prologue" | "act-2" | "act-3" | "act-4" | "act-5" | "epilogue";
 
 export type StoryLayoutType =
-  | "migration-stage"
-  | "movement-only"
-  | "climate-stage"
-  | "fullscreen";
+  "migration-stage" | "movement-only" | "climate-stage" | "fullscreen";
 
 export type StoryPlaybackState =
-  | "idle"
-  | "playing"
-  | "paused"
-  | "waiting-for-gate"
-  | "completed";
+  "idle" | "playing" | "paused" | "waiting-for-gate" | "completed";
 
 export type PoseLandmark = {
   x: number;

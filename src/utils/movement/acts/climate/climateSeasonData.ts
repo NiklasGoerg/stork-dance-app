@@ -7,12 +7,10 @@ export const climateDataSourcePath =
 export type ClimateSeason = "winter" | "spring" | "summer" | "autumn";
 export type ClimateDataSeason = ClimateSeason | "annual_mean";
 export type ClimateDisplayValueType =
-  | "absolute_temperature"
-  | "difference_from_1995_1999";
+  "absolute_temperature" | "difference_from_1995_1999";
 export type ClimateDisplayUnit = "degC";
 export type ClimateMovementResolutionReason =
-  | "baseline-reference"
-  | "movement-percent";
+  "baseline-reference" | "movement-percent";
 export type ClimateSeasonLoaderState = "idle" | "loading" | "loaded" | "error";
 
 export type ClimateSeasonDataRow = {

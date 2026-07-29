@@ -14,10 +14,7 @@ export type Act5FlowId = "act5Full" | "act5Story" | "act5TutorialDebug";
 export type Act5FlowContext = "tutorial" | "climateStory";
 export type Act5TutorialTarget = "maximum" | "minimum";
 export type Act5EncodingId =
-  | "circleRadius"
-  | "horizontalArcExtent"
-  | "bodyHeight"
-  | "verticalArcExtent";
+  "circleRadius" | "horizontalArcExtent" | "bodyHeight" | "verticalArcExtent";
 
 export type MovementAttemptRules = {
   measuresPerStep: number;
@@ -48,10 +45,10 @@ export type Act5SequenceTarget = {
 };
 
 export const ACT5_SEASON_ORDER = [
-  "summer",
-  "autumn",
   "winter",
   "spring",
+  "summer",
+  "autumn",
 ] as const satisfies readonly ClimateSeason[];
 
 export const ACT5_TUTORIAL_RULES: MovementAttemptRules = {
@@ -73,21 +70,26 @@ export const ACT5_SEASON_THEMES: Record<
   { background: string; surface: string }
 > = {
   summer: {
-    background: "#fff4c7",
-    surface: "#fff9df",
+    background: "var(--act5-season-summer-background)",
+    surface: "var(--act5-season-summer-surface)",
   },
   autumn: {
-    background: "#f3ddcf",
-    surface: "#fbede4",
+    background: "var(--act5-season-autumn-background)",
+    surface: "var(--act5-season-autumn-surface)",
   },
   winter: {
-    background: "#ddecf5",
-    surface: "#edf7fc",
+    background: "var(--act5-season-winter-background)",
+    surface: "var(--act5-season-winter-surface)",
   },
   spring: {
-    background: "#e1f0dc",
-    surface: "#f0f8ed",
+    background: "var(--act5-season-spring-background)",
+    surface: "var(--act5-season-spring-surface)",
   },
+};
+
+export const ACT5_PERIOD_TRANSITION_THEME = {
+  background: "var(--act5-season-transition-background)",
+  surface: "var(--act5-season-transition-surface)",
 };
 
 export const ACT5_SEASON_ENCODING: Record<
@@ -172,18 +174,6 @@ const createTutorialTarget = (
 });
 
 export const buildAct5TutorialFlow = (): Act5SequenceTarget[] => [
-  createTutorialTarget("summer", 100, "maximum"),
-  createTutorialTarget(
-    "summer",
-    resolveMinimumMovementValue("summer"),
-    "minimum",
-  ),
-  createTutorialTarget("autumn", 100, "maximum"),
-  createTutorialTarget(
-    "autumn",
-    resolveMinimumMovementValue("autumn"),
-    "minimum",
-  ),
   createTutorialTarget("winter", 100, "maximum"),
   createTutorialTarget(
     "winter",
@@ -194,6 +184,18 @@ export const buildAct5TutorialFlow = (): Act5SequenceTarget[] => [
   createTutorialTarget(
     "spring",
     resolveMinimumMovementValue("spring"),
+    "minimum",
+  ),
+  createTutorialTarget("summer", 100, "maximum"),
+  createTutorialTarget(
+    "summer",
+    resolveMinimumMovementValue("summer"),
+    "minimum",
+  ),
+  createTutorialTarget("autumn", 100, "maximum"),
+  createTutorialTarget(
+    "autumn",
+    resolveMinimumMovementValue("autumn"),
     "minimum",
   ),
 ];

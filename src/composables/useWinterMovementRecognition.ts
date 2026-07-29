@@ -26,10 +26,7 @@ import {
 } from "~/utils/movement/acts/climate/winter/winterMovementRecognition";
 
 export type WinterMeasureResult =
-  | "success"
-  | "almostCorrect"
-  | "failed"
-  | "trackingUnavailable";
+  "success" | "almostCorrect" | "failed" | "trackingUnavailable";
 
 export type WinterMeasureEvaluation = {
   cycleIndex: number;

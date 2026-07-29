@@ -11,10 +11,7 @@ import {
 
 export type StoryGestureMigration = "autumn" | "spring";
 export type StoryGestureEventStatus =
-  | "pending"
-  | "active"
-  | "completed"
-  | "skipped";
+  "pending" | "active" | "completed" | "skipped";
 
 export type StoryGestureEvent = {
   id: string;

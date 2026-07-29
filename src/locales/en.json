@@ -370,7 +370,9 @@
             "change": "Temperature difference: {temperature}."
           },
           "intervalTransition": "Next time period: {interval}",
-          "completed": "Climate data story completed."
+          "completed": "Climate data story completed.",
+          "completionTitle": "Climate story completed",
+          "completionSubtitle": "All seasonal climate periods are revealed."
         },
         "summerInstructions": {
           "beatCue": "{instruction}",
@@ -624,11 +626,11 @@
           "startSeason": "Start {season}",
           "startSummerSequence": "Start Summer Sequence",
           "startAutumnSequence": "Start Autumn Sequence",
-          "showDiagnostics": "Show diagnostics",
-          "hideDiagnostics": "Hide diagnostics",
           "startSpringSequence": "Start Spring Sequence",
           "startWinterSequence": "Start Winter Sequence",
-          "testSkeletonPulse": "Test Skeleton Success Pulse"
+          "testSkeletonPulse": "Test Skeleton Success Pulse",
+          "autoProgress": "Auto Progress",
+          "autoProgressFeedback": "Auto progress"
         },
         "scenes": {
           "intro": {

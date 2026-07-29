@@ -26,10 +26,7 @@ export type SummerFeedbackCode =
   | "TRY_AGAIN";
 
 export type SummerRecognitionResultState =
-  | "success"
-  | "almostCorrect"
-  | "retryRequired"
-  | "trackingUnavailable";
+  "success" | "almostCorrect" | "retryRequired" | "trackingUnavailable";
 
 export type SummerNeutralCalibration = {
   leftAnkleX: number;

@@ -13,36 +13,6 @@ export const act5IntroCycleConfig = {
   movementPrerollMs,
   seasons: [
     {
-      id: "summer",
-      label: "Summer",
-      labelKey: "seasonClock.seasons.summer",
-      date: "2023-06-01",
-      movementUrl: new URL(
-        "../assets/movement_library/seasons/summer-100-percent.json",
-        import.meta.url,
-      ).href,
-      audioUrl: new URL("../assets/audio/music/summer.wav", import.meta.url)
-        .href,
-      movementLoopDurationMs: 8_000,
-      movementPrerollMs,
-      movementReplayPrerollMs,
-    },
-    {
-      id: "autumn",
-      label: "Autumn",
-      labelKey: "seasonClock.seasons.autumn",
-      date: "2023-09-01",
-      movementUrl: new URL(
-        "../assets/movement_library/seasons/autumn-100-percent.json",
-        import.meta.url,
-      ).href,
-      audioUrl: new URL("../assets/audio/music/autumn.wav", import.meta.url)
-        .href,
-      movementLoopDurationMs: 8_000,
-      movementPrerollMs,
-      movementReplayPrerollMs,
-    },
-    {
       id: "winter",
       label: "Winter",
       labelKey: "seasonClock.seasons.winter",
@@ -67,6 +37,36 @@ export const act5IntroCycleConfig = {
         import.meta.url,
       ).href,
       audioUrl: new URL("../assets/audio/music/spring.wav", import.meta.url)
+        .href,
+      movementLoopDurationMs: 8_000,
+      movementPrerollMs,
+      movementReplayPrerollMs,
+    },
+    {
+      id: "summer",
+      label: "Summer",
+      labelKey: "seasonClock.seasons.summer",
+      date: "2023-06-01",
+      movementUrl: new URL(
+        "../assets/movement_library/seasons/summer-100-percent.json",
+        import.meta.url,
+      ).href,
+      audioUrl: new URL("../assets/audio/music/summer.wav", import.meta.url)
+        .href,
+      movementLoopDurationMs: 8_000,
+      movementPrerollMs,
+      movementReplayPrerollMs,
+    },
+    {
+      id: "autumn",
+      label: "Autumn",
+      labelKey: "seasonClock.seasons.autumn",
+      date: "2023-09-01",
+      movementUrl: new URL(
+        "../assets/movement_library/seasons/autumn-100-percent.json",
+        import.meta.url,
+      ).href,
+      audioUrl: new URL("../assets/audio/music/autumn.wav", import.meta.url)
         .href,
       movementLoopDurationMs: 8_000,
       movementPrerollMs,

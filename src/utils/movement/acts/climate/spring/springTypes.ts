@@ -4,12 +4,7 @@ export type SpringBeat = 1 | 2 | 3 | 4;
 export type SpringValue = "100" | "40" | "30" | "20";
 export type SpringKneeSide = "left" | "right" | "none" | "unknown";
 export type SpringHandHeightRegion =
-  | "low"
-  | "waist"
-  | "chest"
-  | "shoulder"
-  | "overhead"
-  | "unknown";
+  "low" | "waist" | "chest" | "shoulder" | "overhead" | "unknown";
 export type SpringCriterionImportance = "essential" | "supporting";
 export type SpringCriterionStatus = "passed" | "failed" | "notEvaluable";
 export type SpringFeedbackCode =
@@ -28,10 +23,7 @@ export type SpringFeedbackCode =
   | "TRY_AGAIN";
 
 export type SpringRecognitionResultState =
-  | "success"
-  | "almostCorrect"
-  | "retryRequired"
-  | "trackingUnavailable";
+  "success" | "almostCorrect" | "retryRequired" | "trackingUnavailable";
 
 export type SpringMovementReference = {
   value: SpringValue;

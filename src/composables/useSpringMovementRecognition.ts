@@ -27,10 +27,7 @@ import {
 } from "~/utils/movement/acts/climate/spring/springMovementRecognition";
 
 export type SpringMeasureResult =
-  | "success"
-  | "almostCorrect"
-  | "failed"
-  | "trackingUnavailable";
+  "success" | "almostCorrect" | "failed" | "trackingUnavailable";
 
 export type SpringMeasureEvaluation = {
   cycleIndex: number;

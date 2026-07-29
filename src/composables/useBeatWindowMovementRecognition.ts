@@ -42,7 +42,8 @@ export type MovementMeasureResult =
   | "success"
   | "almostCorrect"
   | "failed"
-  | "trackingUnavailable";
+  | "trackingUnavailable"
+  | "autoProgress";
 
 export type MovementMeasureEvaluation<
   TBeatEvaluation extends MovementBeatEvaluationLike,
@@ -69,6 +70,7 @@ type FrameUpdate = {
   repetitionIndex: number | null;
   isTransition: boolean;
   evaluationEnabled?: boolean;
+  autoProgressEnabled?: boolean;
   timestamp?: number;
 };
 
@@ -189,6 +191,7 @@ export const useBeatWindowMovementRecognition = <
   const activeRequiredSuccessfulMeasures = ref(
     options.requiredSuccessfulMeasures ?? 2,
   );
+  const autoProgressEnabled = ref(false);
 
   const beatSamples = new Map<string, BeatSample<TBeatEvaluation>>();
   const measureBeatEvaluations = new Map<number, TBeatEvaluation[]>();
@@ -256,12 +259,18 @@ export const useBeatWindowMovementRecognition = <
       finalizedBeatEvaluations.value,
       currentValue.value,
     );
-    const nextEvaluation = options.adaptFinalSequenceEvaluation
-      ? options.adaptFinalSequenceEvaluation({
-          evaluation,
-          reachedRequiredStreak: hasReachedRequiredStreak.value,
-        })
-      : evaluation;
+    const nextEvaluation = autoProgressEnabled.value
+      ? ({
+          ...evaluation,
+          passed: true,
+          feedbackCode: undefined,
+        } as TSequenceEvaluation)
+      : options.adaptFinalSequenceEvaluation
+        ? options.adaptFinalSequenceEvaluation({
+            evaluation,
+            reachedRequiredStreak: hasReachedRequiredStreak.value,
+          })
+        : evaluation;
 
     sequenceEvaluation.value = nextEvaluation;
     feedbackCode.value = nextEvaluation.feedbackCode ?? null;
@@ -290,7 +299,9 @@ export const useBeatWindowMovementRecognition = <
       beatEvaluations,
       currentValue.value,
     );
-    const result = options.getMeasureResult(evaluation);
+    const result: MovementMeasureResult = autoProgressEnabled.value
+      ? "autoProgress"
+      : options.getMeasureResult(evaluation);
     const measureEvaluation: MovementMeasureEvaluation<
       TBeatEvaluation,
       TFeedback
@@ -301,12 +312,14 @@ export const useBeatWindowMovementRecognition = <
       score: evaluation.totalScore,
       beatEvaluations,
       primaryFeedbackCode:
-        result === "success"
-          ? evaluation.feedbackCode
-          : options.getPrimaryMeasureFeedbackCode(
-              beatEvaluations,
-              evaluation.feedbackCode,
-            ),
+        result === "autoProgress"
+          ? undefined
+          : result === "success"
+            ? evaluation.feedbackCode
+            : options.getPrimaryMeasureFeedbackCode(
+                beatEvaluations,
+                evaluation.feedbackCode,
+              ),
     };
 
     measureEvaluations.value = [
@@ -317,8 +330,9 @@ export const useBeatWindowMovementRecognition = <
     feedbackCode.value = measureEvaluation.primaryFeedbackCode ?? null;
 
     const countsForSuccessfulAttempt =
-      options.isMeasureSuccessfulForStreak?.(result, evaluation) ??
-      result === "success";
+      result === "autoProgress" ||
+      (options.isMeasureSuccessfulForStreak?.(result, evaluation) ??
+        result === "success");
 
     if (countsForSuccessfulAttempt) {
       consecutiveSuccessfulMeasures.value++;
@@ -446,8 +460,11 @@ export const useBeatWindowMovementRecognition = <
     repetitionIndex,
     isTransition,
     evaluationEnabled = true,
+    autoProgressEnabled: shouldAutoProgress = false,
     timestamp = performance.now(),
   }: FrameUpdate) => {
+    autoProgressEnabled.value = shouldAutoProgress;
+
     if (seasonId !== options.seasonId) {
       if (phase.value !== "idle" && phase.value !== "completed") {
         phase.value = "completed";

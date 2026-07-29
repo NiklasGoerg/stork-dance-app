@@ -25,10 +25,7 @@ import {
 } from "~/utils/movement/acts/climate/summer/summerMovementRecognition";
 
 export type SummerCycleResult =
-  | "success"
-  | "almostCorrect"
-  | "failed"
-  | "trackingUnavailable";
+  "success" | "almostCorrect" | "failed" | "trackingUnavailable";
 
 export type SummerCycleEvaluation = {
   cycleIndex: number;
