@@ -26,13 +26,9 @@ import type {
 } from "~/utils/movement/acts/climate/winter/winterTypes";
 import {
   averageValid,
-  calculateJointAngle,
   distance2D,
-  midpoint,
-  toPosePoint,
   type PosePoint,
 } from "~/utils/pose/poseGeometry";
-import { POSE_LANDMARK } from "~/utils/pose/poseLandmarks";
 
 export * from "~/utils/movement/acts/climate/winter/winterReference";
 export * from "~/utils/movement/acts/climate/winter/winterTypes";
@@ -43,22 +39,6 @@ type BeatContext = {
 };
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
-
-const getLandmarkPoint = (landmarks: PoseLandmarkLike[], index: number) =>
-  toPosePoint(landmarks[index]);
-
-const getTorsoLength = (landmarks: PoseLandmarkLike[]) => {
-  const leftTorso = distance2D(
-    getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_HIP),
-  );
-  const rightTorso = distance2D(
-    getLandmarkPoint(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-    getLandmarkPoint(landmarks, POSE_LANDMARK.RIGHT_HIP),
-  );
-
-  return averageValid([leftTorso, rightTorso]);
-};
 
 const getBodyHeight = ({
   shoulderCenter,
@@ -235,24 +215,10 @@ export const extractWinterRecognitionMetrics = (
     leftAnkle,
     rightAnkle,
   } = bodyMetrics;
-  const leftShoulder = getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_SHOULDER);
-  const rightShoulder = getLandmarkPoint(
-    landmarks,
-    POSE_LANDMARK.RIGHT_SHOULDER,
-  );
-  const leftHip = getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_HIP);
-  const rightHip = getLandmarkPoint(landmarks, POSE_LANDMARK.RIGHT_HIP);
-  const leftElbow = getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_ELBOW);
-  const rightElbow = getLandmarkPoint(landmarks, POSE_LANDMARK.RIGHT_ELBOW);
-  const leftKnee = getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_KNEE);
-  const rightKnee = getLandmarkPoint(landmarks, POSE_LANDMARK.RIGHT_KNEE);
-  const headPoint =
-    getLandmarkPoint(landmarks, POSE_LANDMARK.NOSE) ??
-    midpoint(
-      landmarks[POSE_LANDMARK.LEFT_EAR],
-      landmarks[POSE_LANDMARK.RIGHT_EAR],
-    );
-  const torsoLength = getTorsoLength(landmarks) ?? shoulderWidth;
+  const leftShoulder = bodyMetrics.leftShoulder;
+  const rightShoulder = bodyMetrics.rightShoulder;
+  const headPoint = bodyMetrics.headPoint;
+  const torsoLength = bodyMetrics.torsoLength ?? shoulderWidth;
 
   if (!shoulderWidth || !shoulderCenter || !hipCenter || !torsoLength) {
     return createEmptyMetrics(expectedValue, neutralReference);
@@ -279,9 +245,9 @@ export const extractWinterRecognitionMetrics = (
     bodyHeight,
     neutralBodyHeight: neutralReference?.bodyHeight,
   });
-  const leftKneeAngle = calculateJointAngle(leftHip, leftKnee, leftAnkle);
-  const rightKneeAngle = calculateJointAngle(rightHip, rightKnee, rightAnkle);
-  const averageKneeAngle = averageValid([leftKneeAngle, rightKneeAngle]);
+  const leftKneeAngle = bodyMetrics.leftKneeAngle;
+  const rightKneeAngle = bodyMetrics.rightKneeAngle;
+  const averageKneeAngle = bodyMetrics.averageKneeAngle;
   const torsoForwardLean =
     shoulderCenter && hipCenter
       ? Math.abs(shoulderCenter.x - hipCenter.x) / shoulderWidth
@@ -316,24 +282,12 @@ export const extractWinterRecognitionMetrics = (
     handOpeningWidth === null
       ? null
       : handOpeningWidth >= winterMovementConfig.thresholds.openArmWidthMin;
-  const leftElbowAngle = calculateJointAngle(
-    leftShoulder,
-    leftElbow,
-    leftWrist,
-  );
-  const rightElbowAngle = calculateJointAngle(
-    rightShoulder,
-    rightElbow,
-    rightWrist,
-  );
-  const averageElbowAngle = averageValid([leftElbowAngle, rightElbowAngle]);
+  const averageElbowAngle = bodyMetrics.averageElbowAngle;
   const elbowsMostlyStraight =
     averageElbowAngle === null
       ? null
       : averageElbowAngle >= winterMovementConfig.thresholds.elbowStraightMin;
-  const handCenterXOffset = bodyMetrics.handCenter
-    ? (bodyMetrics.handCenter.x - shoulderCenter.x) / shoulderWidth
-    : null;
+  const handCenterXOffset = bodyMetrics.handCenterXOffset;
   const handsCenteredForHug =
     handCenterXOffset === null
       ? null

@@ -7,6 +7,10 @@ import {
   WINTER_MOVEMENT_REFERENCE,
   winterMovementConfig,
 } from "~/utils/movement/acts/climate/winter/winterReference";
+import {
+  createAct5SeasonCriterionFactory,
+  getHighestPriorityFailedCriterion,
+} from "~/features/act5/movements/criteria";
 import type {
   WinterBeat,
   WinterCriterionImportance,
@@ -16,41 +20,11 @@ import type {
   WinterValue,
 } from "~/utils/movement/acts/climate/winter/winterTypes";
 
-const roundDebug = (value: number | null) =>
-  value === null || !Number.isFinite(value) ? "n/a" : Number(value.toFixed(2));
-
-const criterion = ({
-  id,
-  label,
-  importance,
-  value,
-  passed,
-  expectedRange,
-  feedbackCode,
-}: {
-  id: string;
-  label: string;
-  importance: WinterCriterionImportance;
-  value: number | string | boolean | null | undefined;
-  passed: boolean;
-  expectedRange?: string;
-  feedbackCode?: WinterFeedbackCode;
-}): WinterCriterionResult => {
-  const evaluable =
-    value !== null && value !== undefined && value !== "unknown";
-
-  return {
-    id,
-    label,
-    status: !evaluable ? "notEvaluable" : passed ? "passed" : "failed",
-    passed: evaluable && passed,
-    score: evaluable && passed ? 1 : 0,
-    importance,
-    debugValue: typeof value === "number" ? roundDebug(value) : String(value),
-    expectedRange,
-    feedbackCode: evaluable && !passed ? feedbackCode : undefined,
-  };
-};
+const criterion = createAct5SeasonCriterionFactory<
+  WinterCriterionImportance,
+  WinterFeedbackCode,
+  WinterCriterionResult
+>();
 
 const openArmsCriterion = (metrics: WinterRecognitionMetrics) =>
   criterion({
@@ -319,16 +293,12 @@ export const getWinterBeatFeedbackCode = (
     "arms-released",
     "feet-stable",
   ];
-  const failedCriterion = priority
-    .map((id) =>
-      criteria.find(
-        (item) =>
-          item.id === id &&
-          item.status === "failed" &&
-          (item.importance === "essential" || item.feedbackCode),
-      ),
-    )
-    .find((item): item is WinterCriterionResult => Boolean(item));
+  const failedCriterion = getHighestPriorityFailedCriterion(
+    criteria.filter(
+      (item) => item.importance === "essential" || item.feedbackCode,
+    ),
+    priority,
+  );
 
   if (failedCriterion) return failedCriterion.feedbackCode ?? "TRY_AGAIN";
 

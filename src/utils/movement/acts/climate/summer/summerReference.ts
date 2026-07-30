@@ -6,7 +6,6 @@ import type {
 } from "~/utils/movement/acts/climate/summer/summerTypes";
 
 export const BEAT_EVALUATION_WINDOW_MS = 350;
-export const MAX_AUTOMATIC_RETRIES = 2;
 export const SUMMER_BEAT_WEIGHTS: Record<SummerBeat, number> = {
   1: 20,
   2: 35,

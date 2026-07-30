@@ -4,6 +4,7 @@ import {
   getWeightedBeatEvaluationScore,
 } from "~/utils/movement/core/criteria";
 import { extractNormalizedBodyMetrics } from "~/utils/movement/core/bodyMetrics";
+import { evaluateHandsGatheredAtCenter } from "~/utils/movement/core/predicates/handPoses";
 import {
   buildSpringBeatCriteria,
   getSpringBeatFeedbackCode,
@@ -25,12 +26,7 @@ import type {
   SpringSequenceEvaluation,
   SpringValue,
 } from "~/utils/movement/acts/climate/spring/springTypes";
-import {
-  averageValid,
-  calculateJointAngle,
-  distance2D,
-  toPosePoint,
-} from "~/utils/pose/poseGeometry";
+import { averageValid, toPosePoint } from "~/utils/pose/poseGeometry";
 import { POSE_LANDMARK } from "~/utils/pose/poseLandmarks";
 
 export * from "~/utils/movement/acts/climate/spring/springReference";
@@ -44,19 +40,6 @@ type BeatContext = {
 
 const getLandmarkPoint = (landmarks: PoseLandmarkLike[], index: number) =>
   toPosePoint(landmarks[index]);
-
-const getTorsoLength = (landmarks: PoseLandmarkLike[]) => {
-  const leftTorso = distance2D(
-    getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_HIP),
-  );
-  const rightTorso = distance2D(
-    getLandmarkPoint(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-    getLandmarkPoint(landmarks, POSE_LANDMARK.RIGHT_HIP),
-  );
-
-  return averageValid([leftTorso, rightTorso]);
-};
 
 const classifyHandHeightRegion = (
   lowerHandHeight: number | null,
@@ -198,7 +181,7 @@ export const extractSpringRecognitionMetrics = (
     landmarks,
     POSE_LANDMARK.RIGHT_SHOULDER,
   );
-  const torsoLength = getTorsoLength(landmarks) ?? shoulderWidth;
+  const torsoLength = bodyMetrics.torsoLength ?? shoulderWidth;
 
   if (!shoulderWidth || !shoulderCenter || !hipCenter || !torsoLength) {
     return createEmptyMetrics(expectedValue, expectedKneeSide);
@@ -228,16 +211,11 @@ export const extractSpringRecognitionMetrics = (
   const rightHandLateralOffset = rightWrist
     ? (rightWrist.x - shoulderCenter.x) / shoulderWidth
     : null;
-  const handCenterXOffset = bodyMetrics.handCenter
-    ? (bodyMetrics.handCenter.x - shoulderCenter.x) / shoulderWidth
-    : null;
+  const handCenterXOffset = bodyMetrics.handCenterXOffset;
   const handCenterHeight = bodyMetrics.handCenter
     ? (hipCenter.y - bodyMetrics.handCenter.y) / torsoLength
     : null;
-  const handOpeningWidth =
-    leftWrist && rightWrist
-      ? Math.abs(rightWrist.x - leftWrist.x) / shoulderWidth
-      : null;
+  const handOpeningWidth = bodyMetrics.normalizedWristSpan;
   const leftWristOutsideShoulder =
     leftWrist && leftShoulder
       ? Math.abs(leftWrist.x - leftShoulder.x) / shoulderWidth
@@ -247,13 +225,13 @@ export const extractSpringRecognitionMetrics = (
       ? Math.abs(rightWrist.x - rightShoulder.x) / shoulderWidth
       : null;
   const normalizedHandDistance = bodyMetrics.normalizedHandDistance;
-  const handsGathered =
-    normalizedHandDistance === null || handCenterXOffset === null
-      ? null
-      : normalizedHandDistance <=
-          springMovementConfig.thresholds.handsGatheredMax &&
-        Math.abs(handCenterXOffset) <=
-          springMovementConfig.thresholds.centerMaxOffset;
+  const gatheredAtCenter = evaluateHandsGatheredAtCenter(bodyMetrics, {
+    maxNormalizedHandDistance: springMovementConfig.thresholds.handsGatheredMax,
+    maxAbsoluteCenterOffset: springMovementConfig.thresholds.centerMaxOffset,
+  });
+  const handsGathered = gatheredAtCenter.evaluable
+    ? gatheredAtCenter.passed
+    : null;
   const handsOpen =
     handOpeningWidth === null
       ? null
@@ -273,17 +251,9 @@ export const extractSpringRecognitionMetrics = (
       ? null
       : lowerHandHeight >=
           SPRING_MOVEMENT_REFERENCE["100"].handHeightRange.min && handsGathered;
-  const leftElbowAngle = calculateJointAngle(
-    leftShoulder,
-    getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_ELBOW),
-    leftWrist,
-  );
-  const rightElbowAngle = calculateJointAngle(
-    rightShoulder,
-    getLandmarkPoint(landmarks, POSE_LANDMARK.RIGHT_ELBOW),
-    rightWrist,
-  );
-  const averageElbowAngle = averageValid([leftElbowAngle, rightElbowAngle]);
+  const leftElbowAngle = bodyMetrics.leftElbowAngle;
+  const rightElbowAngle = bodyMetrics.rightElbowAngle;
+  const averageElbowAngle = bodyMetrics.averageElbowAngle;
   const leftKnee = getLandmarkPoint(landmarks, POSE_LANDMARK.LEFT_KNEE);
   const rightKnee = getLandmarkPoint(landmarks, POSE_LANDMARK.RIGHT_KNEE);
   const leftKneeLift = leftKnee

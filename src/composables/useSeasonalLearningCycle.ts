@@ -820,6 +820,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     showInstructorAvatar,
     totalDurationMs,
     initialize,
+    complete,
     pause,
     play,
     reset,

@@ -502,6 +502,50 @@
           "vsBaseline": "vs. 1995-1999",
           "periodProgress": "Period {current} of {total}"
         },
+        "infoCard": {
+          "periodShift": "Period shift",
+          "vs": "vs {value}",
+          "aria": {
+            "card": "Act 5 climate information",
+            "completion": "Act 5 completion",
+            "periodTransition": "Climate period transition",
+            "currentTarget": "Current movement target",
+            "currentClimateData": "Current climate data",
+            "instructions": "Movement instructions"
+          }
+        },
+        "chart": {
+          "legend": "Chart legend",
+          "eyebrow": {
+            "inactive": "Act 5 climate",
+            "active": "Seasonal temperature"
+          },
+          "title": {
+            "completed": "Completed climate story summary",
+            "referenceAbsolute": "Absolute seasonal temperature",
+            "absoluteToDelta": "Absolute temperature -> Change from 1995-1999",
+            "absoluteSnapshot": "Absolute seasonal temperature snapshot",
+            "delta": "Change from 1995-1999",
+            "inactive": "Climate story chart"
+          },
+          "view": {
+            "summary": "Summary",
+            "absolute": "Absolute",
+            "snapshot": "Snapshot",
+            "transition": "Transition",
+            "delta": "Delta",
+            "inactive": "Inactive"
+          },
+          "axis": {
+            "period": "Climate period",
+            "temperature": "Temperature (degC)",
+            "change": "Change (degC)"
+          },
+          "empty": {
+            "tutorial": "Movement tutorial first. Climate data stays hidden.",
+            "story": "The climate chart will begin with the real Act 5 story."
+          }
+        },
         "autumnFeedback": {
           "directionPattern": "Pattern: first two sweeps left to right, second two sweeps right to left.",
           "SUCCESS": "Bravo",
@@ -622,6 +666,7 @@
           "winterInterludeDefault": "Use the same four-part winter contraction."
         },
         "debug": {
+          "toggle": "Debug",
           "startAct5Tutorial": "Start Act 5 Tutorial",
           "startSeason": "Start {season}",
           "startSummerSequence": "Start Summer Sequence",

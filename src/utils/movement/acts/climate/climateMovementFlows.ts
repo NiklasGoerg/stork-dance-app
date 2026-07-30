@@ -142,10 +142,3 @@ export const climateMovementFlowRegistry = {
     recognitionEnabled: false,
   }),
 } as const;
-
-export const climateSequenceFlows = [
-  climateMovementFlowRegistry.springSequenceDebug,
-  climateMovementFlowRegistry.summerSequenceDebug,
-  climateMovementFlowRegistry.autumnSequenceDebug,
-  climateMovementFlowRegistry.winterSequenceDebug,
-] as const;

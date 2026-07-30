@@ -1,15 +1,12 @@
 import { computed } from "vue";
 import type { PoseLandmarkLike } from "~/types/pose";
-import {
-  useBeatWindowMovementRecognition,
-  type BeatWindowAttemptRules,
-} from "~/composables/useBeatWindowMovementRecognition";
+import type { BeatWindowAttemptRules } from "~/composables/useBeatWindowMovementRecognition";
 import {
   getMedianSampleValue,
   pushRollingSample,
 } from "~/utils/movement/core/calibration";
+import { useSeasonMovementRecognition } from "~/features/act5/movements/useSeasonMovementRecognition";
 import {
-  WINTER_BEAT_EVALUATION_WINDOW_MS,
   evaluateWinterBeat,
   evaluateWinterSequence,
   extractWinterRecognitionMetrics,
@@ -36,16 +33,6 @@ export type WinterMeasureEvaluation = {
   primaryFeedbackCode?: WinterFeedbackCode;
 };
 
-const winterBeats = [1, 2, 3, 4] as WinterBeat[];
-const winterBeatTargetsMs: Record<WinterBeat, number> = {
-  1: 0,
-  2: 1000,
-  3: 2000,
-  4: 3000,
-};
-
-const winterExpectedMeasures = 3;
-const winterVariationDurationMs = 4000;
 const maxPreparationSamples = 18;
 
 type PreparationSample = {
@@ -151,7 +138,7 @@ export const useWinterMovementRecognition = () => {
     };
   };
 
-  const engine = useBeatWindowMovementRecognition<
+  const engine = useSeasonMovementRecognition<
     WinterBeat,
     WinterValue,
     WinterRecognitionMetrics,
@@ -161,12 +148,6 @@ export const useWinterMovementRecognition = () => {
   >({
     seasonId: "winter",
     defaultValue: "100",
-    beatTargetsMs: winterBeatTargetsMs,
-    beats: winterBeats,
-    evaluationWindowMs: WINTER_BEAT_EVALUATION_WINDOW_MS,
-    variationDurationMs: winterVariationDurationMs,
-    measuresPerValue: winterExpectedMeasures,
-    requiredSuccessfulMeasures: 2,
     createEmptyMetrics: () => extractWinterRecognitionMetrics(null),
     evaluateBeat: ({ landmarks, beat, timestamp, value }) =>
       evaluateWinterBeat(landmarks, beat, timestamp, {

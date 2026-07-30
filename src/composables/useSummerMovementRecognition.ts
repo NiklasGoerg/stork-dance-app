@@ -1,15 +1,12 @@
 import { computed, ref } from "vue";
 import type { PoseLandmarkLike } from "~/types/pose";
-import {
-  useBeatWindowMovementRecognition,
-  type BeatWindowAttemptRules,
-} from "~/composables/useBeatWindowMovementRecognition";
+import type { BeatWindowAttemptRules } from "~/composables/useBeatWindowMovementRecognition";
 import {
   getMedianSampleValue,
   pushRollingSample,
 } from "~/utils/movement/core/calibration";
+import { useSeasonMovementRecognition } from "~/features/act5/movements/useSeasonMovementRecognition";
 import {
-  BEAT_EVALUATION_WINDOW_MS,
   evaluateSummerBeat,
   evaluateSummerSequence,
   extractSummerRecognitionMetrics,
@@ -35,18 +32,8 @@ export type SummerCycleEvaluation = {
   primaryFeedbackCode?: SummerFeedbackCode;
 };
 
-const summerBeats = [1, 2, 3, 4] as SummerBeat[];
-const summerBeatTargetsMs: Record<SummerBeat, number> = {
-  1: 0,
-  2: 1000,
-  3: 2000,
-  4: 3000,
-};
-
 const minCalibrationSamples = 6;
 const maxCalibrationSamples = 18;
-const summerExpectedMeasures = 3;
-const summerVariationDurationMs = 4000;
 
 type CalibrationSample = {
   leftAnkleX: number;
@@ -302,7 +289,7 @@ export const useSummerMovementRecognition = () => {
     return fallbackCode;
   };
 
-  const engine = useBeatWindowMovementRecognition<
+  const engine = useSeasonMovementRecognition<
     SummerBeat,
     SummerIntensity,
     SummerRecognitionMetrics,
@@ -312,12 +299,6 @@ export const useSummerMovementRecognition = () => {
   >({
     seasonId: "summer",
     defaultValue: "100",
-    beatTargetsMs: summerBeatTargetsMs,
-    beats: summerBeats,
-    evaluationWindowMs: BEAT_EVALUATION_WINDOW_MS,
-    variationDurationMs: summerVariationDurationMs,
-    measuresPerValue: summerExpectedMeasures,
-    requiredSuccessfulMeasures: 2,
     createEmptyMetrics: () => extractSummerRecognitionMetrics(null),
     evaluateBeat: ({ landmarks, beat, timestamp, value }) =>
       evaluateSummerBeat(landmarks, beat, timestamp, {

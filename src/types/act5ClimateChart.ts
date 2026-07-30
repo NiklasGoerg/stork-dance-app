@@ -6,16 +6,10 @@ import type {
 import type {
   Act5FlowId,
   Act5Phase,
-} from "~/utils/movement/acts/climate/act5Flow";
+  Act5SequenceStatus,
+} from "~/features/act5/types/act5";
 
-export type Act5ClimateChartSequenceStatus =
-  | "idle"
-  | "performing"
-  | "feedbackInterlude"
-  | "previewingNext"
-  | "storyIntro"
-  | "periodTransition"
-  | "completed";
+export type Act5ClimateChartSequenceStatus = Act5SequenceStatus;
 
 export type Act5ClimateChartPeriodTransition = {
   previousPeriod: string;
@@ -35,6 +29,7 @@ export type Act5ClimateProgressChartProps = {
   activeStep: ClimateMovementFlowStep | null;
   activeTargetIndex: number;
   attemptNumber: number;
+  completedStepIds: string[];
   periodTransition: Act5ClimateChartPeriodTransition | null;
   measureEvaluations: Act5ClimateChartMeasureEvaluation[];
   requiredSuccessfulRepetitions: number;

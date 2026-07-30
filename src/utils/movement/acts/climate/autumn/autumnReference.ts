@@ -80,15 +80,6 @@ export const AUTUMN_MOVEMENT_REFERENCE: Record<
   },
 };
 
-export const autumnValueMapping: Record<string, AutumnValueClass> = {
-  "0.275": "25",
-  "0.389": "40",
-  "0.500": "50",
-  "0.516": "50",
-  "0.840": "80",
-  "1.000": "100",
-};
-
 export const autumnMovementConfig = {
   thresholds: {
     handsTogetherMax: 1.45,

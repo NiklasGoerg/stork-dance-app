@@ -90,7 +90,7 @@ type SequenceEvaluationLike<
   feedbackCode?: TFeedback;
 };
 
-type UseBeatWindowMovementRecognitionOptions<
+export type UseBeatWindowMovementRecognitionOptions<
   TBeat extends number,
   TValue extends string,
   TMetrics,
@@ -167,8 +167,14 @@ export const useBeatWindowMovementRecognition = <
     TSequenceEvaluation
   >,
 ) => {
+  const firstBeat = options.beats[0];
+
+  if (firstBeat === undefined) {
+    throw new Error("Beat-window recognition needs at least one beat.");
+  }
+
   const phase = ref<MovementRecognitionPhase>("idle");
-  const currentBeat = ref<TBeat>(options.beats[0]);
+  const currentBeat = ref<TBeat>(firstBeat);
   const currentRepetitionIndex = ref<number | null>(null);
   const currentEvaluation = ref<TBeatEvaluation | null>(null);
   const currentMeasureEvaluation = ref<MovementMeasureEvaluation<
@@ -212,7 +218,7 @@ export const useBeatWindowMovementRecognition = <
     retryRequired.value = false;
     currentEvaluation.value = null;
     currentMeasureEvaluation.value = null;
-    currentBeat.value = options.beats[0];
+    currentBeat.value = firstBeat;
     currentRepetitionIndex.value = null;
     consecutiveSuccessfulMeasures.value = 0;
     hasReachedRequiredStreak.value = false;
@@ -256,7 +262,7 @@ export const useBeatWindowMovementRecognition = <
     phase.value = "evaluating";
 
     const evaluation = options.evaluateSequence(
-      finalizedBeatEvaluations.value,
+      finalizedBeatEvaluations.value as TBeatEvaluation[],
       currentValue.value,
     );
     const nextEvaluation = autoProgressEnabled.value
@@ -291,7 +297,7 @@ export const useBeatWindowMovementRecognition = <
       ...(measureBeatEvaluations.get(measureIndex) ?? []),
     ]
       .sort((a, b) => a.beat - b.beat)
-      .slice(0, options.beats.length);
+      .slice(0, options.beats.length) as TBeatEvaluation[];
 
     if (beatEvaluations.length < options.beats.length) return;
 
@@ -322,10 +328,12 @@ export const useBeatWindowMovementRecognition = <
               ),
     };
 
-    measureEvaluations.value = [
-      ...measureEvaluations.value,
-      measureEvaluation,
-    ].sort((a, b) => a.measureIndex - b.measureIndex);
+    measureEvaluations.value = (
+      [
+        ...measureEvaluations.value,
+        measureEvaluation,
+      ] as MovementMeasureEvaluation<TBeatEvaluation, TFeedback>[]
+    ).sort((a, b) => a.measureIndex - b.measureIndex);
     currentMeasureEvaluation.value = measureEvaluation;
     feedbackCode.value = measureEvaluation.primaryFeedbackCode ?? null;
 
@@ -374,7 +382,7 @@ export const useBeatWindowMovementRecognition = <
     finalizedBeatEvaluations.value = [
       ...finalizedBeatEvaluations.value,
       evaluation,
-    ];
+    ] as TBeatEvaluation[];
     options.onBeatFinalized?.(evaluation, measureIndex);
 
     measureBeatEvaluations.set(measureIndex, [
@@ -502,6 +510,8 @@ export const useBeatWindowMovementRecognition = <
     );
     const beat = options.beats[beatIndex];
 
+    if (beat === undefined) return;
+
     currentBeat.value = beat;
 
     if (!evaluationEnabled) {
@@ -536,7 +546,8 @@ export const useBeatWindowMovementRecognition = <
 
   const debugSnapshot = computed(() => {
     const evaluation = currentEvaluation.value;
-    const criteria = evaluation?.criteria ?? [];
+    const criteria: MovementCriterionLike<TFeedback>[] =
+      evaluation?.criteria ?? [];
 
     return {
       phase: phase.value,

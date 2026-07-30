@@ -1,15 +1,12 @@
 import { computed } from "vue";
 import type { PoseLandmarkLike } from "~/types/pose";
-import {
-  useBeatWindowMovementRecognition,
-  type BeatWindowAttemptRules,
-} from "~/composables/useBeatWindowMovementRecognition";
+import type { BeatWindowAttemptRules } from "~/composables/useBeatWindowMovementRecognition";
 import {
   getMedianSampleValue,
   pushRollingSample,
 } from "~/utils/movement/core/calibration";
+import { useSeasonMovementRecognition } from "~/features/act5/movements/useSeasonMovementRecognition";
 import {
-  SPRING_BEAT_EVALUATION_WINDOW_MS,
   evaluateSpringBeat,
   evaluateSpringSequence,
   extractSpringRecognitionMetrics,
@@ -36,17 +33,6 @@ export type SpringMeasureEvaluation = {
   beatEvaluations: SpringBeatEvaluation[];
   primaryFeedbackCode?: SpringFeedbackCode;
 };
-
-const springBeats = [1, 2, 3, 4] as SpringBeat[];
-const springBeatTargetsMs: Record<SpringBeat, number> = {
-  1: 0,
-  2: 1000,
-  3: 2000,
-  4: 3000,
-};
-
-const springExpectedMeasures = 3;
-const springVariationDurationMs = 4000;
 
 type PreparationSample = {
   leftHandLateralOffset: number;
@@ -138,7 +124,7 @@ export const useSpringMovementRecognition = () => {
     };
   };
 
-  const engine = useBeatWindowMovementRecognition<
+  const engine = useSeasonMovementRecognition<
     SpringBeat,
     SpringValue,
     SpringRecognitionMetrics,
@@ -148,12 +134,6 @@ export const useSpringMovementRecognition = () => {
   >({
     seasonId: "spring",
     defaultValue: "100",
-    beatTargetsMs: springBeatTargetsMs,
-    beats: springBeats,
-    evaluationWindowMs: SPRING_BEAT_EVALUATION_WINDOW_MS,
-    variationDurationMs: springVariationDurationMs,
-    measuresPerValue: springExpectedMeasures,
-    requiredSuccessfulMeasures: 2,
     createEmptyMetrics: () => extractSpringRecognitionMetrics(null),
     evaluateBeat: ({ landmarks, beat, timestamp, measureIndex, value }) =>
       evaluateSpringBeat(landmarks, beat, timestamp, {

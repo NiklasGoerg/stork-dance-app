@@ -1,9 +1,14 @@
 import { getWeightedCriteriaScore } from "~/utils/movement/core/criteria";
+import { evaluateFeetClose } from "~/utils/movement/core/predicates/stancePoses";
 import { isInMovementRange } from "~/utils/movement/core/range";
 import {
   AUTUMN_MOVEMENT_REFERENCE,
   autumnMovementConfig,
 } from "~/utils/movement/acts/climate/autumn/autumnReference";
+import {
+  createAct5SeasonCriterionFactory,
+  getHighestPriorityFailedCriterion,
+} from "~/features/act5/movements/criteria";
 import type {
   AutumnBeat,
   AutumnCriterionImportance,
@@ -19,41 +24,14 @@ type BeatContext = {
   expectedValueClass: AutumnValueClass;
 };
 
-const roundDebug = (value: number | null) =>
-  value === null || !Number.isFinite(value) ? "n/a" : Number(value.toFixed(2));
-
-const criterion = ({
-  id,
-  label,
-  importance,
-  value,
-  passed,
-  expectedRange,
-  feedbackCode,
-}: {
-  id: string;
-  label: string;
-  importance: AutumnCriterionImportance;
-  value: number | string | null | undefined;
-  passed: boolean;
-  expectedRange?: string;
-  feedbackCode?: AutumnFeedbackCode;
-}): AutumnCriterionResult => {
-  const evaluable =
-    value !== null && value !== undefined && value !== "unknown";
-
-  return {
-    id,
-    label,
-    status: !evaluable ? "notEvaluable" : passed ? "passed" : "failed",
-    passed: evaluable && passed,
-    score: evaluable && passed ? 1 : 0,
-    importance,
-    debugValue: typeof value === "number" ? roundDebug(value) : value,
-    expectedRange,
-    feedbackCode: evaluable && !passed ? feedbackCode : undefined,
-  };
-};
+const criterion = createAct5SeasonCriterionFactory<
+  AutumnCriterionImportance,
+  AutumnFeedbackCode,
+  AutumnCriterionResult
+>({
+  nullishDebugValue: "omit",
+  stringifyNonNumericDebugValue: false,
+});
 
 const getHeightCriterion = (metrics: AutumnRecognitionMetrics) =>
   criterion({
@@ -430,17 +408,21 @@ export const buildAutumnBeatCriteria = (
       feedbackCode: "RETURN_HANDS_TO_CENTER",
     }),
     getHeightCriterion(metrics),
-    criterion({
-      id: "feet-close",
-      label: "Feet return close together",
-      importance: "supporting",
-      value: metrics.normalizedAnkleDistance,
-      passed:
-        metrics.normalizedAnkleDistance !== null &&
-        metrics.normalizedAnkleDistance <= thresholds.closedFeetMax,
-      expectedRange: `<= ${thresholds.closedFeetMax}`,
-      feedbackCode: "RETURN_FEET_TOGETHER",
-    }),
+    (() => {
+      const feetClose = evaluateFeetClose(metrics, {
+        maxNormalizedAnkleDistance: thresholds.closedFeetMax,
+      });
+
+      return criterion({
+        id: "feet-close",
+        label: "Feet return close together",
+        importance: "supporting",
+        value: feetClose.metrics.normalizedAnkleDistance,
+        passed: feetClose.passed,
+        expectedRange: `<= ${thresholds.closedFeetMax}`,
+        feedbackCode: "RETURN_FEET_TOGETHER",
+      });
+    })(),
   ];
 };
 
@@ -469,16 +451,12 @@ export const getAutumnBeatFeedbackCode = (
     "feet-close",
     "torso-facing-forward",
   ];
-  const failedCriterion = priority
-    .map((id) =>
-      criteria.find(
-        (item) =>
-          item.id === id &&
-          item.status === "failed" &&
-          (item.importance === "essential" || item.feedbackCode),
-      ),
-    )
-    .find((item): item is AutumnCriterionResult => Boolean(item));
+  const failedCriterion = getHighestPriorityFailedCriterion(
+    criteria.filter(
+      (item) => item.importance === "essential" || item.feedbackCode,
+    ),
+    priority,
+  );
 
   if (failedCriterion) return failedCriterion.feedbackCode ?? "TRY_AGAIN";
 

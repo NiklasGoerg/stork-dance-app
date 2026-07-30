@@ -24,7 +24,10 @@
 
       <div class="act5-climate-chart__meta">
         <span class="act5-climate-chart__view">{{ viewLabel }}</span>
-        <ul class="act5-climate-chart__legend" aria-label="Chart legend">
+        <ul
+          class="act5-climate-chart__legend"
+          :aria-label="t('story.acts.act5.chart.legend')"
+        >
           <li
             v-for="season in seasonSeries"
             :key="season.season"
@@ -91,7 +94,7 @@
             :y="chartHeight - 8"
             text-anchor="middle"
           >
-            Climate period
+            {{ t("story.acts.act5.chart.axis.period") }}
           </text>
           <text
             class="act5-climate-chart__axis-label"
@@ -282,6 +285,7 @@ type RenderSegment = {
 };
 
 const props = defineProps<Act5ClimateProgressChartProps>();
+const { t } = useI18n();
 
 const chartWidth = 960;
 const chartHeight = 300;
@@ -293,13 +297,28 @@ const previewColor = "rgba(94, 108, 103, 0.5)";
 const inactiveFlowIds = new Set(["act5TutorialDebug"]);
 const successfulResults = new Set(["success", "almostCorrect", "autoProgress"]);
 const seasonSeries: SeasonConfig[] = [
-  { season: "winter", label: "Winter", color: "var(--act5-chart-winter)" },
-  { season: "spring", label: "Spring", color: "var(--act5-chart-spring)" },
-  { season: "summer", label: "Summer", color: "var(--act5-chart-summer)" },
-  { season: "autumn", label: "Autumn", color: "var(--act5-chart-autumn)" },
+  {
+    season: "winter",
+    label: t("seasonClock.seasons.winter"),
+    color: "var(--act5-chart-winter)",
+  },
+  {
+    season: "spring",
+    label: t("seasonClock.seasons.spring"),
+    color: "var(--act5-chart-spring)",
+  },
+  {
+    season: "summer",
+    label: t("seasonClock.seasons.summer"),
+    color: "var(--act5-chart-summer)",
+  },
+  {
+    season: "autumn",
+    label: t("seasonClock.seasons.autumn"),
+    color: "var(--act5-chart-autumn)",
+  },
 ];
 
-const completedStepIds = ref<string[]>([]);
 const pulseKey = ref("");
 const lastPulsedAttemptKey = ref("");
 const feedbackBurstKey = ref("");
@@ -330,7 +349,7 @@ const rowByStepId = computed(() => {
 
   return rows;
 });
-const completedStepIdSet = computed(() => new Set(completedStepIds.value));
+const completedStepIdSet = computed(() => new Set(props.completedStepIds));
 const intervalOrders = computed(() => [
   ...new Set(chartRows.value.map((row) => row.intervalOrder)),
 ]);
@@ -757,44 +776,54 @@ const activeValueLabel = computed(() => {
   };
 });
 const eyebrowLabel = computed(() =>
-  isInactive.value ? "Act 5 climate" : "Seasonal temperature",
+  isInactive.value
+    ? t("story.acts.act5.chart.eyebrow.inactive")
+    : t("story.acts.act5.chart.eyebrow.active"),
 );
 const titleLabel = computed(() => {
   if (isCompletedSummary.value) {
-    return "Completed climate story summary";
+    return t("story.acts.act5.chart.title.completed");
   }
 
   if (chartMode.value === "referenceAbsolute") {
-    return "Absolute seasonal temperature";
+    return t("story.acts.act5.chart.title.referenceAbsolute");
   }
   if (chartMode.value === "absoluteToDelta") {
-    return "Absolute temperature -> Change from 1995-1999";
+    return t("story.acts.act5.chart.title.absoluteToDelta");
   }
   if (chartMode.value === "absoluteSnapshot") {
-    return "Absolute seasonal temperature snapshot";
+    return t("story.acts.act5.chart.title.absoluteSnapshot");
   }
   if (chartMode.value === "delta") {
-    return "Change from 1995-1999";
+    return t("story.acts.act5.chart.title.delta");
   }
 
-  return "Climate story chart";
+  return t("story.acts.act5.chart.title.inactive");
 });
 const viewLabel = computed(() => {
-  if (isCompletedSummary.value) return "Summary";
-  if (chartMode.value === "referenceAbsolute") return "Absolute";
-  if (chartMode.value === "absoluteSnapshot") return "Snapshot";
-  if (chartMode.value === "absoluteToDelta") return "Transition";
-  if (chartMode.value === "delta") return "Delta";
+  if (isCompletedSummary.value) return t("story.acts.act5.chart.view.summary");
+  if (chartMode.value === "referenceAbsolute") {
+    return t("story.acts.act5.chart.view.absolute");
+  }
+  if (chartMode.value === "absoluteSnapshot") {
+    return t("story.acts.act5.chart.view.snapshot");
+  }
+  if (chartMode.value === "absoluteToDelta") {
+    return t("story.acts.act5.chart.view.transition");
+  }
+  if (chartMode.value === "delta") return t("story.acts.act5.chart.view.delta");
 
-  return "Inactive";
+  return t("story.acts.act5.chart.view.inactive");
 });
 const yAxisLabel = computed(() =>
-  chartView.value === "absolute" ? "Temperature (degC)" : "Change (degC)",
+  chartView.value === "absolute"
+    ? t("story.acts.act5.chart.axis.temperature")
+    : t("story.acts.act5.chart.axis.change"),
 );
 const emptyLabel = computed(() =>
   props.phase === "tutorial"
-    ? "Movement tutorial first. Climate data stays hidden."
-    : "The climate chart will begin with the real Act 5 story.",
+    ? t("story.acts.act5.chart.empty.tutorial")
+    : t("story.acts.act5.chart.empty.story"),
 );
 
 const formatAxisValue = (value: number) => {
@@ -812,13 +841,7 @@ const formatTemperatureValue = (value: number) => {
 
   return `0.00 ${unit}`;
 };
-const addCompletedStep = (stepId: string) => {
-  if (!stepId || completedStepIdSet.value.has(stepId)) return;
-
-  completedStepIds.value = [...completedStepIds.value, stepId];
-};
 const resetChartProgress = () => {
-  completedStepIds.value = [];
   pulseKey.value = "";
   lastPulsedAttemptKey.value = "";
   feedbackBurstKey.value = "";
@@ -888,10 +911,6 @@ watch(
   ([stepId, successCount, requiredCount]) => {
     if (chartMode.value === "inactive" || !stepId) return;
 
-    if (successCount >= requiredCount) {
-      addCompletedStep(stepId);
-    }
-
     const attemptKey = `${stepId}-${props.attemptNumber}`;
     const successIncreased =
       attemptKey === lastObservedAttemptKey.value &&
@@ -916,20 +935,6 @@ watch(
       lastPulsedAttemptKey.value = attemptKey;
       triggerFeedbackBurst(stepId, successCount, "extra");
     }
-  },
-  { immediate: true },
-);
-
-watch(
-  [() => props.phase, chartRows],
-  ([phase]) => {
-    if (phase !== "completed") return;
-
-    const allSteps = chartRows.value.map(getStepId);
-
-    completedStepIds.value = [
-      ...new Set([...completedStepIds.value, ...allSteps]),
-    ];
   },
   { immediate: true },
 );

@@ -1,11 +1,8 @@
 import { computed } from "vue";
 import type { PoseLandmarkLike } from "~/types/pose";
+import type { BeatWindowAttemptRules } from "~/composables/useBeatWindowMovementRecognition";
+import { useSeasonMovementRecognition } from "~/features/act5/movements/useSeasonMovementRecognition";
 import {
-  useBeatWindowMovementRecognition,
-  type BeatWindowAttemptRules,
-} from "~/composables/useBeatWindowMovementRecognition";
-import {
-  AUTUMN_BEAT_EVALUATION_WINDOW_MS,
   evaluateAutumnBeat,
   evaluateAutumnSequence,
   extractAutumnRecognitionMetrics,
@@ -31,17 +28,6 @@ export type AutumnCycleEvaluation = {
   beatEvaluations: AutumnBeatEvaluation[];
   primaryFeedbackCode?: AutumnFeedbackCode;
 };
-
-const autumnBeats = [1, 2, 3, 4] as AutumnBeat[];
-const autumnBeatTargetsMs: Record<AutumnBeat, number> = {
-  1: 0,
-  2: 1000,
-  3: 2000,
-  4: 3000,
-};
-
-const autumnExpectedMeasures = 3;
-const autumnVariationDurationMs = 4000;
 
 const getCycleResult = (
   evaluation: AutumnSequenceEvaluation,
@@ -91,7 +77,7 @@ const getBeat1StartReference = (
 
 export const useAutumnMovementRecognition = () => {
   const beat1References = new Map<number, AutumnStartReference>();
-  const engine = useBeatWindowMovementRecognition<
+  const engine = useSeasonMovementRecognition<
     AutumnBeat,
     AutumnValueClass,
     AutumnRecognitionMetrics,
@@ -101,12 +87,6 @@ export const useAutumnMovementRecognition = () => {
   >({
     seasonId: "autumn",
     defaultValue: "100",
-    beatTargetsMs: autumnBeatTargetsMs,
-    beats: autumnBeats,
-    evaluationWindowMs: AUTUMN_BEAT_EVALUATION_WINDOW_MS,
-    variationDurationMs: autumnVariationDurationMs,
-    measuresPerValue: autumnExpectedMeasures,
-    requiredSuccessfulMeasures: 2,
     createEmptyMetrics: () => extractAutumnRecognitionMetrics(null),
     evaluateBeat: ({ landmarks, beat, timestamp, measureIndex, value }) =>
       evaluateAutumnBeat(landmarks, beat, timestamp, {

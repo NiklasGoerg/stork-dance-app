@@ -8,41 +8,12 @@ import { AUTUMN_MOVEMENT_REFERENCE } from "~/utils/movement/acts/climate/autumn/
 import { SPRING_MOVEMENT_REFERENCE } from "~/utils/movement/acts/climate/spring/springReference";
 import { SUMMER_MOVEMENT_REFERENCE } from "~/utils/movement/acts/climate/summer/summerReference";
 import { WINTER_MOVEMENT_REFERENCE } from "~/utils/movement/acts/climate/winter/winterReference";
-
-export type Act5Phase = "tutorial" | "climateStory" | "completed";
-export type Act5FlowId = "act5Full" | "act5Story" | "act5TutorialDebug";
-export type Act5FlowContext = "tutorial" | "climateStory";
-export type Act5TutorialTarget = "maximum" | "minimum";
-export type Act5EncodingId =
-  "circleRadius" | "horizontalArcExtent" | "bodyHeight" | "verticalArcExtent";
-
-export type MovementAttemptRules = {
-  measuresPerStep: number;
-  requiredSuccessfulMeasures: number;
-  retryUntilSuccess: boolean;
-  feedbackInterludeBeats: number;
-};
-
-export type MovementEncodingDefinition = {
-  id: Act5EncodingId;
-  tutorialTitleKey: string;
-  tutorialExplanationKey: string;
-  maximumExplanationKey: string;
-  minimumExplanationKey: string;
-  actionNounKey: string;
-};
-
-export type Act5SequenceTarget = {
-  id: string;
-  context: Act5FlowContext;
-  season: ClimateSeason;
-  movementValue: number;
-  target?: Act5TutorialTarget;
-  interval?: string;
-  climateData?: ClimateMovementFlowStep;
-  encoding: MovementEncodingDefinition;
-  rules: MovementAttemptRules;
-};
+import type {
+  Act5SequenceTarget,
+  Act5TutorialTarget,
+  MovementAttemptRules,
+  MovementEncodingDefinition,
+} from "~/features/act5/types/act5";
 
 export const ACT5_SEASON_ORDER = [
   "winter",
@@ -137,19 +108,22 @@ const supportedMovementValues: Record<ClimateSeason, readonly number[]> = {
   spring: Object.keys(SPRING_MOVEMENT_REFERENCE).map(Number),
 };
 
+export const getAct5SupportedMovementValues = (season: ClimateSeason) =>
+  supportedMovementValues[season];
+
 export const resolveMinimumMovementValue = (season: ClimateSeason) => {
   const values = supportedMovementValues[season].filter((value) => value !== 0);
 
   return Math.min(...values);
 };
 
-const createTargetKey = ({
+export const createAct5TargetKey = ({
   context,
   season,
   movementValue,
   interval,
 }: {
-  context: Act5FlowContext;
+  context: Act5SequenceTarget["context"];
   season: ClimateSeason;
   movementValue: number;
   interval?: string;
@@ -160,7 +134,7 @@ const createTutorialTarget = (
   movementValue: number,
   target: Act5TutorialTarget,
 ): Act5SequenceTarget => ({
-  id: createTargetKey({
+  id: createAct5TargetKey({
     context: "tutorial",
     season,
     movementValue,
@@ -173,7 +147,25 @@ const createTutorialTarget = (
   rules: ACT5_TUTORIAL_RULES,
 });
 
-export const buildAct5TutorialFlow = (): Act5SequenceTarget[] => [
+const createStoryTarget = (
+  climateData: ClimateMovementFlowStep,
+): Act5SequenceTarget => ({
+  id: createAct5TargetKey({
+    context: "climateStory",
+    interval: climateData.interval,
+    season: climateData.season,
+    movementValue: climateData.movementValue,
+  }),
+  context: "climateStory",
+  season: climateData.season,
+  movementValue: climateData.movementValue,
+  interval: climateData.interval,
+  climateData,
+  encoding: ACT5_SEASON_ENCODING[climateData.season],
+  rules: ACT5_STORY_RULES,
+});
+
+export const buildAct5TutorialSequence = (): Act5SequenceTarget[] => [
   createTutorialTarget("winter", 100, "maximum"),
   createTutorialTarget(
     "winter",
@@ -200,27 +192,7 @@ export const buildAct5TutorialFlow = (): Act5SequenceTarget[] => [
   ),
 ];
 
-export const act5MovementTutorialFlow = buildAct5TutorialFlow();
-
-const createStoryTarget = (
-  climateData: ClimateMovementFlowStep,
-): Act5SequenceTarget => ({
-  id: createTargetKey({
-    context: "climateStory",
-    interval: climateData.interval,
-    season: climateData.season,
-    movementValue: climateData.movementValue,
-  }),
-  context: "climateStory",
-  season: climateData.season,
-  movementValue: climateData.movementValue,
-  interval: climateData.interval,
-  climateData,
-  encoding: ACT5_SEASON_ENCODING[climateData.season],
-  rules: ACT5_STORY_RULES,
-});
-
-export const buildAct5ClimateStoryFlow = (
+export const buildAct5ClimateStorySequence = (
   dataset: ClimateSeasonDataset,
 ): Act5SequenceTarget[] => {
   const intervals = [...new Set(dataset.rows.map((row) => row.intervalOrder))]
@@ -240,13 +212,26 @@ export const buildAct5ClimateStoryFlow = (
   );
 };
 
-export const buildAct5FullFlow = (
+export const buildAct5FullSequence = (
   dataset: ClimateSeasonDataset,
 ): Act5SequenceTarget[] => [
-  ...act5MovementTutorialFlow,
-  ...buildAct5ClimateStoryFlow(dataset),
+  ...buildAct5TutorialSequence(),
+  ...buildAct5ClimateStorySequence(dataset),
 ];
 
-export const buildAct5TutorialDebugFlow = (): Act5SequenceTarget[] => [
-  ...act5MovementTutorialFlow,
+export const buildAct5TutorialDebugSequence = (): Act5SequenceTarget[] => [
+  ...buildAct5TutorialSequence(),
 ];
+
+export const buildAct5DebugSingleSeasonSequence = (
+  season: ClimateSeason,
+): Act5SequenceTarget[] => [createTutorialTarget(season, 100, "maximum")];
+
+export const buildAct5DebugSeasonValueSequence = (
+  season: ClimateSeason,
+): Act5SequenceTarget[] =>
+  getAct5SupportedMovementValues(season).map((movementValue) =>
+    createTutorialTarget(season, movementValue, "maximum"),
+  );
+
+export const act5MovementTutorialFlow = buildAct5TutorialSequence();

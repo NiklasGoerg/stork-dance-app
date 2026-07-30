@@ -30,7 +30,6 @@ import type {
   AutumnValueClass,
 } from "~/utils/movement/acts/climate/autumn/autumnTypes";
 import {
-  calculateJointAngle,
   distance2D,
   toPosePoint,
   type PosePoint,
@@ -339,7 +338,6 @@ export const extractAutumnRecognitionMetrics = (
   const {
     shoulderWidth,
     shoulderCenter,
-    hipCenter,
     torsoCenter,
     handCenter,
     leftWrist,
@@ -351,9 +349,11 @@ export const extractAutumnRecognitionMetrics = (
   }
 
   const destinationSign = destinationSignForDirection(direction);
-  const handCenterXOffset = (handCenter.x - shoulderCenter.x) / shoulderWidth;
-  const handCenterYFromShoulders =
-    (handCenter.y - shoulderCenter.y) / shoulderWidth;
+  const handCenterXOffset = bodyMetrics.handCenterXOffset;
+  const handCenterYFromShoulders = bodyMetrics.handCenterYFromShoulders;
+  if (handCenterXOffset === null || handCenterYFromShoulders === null) {
+    return createEmptyMetrics();
+  }
   const handRadiusFromTorso =
     distance2D(handCenter, torsoCenter) !== null
       ? distance2D(handCenter, torsoCenter)! / shoulderWidth
@@ -406,7 +406,6 @@ export const extractAutumnRecognitionMetrics = (
     rightShoulder !== null &&
     leftShoulder.x * destinationSign > rightShoulder.x * destinationSign;
   const outerShoulder = leftArmIsOuter ? leftShoulder : rightShoulder;
-  const outerElbow = leftArmIsOuter ? leftElbow : rightElbow;
   const outerWrist = leftArmIsOuter ? leftWrist : rightWrist;
   const innerElbow = leftArmIsOuter ? rightElbow : leftElbow;
   const innerWrist = leftArmIsOuter ? rightWrist : leftWrist;
@@ -421,11 +420,9 @@ export const extractAutumnRecognitionMetrics = (
     outerWristXOffset,
     context.startReference?.outerWristXOffset,
   );
-  const outerElbowAngle = calculateJointAngle(
-    outerShoulder,
-    outerElbow,
-    outerWrist,
-  );
+  const outerElbowAngle = leftArmIsOuter
+    ? bodyMetrics.leftElbowAngle
+    : bodyMetrics.rightElbowAngle;
   const outerArmDirection = normalizeVector(
     vectorFrom(outerShoulder, outerWrist),
   );
@@ -441,9 +438,9 @@ export const extractAutumnRecognitionMetrics = (
     outerWristRelativeToOuterShoulder,
   );
   const torsoCenterOffset =
-    hipCenter && shoulderCenter
-      ? Math.abs(hipCenter.x - shoulderCenter.x) / shoulderWidth
-      : null;
+    bodyMetrics.torsoCenterXOffset === null
+      ? null
+      : Math.abs(bodyMetrics.torsoCenterXOffset);
   const torsoFacingScore =
     torsoCenterOffset === null ? null : Math.max(0, 1 - torsoCenterOffset);
   const endpointErrorKind = getEndpointErrorKind(

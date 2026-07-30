@@ -1,8 +1,12 @@
 import type { PoseLandmarkLike } from "~/types/pose";
+import { extractNormalizedBodyMetrics } from "~/utils/movement/core/bodyMetrics";
 import {
   getEssentialCriteriaStats,
   getWeightedCriteriaScore,
 } from "~/utils/movement/core/criteria";
+import { evaluateWristsAboveHead } from "~/utils/movement/core/predicates/armPoses";
+import { evaluateHandsGatheredAtCenter } from "~/utils/movement/core/predicates/handPoses";
+import { evaluateFeetClose } from "~/utils/movement/core/predicates/stancePoses";
 import {
   formatMovementRange,
   getRangeFailureDirection,
@@ -12,6 +16,11 @@ import {
   SUMMER_MOVEMENT_REFERENCE,
   summerMovementConfig,
 } from "~/utils/movement/acts/climate/summer/summerReference";
+import {
+  type Act5SeasonCriterionInput,
+  createAct5SeasonCriterionFactory,
+  roundCriterionDebugValue,
+} from "~/features/act5/movements/criteria";
 import type {
   SummerBeat,
   SummerCriterionDomain,
@@ -23,13 +32,7 @@ import type {
   SummerRecognitionMetrics,
   SummerStepSide,
 } from "~/utils/movement/acts/climate/summer/summerTypes";
-import {
-  averageValid,
-  distance2D,
-  midpoint,
-  toPosePoint,
-} from "~/utils/pose/poseGeometry";
-import { MIN_SHOULDER_WIDTH, POSE_LANDMARK } from "~/utils/pose/poseLandmarks";
+import { averageValid } from "~/utils/pose/poseGeometry";
 
 type BeatContext = {
   expectedIntensity?: SummerIntensity;
@@ -44,68 +47,32 @@ type BeatContext = {
   } | null;
 };
 
-const getLandmark = (landmarks: PoseLandmarkLike[], index: number) =>
-  landmarks[index] ?? null;
-
-const roundDebug = (value: number | null) =>
-  value === null || !Number.isFinite(value) ? "n/a" : Number(value.toFixed(2));
-
-const getShoulderWidth = (landmarks: PoseLandmarkLike[]) => {
-  const shoulderWidth = distance2D(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-  );
-
-  if (!shoulderWidth || shoulderWidth < MIN_SHOULDER_WIDTH) return null;
-
-  return shoulderWidth;
-};
-
-const getHeadPoint = (landmarks: PoseLandmarkLike[]) =>
-  toPosePoint(getLandmark(landmarks, POSE_LANDMARK.NOSE)) ??
-  midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_EAR),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_EAR),
-  );
-
-const criterion = ({
-  id,
-  label,
-  importance,
-  domain = "shape",
-  value,
-  passed,
-  expectedRange,
-  failureDirection,
-  feedbackCode,
-}: {
-  id: string;
-  label: string;
-  importance: SummerCriterionImportance;
+type SummerCriterionInput = Act5SeasonCriterionInput<
+  SummerCriterionImportance,
+  SummerFeedbackCode,
+  number | string | null | undefined
+> & {
   domain?: SummerCriterionDomain;
-  value: number | string | null | undefined;
-  passed: boolean;
-  expectedRange?: string;
   failureDirection?: "tooLow" | "tooHigh";
-  feedbackCode?: SummerFeedbackCode;
-}): SummerCriterionResult => {
-  const evaluable =
-    value !== null && value !== undefined && value !== "unknown";
-
-  return {
-    id,
-    label,
-    status: !evaluable ? "notEvaluable" : passed ? "passed" : "failed",
-    passed: evaluable && passed,
-    score: evaluable && passed ? 1 : 0,
-    importance,
-    domain,
-    debugValue: typeof value === "number" ? roundDebug(value) : value,
-    expectedRange,
-    failureDirection: evaluable && !passed ? failureDirection : undefined,
-    feedbackCode: evaluable && !passed ? feedbackCode : undefined,
-  };
 };
+
+const criterion = createAct5SeasonCriterionFactory<
+  SummerCriterionImportance,
+  SummerFeedbackCode,
+  SummerCriterionResult,
+  SummerCriterionInput,
+  Pick<SummerCriterionResult, "domain" | "failureDirection">
+>({
+  nullishDebugValue: "omit",
+  stringifyNonNumericDebugValue: false,
+  getExtra: ({ domain = "shape", value, passed, failureDirection }) => ({
+    domain,
+    failureDirection:
+      value !== null && value !== undefined && value !== "unknown" && !passed
+        ? failureDirection
+        : undefined,
+  }),
+});
 
 const rangeCriterion = ({
   id,
@@ -146,125 +113,6 @@ const rangeCriterion = ({
   });
 };
 
-const getHandCenterXOffset = (landmarks: PoseLandmarkLike[]) => {
-  const shoulderWidth = getShoulderWidth(landmarks);
-  const handCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_WRIST),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_WRIST),
-  );
-  const shoulderCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-  );
-
-  if (!shoulderWidth || !handCenter || !shoulderCenter) return null;
-
-  return Math.abs(handCenter.x - shoulderCenter.x) / shoulderWidth;
-};
-
-const getHandCenterYFromShoulders = (landmarks: PoseLandmarkLike[]) => {
-  const shoulderWidth = getShoulderWidth(landmarks);
-  const handCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_WRIST),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_WRIST),
-  );
-  const shoulderCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-  );
-
-  if (!shoulderWidth || !handCenter || !shoulderCenter) return null;
-
-  return (handCenter.y - shoulderCenter.y) / shoulderWidth;
-};
-
-const getWristSideOpening = (landmarks: PoseLandmarkLike[]) => {
-  const shoulderWidth = getShoulderWidth(landmarks);
-  const leftWrist = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_WRIST),
-  );
-  const rightWrist = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_WRIST),
-  );
-  const shoulderCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-  );
-
-  if (!shoulderWidth || !leftWrist || !rightWrist || !shoulderCenter) {
-    return null;
-  }
-
-  return {
-    leftOffset: (leftWrist.x - shoulderCenter.x) / shoulderWidth,
-    rightOffset: (rightWrist.x - shoulderCenter.x) / shoulderWidth,
-    span: Math.abs(leftWrist.x - rightWrist.x) / shoulderWidth,
-  };
-};
-
-const getBothHandsAboveHead = (
-  landmarks: PoseLandmarkLike[],
-  marginMultiplier = summerMovementConfig["100"].thresholds
-    .handsAboveHeadMargin,
-) => {
-  const shoulderWidth = getShoulderWidth(landmarks);
-  const headPoint = getHeadPoint(landmarks);
-  const leftWrist = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_WRIST),
-  );
-  const rightWrist = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_WRIST),
-  );
-
-  if (!shoulderWidth || !headPoint || !leftWrist || !rightWrist) return null;
-
-  const margin = shoulderWidth * marginMultiplier;
-
-  return leftWrist.y <= headPoint.y - margin &&
-    rightWrist.y <= headPoint.y - margin
-    ? 1
-    : 0;
-};
-
-const getElbowsBelowShoulders = (landmarks: PoseLandmarkLike[]) => {
-  const shoulderWidth = getShoulderWidth(landmarks);
-  const leftElbow = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_ELBOW),
-  );
-  const rightElbow = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_ELBOW),
-  );
-  const shoulderCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-  );
-
-  if (!shoulderWidth || !leftElbow || !rightElbow || !shoulderCenter) {
-    return null;
-  }
-
-  return leftElbow.y >= shoulderCenter.y - shoulderWidth * 0.25 &&
-    rightElbow.y >= shoulderCenter.y - shoulderWidth * 0.25
-    ? 1
-    : 0;
-};
-
-const getStandingSymmetry = (landmarks: PoseLandmarkLike[]) => {
-  const shoulderCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-  );
-  const hipCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_HIP),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_HIP),
-  );
-  const shoulderWidth = getShoulderWidth(landmarks);
-
-  if (!shoulderCenter || !hipCenter || !shoulderWidth) return null;
-
-  return Math.abs(shoulderCenter.x - hipCenter.x) / shoulderWidth;
-};
-
 export const buildSummerBeatCriteria = (
   landmarks: PoseLandmarkLike[],
   beat: SummerBeat,
@@ -279,9 +127,50 @@ export const buildSummerBeatCriteria = (
     metrics.rightHandHeightFromShoulders,
   ]);
   const averageElbowAngle = metrics.averageElbowAngle;
-  const handCenterXOffset = getHandCenterXOffset(landmarks);
-  const handCenterY = getHandCenterYFromShoulders(landmarks);
-  const opening = getWristSideOpening(landmarks);
+  const bodyMetrics = extractNormalizedBodyMetrics(landmarks);
+  const absoluteHandCenterXOffset =
+    bodyMetrics.handCenterXOffset === null
+      ? null
+      : Math.abs(bodyMetrics.handCenterXOffset);
+  const handCenterY = bodyMetrics.handCenterYFromShoulders;
+  const opening =
+    bodyMetrics.shoulderWidth &&
+    bodyMetrics.shoulderCenter &&
+    bodyMetrics.leftWrist &&
+    bodyMetrics.rightWrist
+      ? {
+          leftOffset:
+            (bodyMetrics.leftWrist.x - bodyMetrics.shoulderCenter.x) /
+            bodyMetrics.shoulderWidth,
+          rightOffset:
+            (bodyMetrics.rightWrist.x - bodyMetrics.shoulderCenter.x) /
+            bodyMetrics.shoulderWidth,
+          span: bodyMetrics.normalizedWristSpan,
+        }
+      : null;
+  const standingSymmetry =
+    bodyMetrics.torsoCenterXOffset === null
+      ? null
+      : Math.abs(bodyMetrics.torsoCenterXOffset);
+  const elbowsBelowShoulders =
+    bodyMetrics.shoulderWidth &&
+    bodyMetrics.shoulderCenter &&
+    bodyMetrics.leftElbow &&
+    bodyMetrics.rightElbow
+      ? bodyMetrics.leftElbow.y >=
+          bodyMetrics.shoulderCenter.y - bodyMetrics.shoulderWidth * 0.25 &&
+        bodyMetrics.rightElbow.y >=
+          bodyMetrics.shoulderCenter.y - bodyMetrics.shoulderWidth * 0.25
+        ? 1
+        : 0
+      : null;
+  const handsGatheredAtCenter = evaluateHandsGatheredAtCenter(bodyMetrics, {
+    maxNormalizedHandDistance: thresholds.handsTogetherMax,
+    maxAbsoluteCenterOffset: thresholds.handCenterMaxOffset,
+  });
+  const feetClose = evaluateFeetClose(bodyMetrics, {
+    maxNormalizedAnkleDistance: thresholds.closedStanceMax,
+  });
 
   if (beat === 1) {
     return [
@@ -289,30 +178,28 @@ export const buildSummerBeatCriteria = (
         id: "feet-close",
         label: "Feet close",
         importance: "essential",
-        value: metrics.normalizedAnkleDistance,
-        passed:
-          metrics.normalizedAnkleDistance !== null &&
-          metrics.normalizedAnkleDistance <= thresholds.closedStanceMax,
+        value: feetClose.metrics.normalizedAnkleDistance,
+        passed: feetClose.passed,
         expectedRange: `<= ${thresholds.closedStanceMax}`,
       }),
       criterion({
         id: "hands-together",
         label: "Hands together in front of upper body",
         importance: "essential",
-        value: metrics.normalizedHandDistance,
+        value: handsGatheredAtCenter.metrics.normalizedHandDistance,
         passed:
-          metrics.normalizedHandDistance !== null &&
-          metrics.normalizedHandDistance <= thresholds.handsTogetherMax,
+          handsGatheredAtCenter.metrics.normalizedHandDistance !== null &&
+          !handsGatheredAtCenter.failedConditions.includes("hand-distance"),
         expectedRange: `<= ${thresholds.handsTogetherMax}`,
       }),
       criterion({
         id: "hand-center-between-shoulders",
         label: "Hand center between shoulders",
         importance: "essential",
-        value: handCenterXOffset,
+        value: absoluteHandCenterXOffset,
         passed:
-          handCenterXOffset !== null &&
-          handCenterXOffset <= thresholds.handCenterMaxOffset,
+          absoluteHandCenterXOffset !== null &&
+          !handsGatheredAtCenter.failedConditions.includes("center-offset"),
         expectedRange: `<= ${thresholds.handCenterMaxOffset}`,
       }),
       criterion({
@@ -330,15 +217,15 @@ export const buildSummerBeatCriteria = (
         id: "elbows-below-shoulders",
         label: "Elbows below shoulders",
         importance: "supporting",
-        value: getElbowsBelowShoulders(landmarks),
-        passed: getElbowsBelowShoulders(landmarks) === 1,
+        value: elbowsBelowShoulders,
+        passed: elbowsBelowShoulders === 1,
       }),
       criterion({
         id: "upright-torso",
         label: "Upper body upright",
         importance: "supporting",
-        value: getStandingSymmetry(landmarks),
-        passed: (getStandingSymmetry(landmarks) ?? 1) <= 0.55,
+        value: standingSymmetry,
+        passed: (standingSymmetry ?? 1) <= 0.55,
         expectedRange: "<= 0.55",
       }),
     ];
@@ -363,6 +250,20 @@ export const buildSummerBeatCriteria = (
       expectedIntensity === "100" ? "STRAIGHTEN_ARMS" : "TRY_AGAIN";
     const elbowFeedbackTooHigh =
       expectedIntensity === "100" ? "TRY_AGAIN" : "BEND_ELBOWS_MORE";
+    const defaultWristsAboveHead = evaluateWristsAboveHead(bodyMetrics, {
+      marginInShoulderWidths:
+        summerMovementConfig["100"].thresholds.handsAboveHeadMargin,
+      requiredCount: 2,
+    });
+    const expectedWristsAboveHead = evaluateWristsAboveHead(bodyMetrics, {
+      marginInShoulderWidths: handsAboveHeadMargin,
+      requiredCount: 2,
+    });
+    const defaultWristsAboveHeadValue = defaultWristsAboveHead.evaluable
+      ? defaultWristsAboveHead.passed
+        ? 1
+        : 0
+      : null;
 
     return [
       criterion({
@@ -392,7 +293,7 @@ export const buildSummerBeatCriteria = (
         expectedRange:
           preparationHandRaise === null
             ? "visible upward movement"
-            : `>= ${roundDebug(
+            : `>= ${roundCriterionDebugValue(
                 preparationHandRaise +
                   (expectedIntensity === "10" ? 0.02 : 0.04),
               )}`,
@@ -404,9 +305,8 @@ export const buildSummerBeatCriteria = (
             label: "Both hands above the head",
             importance: "essential",
             domain: "intensity",
-            value: getBothHandsAboveHead(landmarks),
-            passed:
-              getBothHandsAboveHead(landmarks, handsAboveHeadMargin) === 1,
+            value: defaultWristsAboveHeadValue,
+            passed: expectedWristsAboveHead.passed,
             feedbackCode: "RAISE_ARMS_HIGHER",
           })
         : criterion({
@@ -414,10 +314,10 @@ export const buildSummerBeatCriteria = (
             label: "Hands stay compact in front of upper body",
             importance: "essential",
             domain: "shape",
-            value: handCenterXOffset,
+            value: absoluteHandCenterXOffset,
             passed:
-              handCenterXOffset !== null &&
-              handCenterXOffset <= thresholds.handCenterMaxOffset,
+              absoluteHandCenterXOffset !== null &&
+              absoluteHandCenterXOffset <= thresholds.handCenterMaxOffset,
             expectedRange: `<= ${thresholds.handCenterMaxOffset}`,
             feedbackCode: "MOVE_HANDS_TO_CENTER",
           }),
@@ -485,6 +385,7 @@ export const buildSummerBeatCriteria = (
         value: opening?.span,
         passed:
           opening !== null &&
+          opening.span !== null &&
           opening.span >= minimumShapeOpening &&
           openingDirectionMatches,
         expectedRange: `>= ${minimumShapeOpening}`,
@@ -557,16 +458,20 @@ export const buildSummerBeatCriteria = (
       : metrics.normalizedAnkleDistance / expansionAnkleDistance;
 
   return [
-    criterion({
-      id: "feet-returned-close",
-      label: "Feet returned to closed stance",
-      importance: "essential",
-      value: metrics.normalizedAnkleDistance,
-      passed:
-        metrics.normalizedAnkleDistance !== null &&
-        metrics.normalizedAnkleDistance <= thresholds.closedStanceMax,
-      expectedRange: `<= ${thresholds.closedStanceMax}`,
-    }),
+    (() => {
+      const returnedFeetClose = evaluateFeetClose(bodyMetrics, {
+        maxNormalizedAnkleDistance: thresholds.closedStanceMax,
+      });
+
+      return criterion({
+        id: "feet-returned-close",
+        label: "Feet returned to closed stance",
+        importance: "essential",
+        value: returnedFeetClose.metrics.normalizedAnkleDistance,
+        passed: returnedFeetClose.passed,
+        expectedRange: `<= ${thresholds.closedStanceMax}`,
+      });
+    })(),
     criterion({
       id: "hands-lowered-sides",
       label: "Hands lowered to the sides",
@@ -603,8 +508,8 @@ export const buildSummerBeatCriteria = (
       id: "body-symmetric",
       label: "Body roughly symmetric",
       importance: "supporting",
-      value: getStandingSymmetry(landmarks),
-      passed: (getStandingSymmetry(landmarks) ?? 1) <= 0.55,
+      value: standingSymmetry,
+      passed: (standingSymmetry ?? 1) <= 0.55,
       expectedRange: "<= 0.55",
     }),
   ];

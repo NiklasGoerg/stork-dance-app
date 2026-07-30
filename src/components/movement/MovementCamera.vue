@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onBeforeUnmount, onMounted } from "vue";
 import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
 import type { ViewMode } from "~/types/view";
 import { usePose } from "~/composables/usePose";
@@ -62,6 +62,8 @@ let pose: Awaited<ReturnType<typeof usePose>> | null = null;
 let hands: Awaited<ReturnType<typeof useHands>> | null = null;
 
 let running = false;
+let animationFrameId = 0;
+let mediaStream: MediaStream | null = null;
 
 // 👉 kleinere interne Auflösung (Performance!)
 const WIDTH = 480;
@@ -108,6 +110,7 @@ onMounted(async () => {
     },
   });
 
+  mediaStream = stream;
   video.value.srcObject = stream;
 
   video.value.onloadeddata = async () => {
@@ -126,7 +129,7 @@ onMounted(async () => {
 
 const detectFrame = () => {
   if (!running) return;
-  requestAnimationFrame(detectFrame);
+  animationFrameId = requestAnimationFrame(detectFrame);
 
   if (!video.value || !ctx || !pose) return;
 
@@ -161,6 +164,29 @@ const detectFrame = () => {
     drawHands(handLandmarks);
   }
 };
+
+const stopCamera = () => {
+  running = false;
+
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = 0;
+  }
+
+  mediaStream?.getTracks().forEach((track) => track.stop());
+  mediaStream = null;
+
+  if (video.value) {
+    video.value.srcObject = null;
+    video.value.onloadeddata = null;
+  }
+
+  resetLandmarkSmoothing();
+  lastHandResult = null;
+  emit("poseLandmarks", null);
+};
+
+onBeforeUnmount(stopCamera);
 
 // ==============================
 // DRAW HELPERS

@@ -2,12 +2,12 @@
   <section
     class="act5-info-card"
     :class="`act5-info-card--${model.mode}`"
-    aria-label="Act 5 climate information"
+    :aria-label="t('story.acts.act5.infoCard.aria.card')"
   >
     <section
       v-if="model.mode === 'completed'"
       class="act5-info-card__completion"
-      aria-label="Act 5 completion"
+      :aria-label="t('story.acts.act5.infoCard.aria.completion')"
     >
       <p class="act5-info-card__completion-title">
         {{ model.completion?.title }}
@@ -23,9 +23,11 @@
     <section
       v-else-if="model.mode === 'periodTransition'"
       class="act5-info-card__period-transition"
-      aria-label="Climate period transition"
+      :aria-label="t('story.acts.act5.infoCard.aria.periodTransition')"
     >
-      <p class="act5-info-card__transition-label">Period shift</p>
+      <p class="act5-info-card__transition-label">
+        {{ t("story.acts.act5.infoCard.periodShift") }}
+      </p>
       <div class="act5-info-card__transition-periods">
         <span class="act5-info-card__transition-period">
           {{ model.periodTransition?.previousPeriod }}
@@ -44,7 +46,7 @@
     <div v-else class="act5-info-card__story-content">
       <section
         class="act5-info-card__focus"
-        aria-label="Current movement target"
+        :aria-label="t('story.acts.act5.infoCard.aria.currentTarget')"
       >
         <p class="act5-info-card__season">{{ model.seasonLabel }}</p>
         <p class="act5-info-card__movement">
@@ -54,7 +56,7 @@
 
       <section
         class="act5-info-card__climate"
-        aria-label="Current climate data"
+        :aria-label="t('story.acts.act5.infoCard.aria.currentClimateData')"
       >
         <p class="act5-info-card__period">{{ model.periodLabel }}</p>
         <p
@@ -73,7 +75,11 @@
               v-if="model.temperature.baselineLabel"
               class="act5-info-card__temperature-baseline"
             >
-              vs {{ model.temperature.baselineLabel }}
+              {{
+                t("story.acts.act5.infoCard.vs", {
+                  value: model.temperature.baselineLabel,
+                })
+              }}
             </span>
           </template>
         </p>
@@ -82,7 +88,7 @@
       <ol
         v-if="model.mode === 'activeMovement'"
         class="act5-info-card__instructions"
-        aria-label="Movement instructions"
+        :aria-label="t('story.acts.act5.infoCard.aria.instructions')"
       >
         <li
           v-for="instruction in model.instructions"
@@ -121,6 +127,7 @@ import type { Act5InfoCardModel, Act5InfoTone } from "~/types/act5InfoCard";
 const props = defineProps<{
   model: Act5InfoCardModel;
 }>();
+const { t } = useI18n();
 
 const feedbackDisplay = computed<{
   text: string;

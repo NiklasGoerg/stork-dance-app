@@ -1,5 +1,6 @@
 import type { PoseLandmarkLike } from "~/types/pose";
 import { getWeightedBeatEvaluationScore } from "~/utils/movement/core/criteria";
+import { extractNormalizedBodyMetrics } from "~/utils/movement/core/bodyMetrics";
 import { getMovementRangeFitScore } from "~/utils/movement/core/range";
 import {
   buildSummerBeatCriteria,
@@ -23,14 +24,7 @@ import type {
   SummerSequenceEvaluation,
   SummerStepSide,
 } from "~/utils/movement/acts/climate/summer/summerTypes";
-import {
-  averageValid,
-  calculateJointAngle,
-  distance2D,
-  midpoint,
-  toPosePoint,
-} from "~/utils/pose/poseGeometry";
-import { MIN_SHOULDER_WIDTH, POSE_LANDMARK } from "~/utils/pose/poseLandmarks";
+import { averageValid } from "~/utils/pose/poseGeometry";
 
 export * from "~/utils/movement/acts/climate/summer/summerReference";
 export * from "~/utils/movement/acts/climate/summer/summerTypes";
@@ -48,9 +42,6 @@ type BeatContext = {
     normalizedArmOpening: number | null;
   } | null;
 };
-
-const getLandmark = (landmarks: PoseLandmarkLike[], index: number) =>
-  landmarks[index] ?? null;
 
 const classifyDetectedIntensity = (
   metrics: Omit<
@@ -86,17 +77,6 @@ const classifyDetectedIntensity = (
     : "unknown";
 };
 
-const getShoulderWidth = (landmarks: PoseLandmarkLike[]) => {
-  const shoulderWidth = distance2D(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-  );
-
-  if (!shoulderWidth || shoulderWidth < MIN_SHOULDER_WIDTH) return null;
-
-  return shoulderWidth;
-};
-
 const createEmptyMetrics = (): SummerRecognitionMetrics => ({
   shoulderWidth: null,
   normalizedHandDistance: null,
@@ -123,59 +103,23 @@ export const extractSummerRecognitionMetrics = (
 ): SummerRecognitionMetrics => {
   if (!landmarks?.length) return createEmptyMetrics();
 
-  const shoulderWidth = getShoulderWidth(landmarks);
-  const shoulderCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-  );
-  const hipCenter = midpoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_HIP),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_HIP),
-  );
-  const leftWrist = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_WRIST),
-  );
-  const rightWrist = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_WRIST),
-  );
-  const leftAnkle = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_ANKLE),
-  );
-  const rightAnkle = toPosePoint(
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_ANKLE),
-  );
+  const bodyMetrics = extractNormalizedBodyMetrics(landmarks);
+  const {
+    shoulderWidth,
+    shoulderCenter,
+    hipCenter,
+    leftWrist,
+    rightWrist,
+    leftAnkle,
+    rightAnkle,
+  } = bodyMetrics;
 
   if (!shoulderWidth || !shoulderCenter) return createEmptyMetrics();
 
   const torsoLength =
-    hipCenter &&
-    distance2D(
-      getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-      getLandmark(landmarks, POSE_LANDMARK.LEFT_HIP),
-    ) &&
-    distance2D(
-      getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-      getLandmark(landmarks, POSE_LANDMARK.RIGHT_HIP),
-    )
-      ? (averageValid([
-          distance2D(
-            getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-            getLandmark(landmarks, POSE_LANDMARK.LEFT_HIP),
-          ),
-          distance2D(
-            getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-            getLandmark(landmarks, POSE_LANDMARK.RIGHT_HIP),
-          ),
-        ]) ?? shoulderWidth)
+    hipCenter && bodyMetrics.leftTorsoLength && bodyMetrics.rightTorsoLength
+      ? (bodyMetrics.torsoLength ?? shoulderWidth)
       : shoulderWidth;
-  const normalizedHandDistance =
-    leftWrist && rightWrist
-      ? distance2D(leftWrist, rightWrist)! / shoulderWidth
-      : null;
-  const normalizedAnkleDistance =
-    leftAnkle && rightAnkle
-      ? distance2D(leftAnkle, rightAnkle)! / shoulderWidth
-      : null;
   const leftFootLateralOffset =
     leftAnkle && neutralCalibration
       ? Math.abs(leftAnkle.x - neutralCalibration.leftAnkleX) / shoulderWidth
@@ -195,7 +139,7 @@ export const extractSummerRecognitionMetrics = (
   const detectedStepSide = getDetectedStepSide({
     leftFootLateralOffset,
     rightFootLateralOffset,
-    normalizedAnkleDistance,
+    normalizedAnkleDistance: bodyMetrics.normalizedAnkleDistance,
   });
   const leftHandHeightFromShoulders = leftWrist
     ? (leftWrist.y - shoulderCenter.y) / shoulderWidth
@@ -215,21 +159,10 @@ export const extractSummerRecognitionMetrics = (
     leftHandRaiseAmplitude,
     rightHandRaiseAmplitude,
   ]);
-  const leftElbowAngle = calculateJointAngle(
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_ELBOW),
-    getLandmark(landmarks, POSE_LANDMARK.LEFT_WRIST),
-  );
-  const rightElbowAngle = calculateJointAngle(
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_SHOULDER),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_ELBOW),
-    getLandmark(landmarks, POSE_LANDMARK.RIGHT_WRIST),
-  );
-  const averageElbowAngle = averageValid([leftElbowAngle, rightElbowAngle]);
-  const normalizedArmOpening =
-    leftWrist && rightWrist
-      ? Math.abs(leftWrist.x - rightWrist.x) / shoulderWidth
-      : null;
+  const leftElbowAngle = bodyMetrics.leftElbowAngle;
+  const rightElbowAngle = bodyMetrics.rightElbowAngle;
+  const averageElbowAngle = bodyMetrics.averageElbowAngle;
+  const normalizedArmOpening = bodyMetrics.normalizedWristSpan;
   const combinedAmplitude = averageValid([
     stepAmplitude,
     handRaiseAmplitude,
@@ -237,8 +170,8 @@ export const extractSummerRecognitionMetrics = (
   ]);
   const detectedIntensityClass = classifyDetectedIntensity({
     shoulderWidth,
-    normalizedHandDistance,
-    normalizedAnkleDistance,
+    normalizedHandDistance: bodyMetrics.normalizedHandDistance,
+    normalizedAnkleDistance: bodyMetrics.normalizedAnkleDistance,
     leftFootLateralOffset,
     rightFootLateralOffset,
     stepAmplitude,
@@ -255,8 +188,8 @@ export const extractSummerRecognitionMetrics = (
 
   return {
     shoulderWidth,
-    normalizedHandDistance,
-    normalizedAnkleDistance,
+    normalizedHandDistance: bodyMetrics.normalizedHandDistance,
+    normalizedAnkleDistance: bodyMetrics.normalizedAnkleDistance,
     leftFootLateralOffset,
     rightFootLateralOffset,
     stepAmplitude,

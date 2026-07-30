@@ -4,6 +4,10 @@ import {
   SPRING_MOVEMENT_REFERENCE,
   springMovementConfig,
 } from "~/utils/movement/acts/climate/spring/springReference";
+import {
+  createAct5SeasonCriterionFactory,
+  getHighestPriorityFailedCriterion,
+} from "~/features/act5/movements/criteria";
 import type {
   SpringBeat,
   SpringCriterionImportance,
@@ -13,41 +17,11 @@ import type {
   SpringValue,
 } from "~/utils/movement/acts/climate/spring/springTypes";
 
-const roundDebug = (value: number | null) =>
-  value === null || !Number.isFinite(value) ? "n/a" : Number(value.toFixed(2));
-
-const criterion = ({
-  id,
-  label,
-  importance,
-  value,
-  passed,
-  expectedRange,
-  feedbackCode,
-}: {
-  id: string;
-  label: string;
-  importance: SpringCriterionImportance;
-  value: number | string | boolean | null | undefined;
-  passed: boolean;
-  expectedRange?: string;
-  feedbackCode?: SpringFeedbackCode;
-}): SpringCriterionResult => {
-  const evaluable =
-    value !== null && value !== undefined && value !== "unknown";
-
-  return {
-    id,
-    label,
-    status: !evaluable ? "notEvaluable" : passed ? "passed" : "failed",
-    passed: evaluable && passed,
-    score: evaluable && passed ? 1 : 0,
-    importance,
-    debugValue: typeof value === "number" ? roundDebug(value) : String(value),
-    expectedRange,
-    feedbackCode: evaluable && !passed ? feedbackCode : undefined,
-  };
-};
+const criterion = createAct5SeasonCriterionFactory<
+  SpringCriterionImportance,
+  SpringFeedbackCode,
+  SpringCriterionResult
+>();
 
 const kneeCriterion = (metrics: SpringRecognitionMetrics) =>
   criterion({
@@ -165,13 +139,11 @@ const openHandsCriterion = (metrics: SpringRecognitionMetrics) =>
 
 const sideShoulderOpeningCriterion = (metrics: SpringRecognitionMetrics) => {
   const minOutside = springMovementConfig.thresholds.wristOutsideShoulderMin;
-  const outsideSignals = [
-    metrics.leftWristOutsideShoulder,
-    metrics.rightWristOutsideShoulder,
-  ];
+  const leftOutsideSignal = metrics.leftWristOutsideShoulder;
+  const rightOutsideSignal = metrics.rightWristOutsideShoulder;
   const minimumOutsideSignal =
-    outsideSignals[0] !== null && outsideSignals[1] !== null
-      ? Math.min(outsideSignals[0], outsideSignals[1])
+    leftOutsideSignal !== null && rightOutsideSignal !== null
+      ? Math.min(leftOutsideSignal, rightOutsideSignal)
       : null;
 
   return criterion({
@@ -349,16 +321,12 @@ export const getSpringBeatFeedbackCode = (
     "knee-pattern",
     "arms-extended",
   ];
-  const failedCriterion = priority
-    .map((id) =>
-      criteria.find(
-        (item) =>
-          item.id === id &&
-          item.status === "failed" &&
-          (item.importance === "essential" || item.feedbackCode),
-      ),
-    )
-    .find((item): item is SpringCriterionResult => Boolean(item));
+  const failedCriterion = getHighestPriorityFailedCriterion(
+    criteria.filter(
+      (item) => item.importance === "essential" || item.feedbackCode,
+    ),
+    priority,
+  );
 
   if (failedCriterion) return failedCriterion.feedbackCode ?? "TRY_AGAIN";
 
