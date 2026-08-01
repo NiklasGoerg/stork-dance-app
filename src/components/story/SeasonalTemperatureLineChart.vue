@@ -134,10 +134,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { extent, line, scaleLinear } from "d3";
-import type {
-  ClimateSeason,
-  ClimateSeasonDataRow,
-} from "~/utils/movement/acts/climate/climateSeasonData";
+import type { ClimateSeason, ClimateSeasonDataRow } from "~/types/climate";
 import { isClimateMovementSeason } from "~/utils/movement/acts/climate/climateSeasonData";
 
 type ChartPoint = {

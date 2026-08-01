@@ -3,6 +3,12 @@ import {
   getBeatPassState,
   getWeightedBeatEvaluationScore,
 } from "~/utils/movement/core/criteria";
+import {
+  springCriterionFeedbackMetadata,
+  springFeedbackMetadata,
+} from "~/utils/act5/feedback/catalog";
+import { buildAct5BeatFeedbackSignals } from "~/utils/act5/feedback/signals";
+import { selectAct5FinalFeedback } from "~/utils/act5/feedback/selectFinalFeedback";
 import { extractNormalizedBodyMetrics } from "~/utils/movement/core/bodyMetrics";
 import { evaluateHandsGatheredAtCenter } from "~/utils/movement/core/predicates/handPoses";
 import {
@@ -18,6 +24,7 @@ import {
 import type {
   SpringBeat,
   SpringBeatEvaluation,
+  SpringFeedbackCode,
   SpringHandHeightRegion,
   SpringKneeSide,
   SpringPreparationReference,
@@ -35,6 +42,7 @@ export * from "~/utils/movement/acts/climate/spring/springTypes";
 type BeatContext = {
   expectedValue?: SpringValue;
   expectedKneeSide?: SpringKneeSide;
+  measureIndex?: number | null;
   preparationReference?: SpringPreparationReference | null;
 };
 
@@ -331,6 +339,7 @@ export const evaluateSpringBeat = (
   if (!landmarks?.length || metrics.shoulderWidth === null) {
     return {
       beat,
+      measureIndex: context.measureIndex,
       score: 0,
       passed: false,
       trackingUnavailable: true,
@@ -339,6 +348,18 @@ export const evaluateSpringBeat = (
       expectedValue,
       expectedKneeSide,
       feedbackCode: "FULL_BODY_NOT_VISIBLE",
+      feedbackSignals: buildAct5BeatFeedbackSignals<SpringFeedbackCode>({
+        season: "spring",
+        beat,
+        measureIndex: context.measureIndex ?? null,
+        criteria: [],
+        trackingUnavailable: true,
+        fallbackCode: "FULL_BODY_NOT_VISIBLE",
+        codeMetadata: springFeedbackMetadata,
+        criterionMetadata: springCriterionFeedbackMetadata,
+        missedBeatSample: !landmarks?.length,
+        landmarkConfidence: metrics.landmarkConfidence,
+      }),
       metrics,
     };
   }
@@ -353,6 +374,7 @@ export const evaluateSpringBeat = (
 
   return {
     beat,
+    measureIndex: context.measureIndex,
     score,
     passed,
     trackingUnavailable,
@@ -361,6 +383,17 @@ export const evaluateSpringBeat = (
     expectedValue,
     expectedKneeSide,
     feedbackCode: passed ? undefined : getSpringBeatFeedbackCode(criteria),
+    feedbackSignals: buildAct5BeatFeedbackSignals<SpringFeedbackCode>({
+      season: "spring",
+      beat,
+      measureIndex: context.measureIndex ?? null,
+      criteria,
+      trackingUnavailable,
+      fallbackCode: getSpringBeatFeedbackCode(criteria),
+      codeMetadata: springFeedbackMetadata,
+      criterionMetadata: springCriterionFeedbackMetadata,
+      landmarkConfidence: metrics.landmarkConfidence,
+    }),
     metrics,
   };
 };
@@ -433,17 +466,24 @@ export const evaluateSpringSequence = (
     beatEvaluations,
     SPRING_BEAT_WEIGHTS,
   );
-  const hasTrackingUnavailable = beatEvaluations.some(
-    (evaluation) => evaluation.trackingUnavailable,
-  );
   const hasCentralFailure = beatEvaluations.some(
     (evaluation) => !evaluation.passed,
   );
+  const selectedFeedback = selectAct5FinalFeedback<SpringFeedbackCode>({
+    season: "spring",
+    beatEvaluations,
+    codeMetadata: springFeedbackMetadata,
+    criterionMetadata: springCriterionFeedbackMetadata,
+    fallbackCode: "TRY_AGAIN",
+  });
+  const hasSevereTracking =
+    selectedFeedback.category === "tracking" &&
+    selectedFeedback.evidence.severeTracking;
   const passed =
-    !hasTrackingUnavailable &&
+    !hasSevereTracking &&
     !hasCentralFailure &&
     totalScore >= springMovementConfig.thresholds.almostCorrectScore;
-  const resultState: SpringRecognitionResultState = hasTrackingUnavailable
+  const resultState: SpringRecognitionResultState = hasSevereTracking
     ? "trackingUnavailable"
     : totalScore >= springMovementConfig.thresholds.successScore &&
         !hasCentralFailure
@@ -451,18 +491,16 @@ export const evaluateSpringSequence = (
       : passed
         ? "almostCorrect"
         : "retryRequired";
-  const prioritizedProblem =
-    getPrioritizedSpringProblemEvaluation(beatEvaluations);
 
   return {
     passed,
     resultState,
     totalScore,
     beatEvaluations,
-    feedbackCode:
-      resultState === "success"
-        ? "SUCCESS"
-        : (prioritizedProblem?.feedbackCode ?? "TRY_AGAIN"),
+    feedbackCode: resultState === "success" ? "SUCCESS" : selectedFeedback.code,
+    primaryFeedbackCode:
+      resultState === "success" ? "SUCCESS" : selectedFeedback.code,
+    selectedFeedback,
   };
 };
 

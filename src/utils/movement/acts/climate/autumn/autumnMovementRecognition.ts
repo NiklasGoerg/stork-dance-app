@@ -1,5 +1,11 @@
 import type { PoseLandmarkLike } from "~/types/pose";
 import {
+  autumnCriterionFeedbackMetadata,
+  autumnFeedbackMetadata,
+} from "~/utils/act5/feedback/catalog";
+import { buildAct5BeatFeedbackSignals } from "~/utils/act5/feedback/signals";
+import { selectAct5FinalFeedback } from "~/utils/act5/feedback/selectFinalFeedback";
+import {
   getBeatPassState,
   getWeightedBeatEvaluationScore,
 } from "~/utils/movement/core/criteria";
@@ -24,6 +30,7 @@ import type {
   AutumnDirectionResult,
   AutumnEndpointErrorKind,
   AutumnEndpointRegion,
+  AutumnFeedbackCode,
   AutumnRecognitionMetrics,
   AutumnRecognitionResultState,
   AutumnSequenceEvaluation,
@@ -42,6 +49,7 @@ export * from "~/utils/movement/acts/climate/autumn/autumnTypes";
 type BeatContext = {
   expectedDirection?: AutumnDirection;
   expectedValueClass?: AutumnValueClass;
+  measureIndex?: number | null;
   startReference?: AutumnStartReference | null;
 };
 
@@ -523,6 +531,7 @@ export const evaluateAutumnBeat = (
   if (!landmarks?.length || metricsWithContext.shoulderWidth === null) {
     return {
       beat,
+      measureIndex: context.measureIndex,
       score: 0,
       passed: false,
       trackingUnavailable: true,
@@ -531,6 +540,18 @@ export const evaluateAutumnBeat = (
       expectedDirection,
       expectedValueClass,
       feedbackCode: "FULL_BODY_NOT_VISIBLE",
+      feedbackSignals: buildAct5BeatFeedbackSignals<AutumnFeedbackCode>({
+        season: "autumn",
+        beat,
+        measureIndex: context.measureIndex ?? null,
+        criteria: [],
+        trackingUnavailable: true,
+        fallbackCode: "FULL_BODY_NOT_VISIBLE",
+        codeMetadata: autumnFeedbackMetadata,
+        criterionMetadata: autumnCriterionFeedbackMetadata,
+        missedBeatSample: !landmarks?.length,
+        landmarkConfidence: metricsWithContext.landmarkConfidence,
+      }),
       metrics: metricsWithContext,
     };
   }
@@ -548,6 +569,7 @@ export const evaluateAutumnBeat = (
 
   return {
     beat,
+    measureIndex: context.measureIndex,
     score,
     passed,
     trackingUnavailable,
@@ -556,6 +578,17 @@ export const evaluateAutumnBeat = (
     expectedDirection,
     expectedValueClass,
     feedbackCode: passed ? undefined : getAutumnBeatFeedbackCode(criteria),
+    feedbackSignals: buildAct5BeatFeedbackSignals<AutumnFeedbackCode>({
+      season: "autumn",
+      beat,
+      measureIndex: context.measureIndex ?? null,
+      criteria,
+      trackingUnavailable,
+      fallbackCode: getAutumnBeatFeedbackCode(criteria),
+      codeMetadata: autumnFeedbackMetadata,
+      criterionMetadata: autumnCriterionFeedbackMetadata,
+      landmarkConfidence: metricsWithContext.landmarkConfidence,
+    }),
     metrics: metricsWithContext,
   };
 };
@@ -625,9 +658,6 @@ export const evaluateAutumnSequence = (
     beatEvaluations,
     AUTUMN_BEAT_WEIGHTS,
   );
-  const hasTrackingUnavailable = beatEvaluations.some(
-    (evaluation) => evaluation.trackingUnavailable,
-  );
   const hasCentralFailure = beatEvaluations.some(
     (evaluation) =>
       (evaluation.beat === 1 ||
@@ -635,30 +665,40 @@ export const evaluateAutumnSequence = (
         evaluation.beat === 4) &&
       !evaluation.passed,
   );
+  const selectedFeedback = selectAct5FinalFeedback<AutumnFeedbackCode>({
+    season: "autumn",
+    beatEvaluations,
+    codeMetadata: autumnFeedbackMetadata,
+    criterionMetadata: autumnCriterionFeedbackMetadata,
+    fallbackCode: "TRY_AGAIN",
+  });
   const passed =
-    !hasTrackingUnavailable &&
+    !(
+      selectedFeedback.category === "tracking" &&
+      selectedFeedback.evidence.severeTracking
+    ) &&
     !hasCentralFailure &&
     totalScore >= autumnMovementConfig.thresholds.almostCorrectScore;
-  const resultState: AutumnRecognitionResultState = hasTrackingUnavailable
-    ? "trackingUnavailable"
-    : totalScore >= autumnMovementConfig.thresholds.successScore &&
-        !hasCentralFailure
-      ? "success"
-      : passed
-        ? "almostCorrect"
-        : "retryRequired";
-  const prioritizedProblem =
-    getPrioritizedAutumnProblemEvaluation(beatEvaluations);
+  const resultState: AutumnRecognitionResultState =
+    selectedFeedback.category === "tracking" &&
+    selectedFeedback.evidence.severeTracking
+      ? "trackingUnavailable"
+      : totalScore >= autumnMovementConfig.thresholds.successScore &&
+          !hasCentralFailure
+        ? "success"
+        : passed
+          ? "almostCorrect"
+          : "retryRequired";
 
   return {
     passed,
     resultState,
     totalScore,
     beatEvaluations,
-    feedbackCode:
-      resultState === "success"
-        ? "SUCCESS"
-        : (prioritizedProblem?.feedbackCode ?? "TRY_AGAIN"),
+    feedbackCode: resultState === "success" ? "SUCCESS" : selectedFeedback.code,
+    primaryFeedbackCode:
+      resultState === "success" ? "SUCCESS" : selectedFeedback.code,
+    selectedFeedback,
   };
 };
 

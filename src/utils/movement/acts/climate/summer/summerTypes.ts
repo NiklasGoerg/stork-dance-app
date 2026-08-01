@@ -1,4 +1,5 @@
 import type { MovementRange } from "~/utils/movement/core/range";
+import type { Act5FeedbackSignal, Act5SelectedFeedback } from "~/types/act5";
 
 export type SummerBeat = 1 | 2 | 3 | 4;
 export type SummerIntensity = "100" | "60" | "30" | "10";
@@ -23,6 +24,7 @@ export type SummerFeedbackCode =
   | "MOVEMENT_TOO_SMALL"
   | "ALTERNATE_STEP_SIDE"
   | "FULL_BODY_NOT_VISIBLE"
+  | "HANDS_NOT_VISIBLE"
   | "TRY_AGAIN";
 
 export type SummerRecognitionResultState =
@@ -71,6 +73,7 @@ export type SummerCriterionResult = {
 
 export type SummerBeatEvaluation = {
   beat: SummerBeat;
+  measureIndex?: number | null;
   score: number;
   movementShapeScore: number;
   intensityMatchScore: number;
@@ -84,6 +87,7 @@ export type SummerBeatEvaluation = {
   detectedStepSide: SummerStepSide;
   detectedIntensityClass: SummerDetectedIntensityClass;
   feedbackCode?: SummerFeedbackCode;
+  feedbackSignals?: Act5FeedbackSignal<SummerFeedbackCode>[];
   metrics: SummerRecognitionMetrics;
 };
 
@@ -94,6 +98,8 @@ export type SummerSequenceEvaluation = {
   beatEvaluations: SummerBeatEvaluation[];
   detectedStepSides: SummerStepSide[];
   feedbackCode?: SummerFeedbackCode;
+  primaryFeedbackCode?: SummerFeedbackCode;
+  selectedFeedback?: Act5SelectedFeedback<SummerFeedbackCode>;
 };
 
 export type SummerThresholds = {

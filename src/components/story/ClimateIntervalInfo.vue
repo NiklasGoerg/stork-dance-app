@@ -19,10 +19,8 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import {
-  formatClimateTemperature,
-  type ClimateMovementFlowStep,
-} from "~/utils/movement/acts/climate/climateSeasonData";
+import { formatClimateTemperature } from "~/utils/movement/acts/climate/climateSeasonData";
+import type { ClimateMovementFlowStep } from "~/types/climate";
 
 const props = defineProps<{
   step: ClimateMovementFlowStep;

@@ -1,7 +1,5 @@
-import {
-  climateDataSourceId,
-  type ClimateSeason,
-} from "~/utils/movement/acts/climate/climateSeasonData";
+import { climateDataSourceId } from "~/utils/movement/acts/climate/climateSeasonData";
+import type { ClimateSeason } from "~/types/climate";
 import type { SeasonalCycleSeasonId } from "~/utils/seasonalCycle";
 
 export type ClimateMovementFamilyId = Extract<

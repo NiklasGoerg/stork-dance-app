@@ -27,7 +27,7 @@ type QueuedSeasonRestart = {
   seasonIndex?: number;
   restartSeasonIndex?: number;
   withCountdown: boolean;
-  beforeRestart?: () => void;
+  beforeRestart?: () => void | Promise<void>;
   interludeDurationMs?: number;
   onInterludeStart?: () => void;
 };
@@ -148,6 +148,15 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
 
     clearTimeout(interludeRestartTimer);
     interludeRestartTimer = null;
+  };
+
+  const restartQueuedSeason = async (request: QueuedSeasonRestart) => {
+    await request.beforeRestart?.();
+    await restartSeason(
+      request.seasonId,
+      request.withCountdown,
+      request.restartSeasonIndex ?? request.seasonIndex,
+    );
   };
 
   const getSeasonDate = () => {
@@ -436,20 +445,10 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
           restartRequest.onInterludeStart?.();
           interludeRestartTimer = setTimeout(() => {
             interludeRestartTimer = null;
-            restartRequest.beforeRestart?.();
-            void restartSeason(
-              restartRequest.seasonId,
-              restartRequest.withCountdown,
-              restartRequest.restartSeasonIndex ?? restartRequest.seasonIndex,
-            );
+            void restartQueuedSeason(restartRequest);
           }, restartRequest.interludeDurationMs);
         } else {
-          restartRequest.beforeRestart?.();
-          void restartSeason(
-            restartRequest.seasonId,
-            restartRequest.withCountdown,
-            restartRequest.restartSeasonIndex ?? restartRequest.seasonIndex,
-          );
+          void restartQueuedSeason(restartRequest);
         }
         return;
       }
@@ -720,7 +719,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
   const queueSeasonRestart = (
     seasonId: SeasonalCycleSeasonConfig["id"],
     withCountdown = false,
-    beforeRestart?: () => void,
+    beforeRestart?: () => void | Promise<void>,
     options: {
       interludeDurationMs?: number;
       onInterludeStart?: () => void;
@@ -741,7 +740,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
   const queueSeasonIndexRestart = (
     seasonIndex: number,
     withCountdown = false,
-    beforeRestart?: () => void,
+    beforeRestart?: () => void | Promise<void>,
     options: {
       interludeDurationMs?: number;
       onInterludeStart?: () => void;

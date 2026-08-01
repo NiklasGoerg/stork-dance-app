@@ -7,7 +7,7 @@ import {
 import {
   createAct5SeasonCriterionFactory,
   getHighestPriorityFailedCriterion,
-} from "~/features/act5/movements/criteria";
+} from "~/utils/act5/criteria";
 import type {
   SpringBeat,
   SpringCriterionImportance,
@@ -307,7 +307,7 @@ export const getSpringBeatFeedbackCode = (
     (item) => item.importance === "essential" && item.status === "notEvaluable",
   );
 
-  if (notEvaluable) return "FULL_BODY_NOT_VISIBLE";
+  if (notEvaluable) return "HANDS_NOT_VISIBLE";
 
   const priority = [
     "hands-start-low",

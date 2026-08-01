@@ -20,7 +20,7 @@ import {
   type Act5SeasonCriterionInput,
   createAct5SeasonCriterionFactory,
   roundCriterionDebugValue,
-} from "~/features/act5/movements/criteria";
+} from "~/utils/act5/criteria";
 import type {
   SummerBeat,
   SummerCriterionDomain,
@@ -177,7 +177,7 @@ export const buildSummerBeatCriteria = (
       criterion({
         id: "feet-close",
         label: "Feet close",
-        importance: "essential",
+        importance: "supporting",
         value: feetClose.metrics.normalizedAnkleDistance,
         passed: feetClose.passed,
         expectedRange: `<= ${thresholds.closedStanceMax}`,
@@ -269,7 +269,7 @@ export const buildSummerBeatCriteria = (
       criterion({
         id: "one-leg-stepped-side",
         label: "One leg stepped clearly to the side",
-        importance: "essential",
+        importance: "supporting",
         value: metrics.detectedStepSide,
         passed:
           metrics.detectedStepSide === "left" ||
@@ -279,7 +279,7 @@ export const buildSummerBeatCriteria = (
       criterion({
         id: "alternate-step-side",
         label: "Alternating step side",
-        importance: "essential",
+        importance: "supporting",
         value: expectedSide ? metrics.detectedStepSide : "not-set",
         passed: sideMatchesExpectation,
         expectedRange: expectedSide ?? "first side may be either",
@@ -373,7 +373,7 @@ export const buildSummerBeatCriteria = (
       criterion({
         id: "stepped-leg-remains",
         label: "Stepped leg remains to the side",
-        importance: "essential",
+        importance: "supporting",
         value: metrics.detectedStepSide,
         passed: steppedSide,
         expectedRange: expectedSide ?? "same side as expansion",
@@ -466,7 +466,7 @@ export const buildSummerBeatCriteria = (
       return criterion({
         id: "feet-returned-close",
         label: "Feet returned to closed stance",
-        importance: "essential",
+        importance: "supporting",
         value: returnedFeetClose.metrics.normalizedAnkleDistance,
         passed: returnedFeetClose.passed,
         expectedRange: `<= ${thresholds.closedStanceMax}`,
@@ -487,7 +487,7 @@ export const buildSummerBeatCriteria = (
     criterion({
       id: "returned-from-expansion",
       label: "Movement returned from expansion",
-      importance: "essential",
+      importance: "supporting",
       value: expansionReturned,
       passed:
         expansionReturned !== null &&
@@ -550,7 +550,7 @@ export const getSummerBeatFeedbackCode = (
     (item) => item.importance === "essential" && item.status === "notEvaluable",
   );
 
-  if (notEvaluable) return "FULL_BODY_NOT_VISIBLE";
+  if (notEvaluable) return "HANDS_NOT_VISIBLE";
   if (!failed) {
     const supportingFailure = criteria.find(
       (item) => item.importance === "supporting" && item.status === "failed",

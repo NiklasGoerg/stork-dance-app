@@ -1,4 +1,5 @@
 import type { MovementRange } from "~/utils/movement/core/range";
+import type { Act5FeedbackSignal, Act5SelectedFeedback } from "~/types/act5";
 
 export type SpringBeat = 1 | 2 | 3 | 4;
 export type SpringValue = "100" | "40" | "30" | "20";
@@ -10,6 +11,7 @@ export type SpringCriterionStatus = "passed" | "failed" | "notEvaluable";
 export type SpringFeedbackCode =
   | "SUCCESS"
   | "FULL_BODY_NOT_VISIBLE"
+  | "HANDS_NOT_VISIBLE"
   | "OPEN_ARMS_TO_BEGIN"
   | "START_HANDS_LOW"
   | "KEEP_HANDS_CLOSE_TO_BODY"
@@ -92,6 +94,7 @@ export type SpringCriterionResult = {
 
 export type SpringBeatEvaluation = {
   beat: SpringBeat;
+  measureIndex?: number | null;
   score: number;
   passed: boolean;
   trackingUnavailable: boolean;
@@ -100,6 +103,7 @@ export type SpringBeatEvaluation = {
   expectedValue: SpringValue;
   expectedKneeSide: SpringKneeSide;
   feedbackCode?: SpringFeedbackCode;
+  feedbackSignals?: Act5FeedbackSignal<SpringFeedbackCode>[];
   metrics: SpringRecognitionMetrics;
 };
 
@@ -109,6 +113,8 @@ export type SpringSequenceEvaluation = {
   totalScore: number;
   beatEvaluations: SpringBeatEvaluation[];
   feedbackCode?: SpringFeedbackCode;
+  primaryFeedbackCode?: SpringFeedbackCode;
+  selectedFeedback?: Act5SelectedFeedback<SpringFeedbackCode>;
 };
 
 export type SpringThresholds = {

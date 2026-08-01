@@ -14,6 +14,9 @@
       <NuxtLink to="/movement-camera-test">
         {{ t("home.nav.movementCameraTest") }}
       </NuxtLink>
+      <ClientOnly>
+        <NarrationVoiceSelector class="home-nav__narration" />
+      </ClientOnly>
     </nav>
 
     <section class="home-hero" aria-labelledby="home-title">
@@ -27,6 +30,8 @@
 </template>
 
 <script setup lang="ts">
+import NarrationVoiceSelector from "~/components/narration/NarrationVoiceSelector.client.vue";
+
 const { t } = useI18n();
 </script>
 
@@ -77,13 +82,18 @@ const { t } = useI18n();
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  width: min(920px, calc(100vw - 32px));
+  width: min(1180px, calc(100vw - 32px));
   padding: 8px;
   border: 1px solid rgba(30, 48, 38, 0.14);
   border-radius: 8px;
   background: rgba(250, 252, 249, 0.78);
   backdrop-filter: blur(12px);
   transform: translateX(-50%);
+}
+
+.home-nav__narration {
+  flex: 1 1 420px;
+  justify-content: center;
 }
 
 .home-nav a {
@@ -167,6 +177,10 @@ const { t } = useI18n();
 
   .home-nav {
     top: 10px;
+  }
+
+  .home-nav__narration {
+    flex-basis: 100%;
   }
 }
 </style>

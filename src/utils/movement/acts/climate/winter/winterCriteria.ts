@@ -10,7 +10,7 @@ import {
 import {
   createAct5SeasonCriterionFactory,
   getHighestPriorityFailedCriterion,
-} from "~/features/act5/movements/criteria";
+} from "~/utils/act5/criteria";
 import type {
   WinterBeat,
   WinterCriterionImportance,

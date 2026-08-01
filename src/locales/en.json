@@ -38,6 +38,24 @@
       "movementCameraTest": "Movement Camera Test"
     }
   },
+  "narration": {
+    "enabledLabel": "Narration",
+    "enabledAria": "Enable narration",
+    "on": "On",
+    "off": "Off",
+    "turnOn": "Turn narration on",
+    "turnOff": "Turn narration off",
+    "voiceLabel": "Voice",
+    "voiceSelectAria": "Select narration voice",
+    "testVoice": "Test",
+    "previewAria": "Test the selected narration voice",
+    "voicePreview": "Hello. This is the selected narration voice.",
+    "loadingVoices": "Loading voices...",
+    "noVoices": "No voices available",
+    "unsupported": "Speech synthesis is not supported in this browser.",
+    "previewDisabled": "Narration is off.",
+    "previewError": "Voice preview could not be played."
+  },
   "movementCameraTest": {
     "camera": "Camera",
     "avatar": "Avatar",
@@ -374,6 +392,84 @@
           "completionTitle": "Climate story completed",
           "completionSubtitle": "All seasonal climate periods are revealed."
         },
+        "narration": {
+          "feedback": {
+            "common": {
+              "fullBodyNotVisible": "Step back a little so I can see your full body.",
+              "upperBodyNotVisible": "Keep your arms and upper body inside the frame.",
+              "lowerBodyNotVisible": "Step back so I can see your legs and feet.",
+              "handsNotVisible": "Keep both hands inside the camera view.",
+              "tryAgain": "Let's try that movement once more."
+            },
+            "winter": {
+              "openArmsWider": "Begin with an open winter shape. Stretch your arms wider.",
+              "raiseArmsToShoulders": "Lift your arms to shoulder height.",
+              "straightenArmsMore": "Reach your arms out a little straighter.",
+              "crossArmsInFront": "Draw the cold inward. Cross your arms in front.",
+              "reachOppositeShoulders": "Bring each hand toward the opposite shoulder.",
+              "keepArmsCrossed": "Keep your arms crossed as your body becomes smaller.",
+              "stayUpright": "It was not quite that cold. Stay a little taller.",
+              "stayHigher": "It was not quite that cold. Keep your body a little higher.",
+              "contractMore": "The winter was colder than that. Make your body a little smaller.",
+              "bendKneesMore": "The winter was colder than that. Bend your knees a little more.",
+              "keepBodyCompact": "Keep the cold close. Stay small through the movement.",
+              "protectHead": "Protect yourself from the cold. Bring your hands toward your head.",
+              "lowerBodyAndProtectHead": "The winter was colder than that. Sink lower and protect your head.",
+              "returnToUpright": "The winter movement is ending. Rise upright again.",
+              "lowerArms": "Let the winter pass. Lower your arms."
+            },
+            "spring": {
+              "startHandsLow": "Begin with the flower closed. Keep your hands low.",
+              "keepHandsCloseToBody": "Keep the flower close to your body before it opens.",
+              "openArmsToBegin": "Let the flower open. Move your arms outward.",
+              "openArmsHigher": "The spring was warmer than that. Let the flower grow higher.",
+              "keepBloomLower": "It was not quite that warm. Keep the flower a little lower.",
+              "reachAboveHead": "Let the flower reach above your head.",
+              "gatherHandsInFront": "Bring your hands together as the flower closes.",
+              "lowerAndReturn": "Lower the flower and return to the starting position.",
+              "liftOtherKnee": "Let the movement change sides. Lift the other knee.",
+              "matchBothHands": "Let both sides of the flower rise together."
+            },
+            "summer": {
+              "moveHandsToCenter": "Begin at the center. Bring your hands together.",
+              "raiseArmsHigher": "Lift the summer circle a little higher.",
+              "straightenArms": "Stretch your arms a little straighter.",
+              "stepWider": "Take a slightly wider step.",
+              "stepSmaller": "Keep the step a little smaller.",
+              "alternateStepSide": "Let the movement change sides. Step the other way.",
+              "openArmsToSides": "The summer was warmer than that. Open the circle wider.",
+              "openArmsLess": "It was not quite that hot. Keep the circle smaller.",
+              "movementTooLarge": "It was not quite that hot. Make the movement a little smaller.",
+              "movementTooSmall": "The summer was warmer than that. Make the movement a little larger.",
+              "bendElbowsMore": "Soften the circle. Bend your elbows a little more.",
+              "returnFeetToCenter": "Bring your feet back to the center.",
+              "lowerArms": "Lower your arms as the circle closes."
+            },
+            "autumn": {
+              "startLeft": "Begin the autumn arc on your left.",
+              "startRight": "Begin the autumn arc on your right.",
+              "wrongSweepDirection": "Let the arc travel toward the other side.",
+              "sweepLeft": "Sweep the autumn arc to the left.",
+              "sweepRight": "Sweep the autumn arc to the right.",
+              "insufficientProgress": "The autumn was warmer than that. Let the arc travel farther.",
+              "endpointTooShort": "The autumn was warmer than that. Let the arc travel farther.",
+              "endpointTooFar": "It was not quite that warm. End the arc a little earlier.",
+              "endpointReachedTooLate": "Let the arc reach its end a little sooner.",
+              "endpointUnstable": "Hold the end of the arc for a moment.",
+              "endAtDestinationSide": "Carry the arc all the way to the destination side.",
+              "endAtFarDestinationSide": "Let the arc travel to the far side.",
+              "endAtCenter": "End the arc near the center.",
+              "endBeforeCenter": "Stop the arc before it reaches the center.",
+              "endAtStartSideDiagonal": "Keep the arc near its starting side and angle it outward.",
+              "alignBothArms": "Let both arms follow the same autumn arc.",
+              "extendOuterArm": "Stretch the outer arm a little farther.",
+              "keepHandsAtChestHeight": "Keep the autumn arc at chest height.",
+              "keepChestForward": "Keep your chest facing forward as the arc moves.",
+              "returnHandsToCenter": "Bring your hands back to the center.",
+              "returnFeetTogether": "Bring your feet together before the next arc."
+            }
+          }
+        },
         "summerInstructions": {
           "beatCue": "{instruction}",
           "beats": {
@@ -432,6 +528,7 @@
           "MOVEMENT_TOO_SMALL": "Make the movement larger for this warming level.",
           "ALTERNATE_STEP_SIDE": "Use the other leg for the next step.",
           "FULL_BODY_NOT_VISIBLE": "Make sure your full body is visible.",
+          "HANDS_NOT_VISIBLE": "Keep both hands inside the camera view.",
           "TRY_AGAIN": "Let's repeat the summer movement."
         },
         "summerCriterion": {
@@ -471,6 +568,7 @@
           "MOVEMENT_TOO_SMALL": "make the movement larger for this warming level.",
           "ALTERNATE_STEP_SIDE": "use the other leg for the next side step.",
           "FULL_BODY_NOT_VISIBLE": "make sure your full body is visible.",
+          "HANDS_NOT_VISIBLE": "keep both hands inside the camera view.",
           "TRY_AGAIN": "try the movement again."
         },
         "summerCycleFeedback": {
@@ -590,6 +688,7 @@
         "springFeedback": {
           "SUCCESS": "Good bloom.",
           "FULL_BODY_NOT_VISIBLE": "Make sure your full body is visible.",
+          "HANDS_NOT_VISIBLE": "Keep both hands inside the camera view.",
           "OPEN_ARMS_TO_BEGIN": "Open both arms away from the start pose.",
           "START_HANDS_LOW": "Start with your hands low.",
           "KEEP_HANDS_CLOSE_TO_BODY": "Keep your hands close to your body.",
@@ -613,6 +712,7 @@
           "SUCCESS": "Bravo",
           "FULL_BODY_NOT_VISIBLE": "Make sure your full body is visible.",
           "UPPER_BODY_NOT_VISIBLE": "Make sure your upper body and hands are visible.",
+          "HANDS_NOT_VISIBLE": "Keep both hands inside the camera view.",
           "LOWER_BODY_NOT_VISIBLE": "Keep your feet visible and stable.",
           "OPEN_ARMS_WIDER": "Open both arms wider.",
           "RAISE_ARMS_TO_SHOULDERS": "Keep your hands around shoulder height.",

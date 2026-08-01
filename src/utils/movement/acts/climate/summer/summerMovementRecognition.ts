@@ -1,4 +1,10 @@
 import type { PoseLandmarkLike } from "~/types/pose";
+import {
+  summerCriterionFeedbackMetadata,
+  summerFeedbackMetadata,
+} from "~/utils/act5/feedback/catalog";
+import { buildAct5BeatFeedbackSignals } from "~/utils/act5/feedback/signals";
+import { selectAct5FinalFeedback } from "~/utils/act5/feedback/selectFinalFeedback";
 import { getWeightedBeatEvaluationScore } from "~/utils/movement/core/criteria";
 import { extractNormalizedBodyMetrics } from "~/utils/movement/core/bodyMetrics";
 import { getMovementRangeFitScore } from "~/utils/movement/core/range";
@@ -17,6 +23,7 @@ import type {
   SummerBeat,
   SummerBeatEvaluation,
   SummerDetectedIntensityClass,
+  SummerFeedbackCode,
   SummerIntensity,
   SummerNeutralCalibration,
   SummerRecognitionMetrics,
@@ -31,6 +38,7 @@ export * from "~/utils/movement/acts/climate/summer/summerTypes";
 
 type BeatContext = {
   expectedIntensity?: SummerIntensity;
+  measureIndex?: number | null;
   expectedStepSide?: Exclude<SummerStepSide, "none" | "unknown"> | null;
   neutralCalibration?: SummerNeutralCalibration | null;
   expansionReference?: {
@@ -267,6 +275,7 @@ export const evaluateSummerBeat = (
   if (!landmarks?.length || metrics.shoulderWidth === null) {
     return {
       beat,
+      measureIndex: context.measureIndex,
       score: 0,
       movementShapeScore: 0,
       intensityMatchScore: 0,
@@ -280,6 +289,18 @@ export const evaluateSummerBeat = (
       detectedStepSide: "unknown",
       detectedIntensityClass: "unknown",
       feedbackCode: "FULL_BODY_NOT_VISIBLE",
+      feedbackSignals: buildAct5BeatFeedbackSignals<SummerFeedbackCode>({
+        season: "summer",
+        beat,
+        measureIndex: context.measureIndex ?? null,
+        criteria: [],
+        trackingUnavailable: true,
+        fallbackCode: "FULL_BODY_NOT_VISIBLE",
+        codeMetadata: summerFeedbackMetadata,
+        criterionMetadata: summerCriterionFeedbackMetadata,
+        missedBeatSample: !landmarks?.length,
+        landmarkConfidence: metrics.landmarkConfidence,
+      }),
       metrics,
     };
   }
@@ -320,6 +341,7 @@ export const evaluateSummerBeat = (
 
   return {
     beat,
+    measureIndex: context.measureIndex,
     score,
     movementShapeScore,
     intensityMatchScore,
@@ -335,6 +357,17 @@ export const evaluateSummerBeat = (
     feedbackCode: passed
       ? undefined
       : getSummerBeatFeedbackCode(beat, criteria),
+    feedbackSignals: buildAct5BeatFeedbackSignals<SummerFeedbackCode>({
+      season: "summer",
+      beat,
+      measureIndex: context.measureIndex ?? null,
+      criteria,
+      trackingUnavailable,
+      fallbackCode: getSummerBeatFeedbackCode(beat, criteria),
+      codeMetadata: summerFeedbackMetadata,
+      criterionMetadata: summerCriterionFeedbackMetadata,
+      landmarkConfidence: metrics.landmarkConfidence,
+    }),
     metrics,
   };
 };
@@ -348,27 +381,33 @@ export const evaluateSummerSequence = (
     beatEvaluations,
     SUMMER_BEAT_WEIGHTS,
   );
-  const hasTrackingUnavailable = beatEvaluations.some(
-    (evaluation) => evaluation.trackingUnavailable,
-  );
   const hasCentralFailure = beatEvaluations.some(
     (evaluation) =>
       (evaluation.beat === 2 || evaluation.beat === 4) && !evaluation.passed,
   );
+  const selectedFeedback = selectAct5FinalFeedback<SummerFeedbackCode>({
+    season: "summer",
+    beatEvaluations,
+    codeMetadata: summerFeedbackMetadata,
+    criterionMetadata: summerCriterionFeedbackMetadata,
+    fallbackCode: "TRY_AGAIN",
+  });
   const passed =
-    !hasTrackingUnavailable &&
+    !(
+      selectedFeedback.category === "tracking" &&
+      selectedFeedback.evidence.severeTracking
+    ) &&
     !hasCentralFailure &&
     totalScore >= thresholds.almostCorrectScore;
-  const resultState: SummerRecognitionResultState = hasTrackingUnavailable
-    ? "trackingUnavailable"
-    : totalScore >= thresholds.successScore && !hasCentralFailure
-      ? "success"
-      : passed
-        ? "almostCorrect"
-        : "retryRequired";
-  const firstProblem = beatEvaluations.find(
-    (evaluation) => !evaluation.passed && evaluation.feedbackCode,
-  );
+  const resultState: SummerRecognitionResultState =
+    selectedFeedback.category === "tracking" &&
+    selectedFeedback.evidence.severeTracking
+      ? "trackingUnavailable"
+      : totalScore >= thresholds.successScore && !hasCentralFailure
+        ? "success"
+        : passed
+          ? "almostCorrect"
+          : "retryRequired";
 
   return {
     passed,
@@ -378,9 +417,9 @@ export const evaluateSummerSequence = (
     detectedStepSides: beatEvaluations.map(
       (evaluation) => evaluation.detectedStepSide,
     ),
-    feedbackCode:
-      resultState === "success"
-        ? "SUCCESS"
-        : (firstProblem?.feedbackCode ?? "TRY_AGAIN"),
+    feedbackCode: resultState === "success" ? "SUCCESS" : selectedFeedback.code,
+    primaryFeedbackCode:
+      resultState === "success" ? "SUCCESS" : selectedFeedback.code,
+    selectedFeedback,
   };
 };

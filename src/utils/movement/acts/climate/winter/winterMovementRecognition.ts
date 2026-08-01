@@ -1,5 +1,11 @@
 import type { PoseLandmarkLike } from "~/types/pose";
 import {
+  winterCriterionFeedbackMetadata,
+  winterFeedbackMetadata,
+} from "~/utils/act5/feedback/catalog";
+import { buildAct5BeatFeedbackSignals } from "~/utils/act5/feedback/signals";
+import { selectAct5FinalFeedback } from "~/utils/act5/feedback/selectFinalFeedback";
+import {
   getBeatPassState,
   getWeightedBeatEvaluationScore,
 } from "~/utils/movement/core/criteria";
@@ -18,6 +24,7 @@ import type {
   WinterBeat,
   WinterBeatEvaluation,
   WinterContractionClass,
+  WinterFeedbackCode,
   WinterNeutralReference,
   WinterRecognitionMetrics,
   WinterRecognitionResultState,
@@ -35,6 +42,7 @@ export * from "~/utils/movement/acts/climate/winter/winterTypes";
 
 type BeatContext = {
   expectedValue?: WinterValue;
+  measureIndex?: number | null;
   neutralReference?: WinterNeutralReference | null;
 };
 
@@ -458,6 +466,7 @@ export const evaluateWinterBeat = (
   if (!landmarks?.length || metrics.shoulderWidth === null) {
     return {
       beat,
+      measureIndex: context.measureIndex,
       score: 0,
       passed: false,
       trackingUnavailable: true,
@@ -465,6 +474,18 @@ export const evaluateWinterBeat = (
       timestamp,
       expectedValue,
       feedbackCode: "FULL_BODY_NOT_VISIBLE",
+      feedbackSignals: buildAct5BeatFeedbackSignals<WinterFeedbackCode>({
+        season: "winter",
+        beat,
+        measureIndex: context.measureIndex ?? null,
+        criteria: [],
+        trackingUnavailable: true,
+        fallbackCode: "FULL_BODY_NOT_VISIBLE",
+        codeMetadata: winterFeedbackMetadata,
+        criterionMetadata: winterCriterionFeedbackMetadata,
+        missedBeatSample: !landmarks?.length,
+        landmarkConfidence: metrics.landmarkConfidence,
+      }),
       metrics,
     };
   }
@@ -479,6 +500,7 @@ export const evaluateWinterBeat = (
 
   return {
     beat,
+    measureIndex: context.measureIndex,
     score,
     passed,
     trackingUnavailable,
@@ -486,6 +508,17 @@ export const evaluateWinterBeat = (
     timestamp,
     expectedValue,
     feedbackCode: passed ? undefined : getWinterBeatFeedbackCode(criteria),
+    feedbackSignals: buildAct5BeatFeedbackSignals<WinterFeedbackCode>({
+      season: "winter",
+      beat,
+      measureIndex: context.measureIndex ?? null,
+      criteria,
+      trackingUnavailable,
+      fallbackCode: getWinterBeatFeedbackCode(criteria),
+      codeMetadata: winterFeedbackMetadata,
+      criterionMetadata: winterCriterionFeedbackMetadata,
+      landmarkConfidence: metrics.landmarkConfidence,
+    }),
     metrics,
   };
 };
@@ -553,35 +586,42 @@ export const evaluateWinterSequence = (
     beatEvaluations,
     WINTER_BEAT_WEIGHTS,
   );
-  const hasTrackingUnavailable = beatEvaluations.some(
-    (evaluation) => evaluation.trackingUnavailable,
-  );
   const hasCentralFailure = beatEvaluations.some(
     (evaluation) => !evaluation.passed,
   );
+  const selectedFeedback = selectAct5FinalFeedback<WinterFeedbackCode>({
+    season: "winter",
+    beatEvaluations,
+    codeMetadata: winterFeedbackMetadata,
+    criterionMetadata: winterCriterionFeedbackMetadata,
+    fallbackCode: "TRY_AGAIN",
+  });
   const passed =
-    !hasTrackingUnavailable &&
+    !(
+      selectedFeedback.category === "tracking" &&
+      selectedFeedback.evidence.severeTracking
+    ) &&
     !hasCentralFailure &&
     totalScore >= winterMovementConfig.thresholds.almostCorrectScore;
-  const resultState: WinterRecognitionResultState = hasTrackingUnavailable
-    ? "trackingUnavailable"
-    : totalScore >= winterMovementConfig.thresholds.successScore &&
-        !hasCentralFailure
-      ? "success"
-      : passed
-        ? "almostCorrect"
-        : "retryRequired";
-  const prioritizedProblem =
-    getPrioritizedWinterProblemEvaluation(beatEvaluations);
+  const resultState: WinterRecognitionResultState =
+    selectedFeedback.category === "tracking" &&
+    selectedFeedback.evidence.severeTracking
+      ? "trackingUnavailable"
+      : totalScore >= winterMovementConfig.thresholds.successScore &&
+          !hasCentralFailure
+        ? "success"
+        : passed
+          ? "almostCorrect"
+          : "retryRequired";
 
   return {
     passed,
     resultState,
     totalScore,
     beatEvaluations,
-    feedbackCode:
-      resultState === "success"
-        ? "SUCCESS"
-        : (prioritizedProblem?.feedbackCode ?? "TRY_AGAIN"),
+    feedbackCode: resultState === "success" ? "SUCCESS" : selectedFeedback.code,
+    primaryFeedbackCode:
+      resultState === "success" ? "SUCCESS" : selectedFeedback.code,
+    selectedFeedback,
   };
 };

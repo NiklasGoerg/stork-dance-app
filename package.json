@@ -10,6 +10,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxi typecheck",
+    "test": "vitest run",
     "lint:check": "eslint .",
     "lint": "eslint . --fix",
     "prettier": "prettier --write ."
@@ -20,6 +21,7 @@
     "@nuxt/eslint": "^1.15.2",
     "@nuxtjs/i18n": "^10.5.0",
     "@pinia/nuxt": "^0.11.3",
+    "@vueuse/core": "^14.4.0",
     "d3": "^7.9.0",
     "eslint": "^10.3.0",
     "leaflet": "^1.9.4",
@@ -35,6 +37,7 @@
     "prettier": "^3.8.3",
     "sass-embedded": "^1.99.0",
     "typescript": "^6.0.3",
+    "vitest": "^4.1.10",
     "vue-tsc": "^3.3.8"
   }
 }

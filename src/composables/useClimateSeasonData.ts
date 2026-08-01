@@ -5,11 +5,13 @@ import {
   climateDataSourcePath,
   getBaselineStep,
   parseClimateSeasonDataCsv,
-  type ClimateDataValidationError,
-  type ClimateSeason,
-  type ClimateSeasonDataset,
-  type ClimateSeasonLoaderState,
 } from "~/utils/movement/acts/climate/climateSeasonData";
+import type {
+  ClimateDataValidationError,
+  ClimateSeason,
+  ClimateSeasonDataset,
+  ClimateSeasonLoaderState,
+} from "~/types/climate";
 
 const dataset = ref<ClimateSeasonDataset | null>(null);
 const validationErrors = ref<ClimateDataValidationError[]>([]);
