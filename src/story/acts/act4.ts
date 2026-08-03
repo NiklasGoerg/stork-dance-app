@@ -1,5 +1,5 @@
 import type { StoryAct } from "~/story/types";
-import { storyCycleDefinitions } from "~/utils/storkStoryCycles";
+import { migrationStoryCycleDefinitions as storyCycleDefinitions } from "~/utils/migrationStoryData";
 
 export const act4 = {
   id: "act-4",

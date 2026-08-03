@@ -3,8 +3,12 @@ import {
   BASE_RHYTHM_LOOP_DURATION_SECONDS,
   STORY_AUDIO_CONFIG,
 } from "~/utils/storyAudioConfig";
+import {
+  getSharedAudioBuffer,
+  getSharedAudioContext,
+  loadSharedAudioBuffer,
+} from "~/composables/audio/useAudioBufferRuntime";
 
-let audioContext: AudioContext | null = null;
 let metronomeTimer: ReturnType<typeof setInterval> | null = null;
 let baseRhythmBuffer: AudioBuffer | null = null;
 let baseRhythmLoadPromise: Promise<void> | null = null;
@@ -16,8 +20,6 @@ let seasonalAudioStartedAtSeconds = 0;
 let seasonalAudioStartOffsetSeconds = 0;
 let seasonalAudioDurationSeconds = 0;
 let seasonalAudioActiveCueId: string | null = null;
-const seasonalAudioBuffers = new Map<string, AudioBuffer>();
-const seasonalAudioLoadPromises = new Map<string, Promise<void>>();
 
 const baseRhythmLoopUrl = new URL(
   "../assets/audio/music/base-rhythm-60bpm-4bar.wav",
@@ -26,14 +28,6 @@ const baseRhythmLoopUrl = new URL(
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Unknown audio error.";
-
-const getAudioContext = () => {
-  if (import.meta.server) return null;
-
-  audioContext ??= new AudioContext();
-
-  return audioContext;
-};
 
 const normalizeLoopOffset = (
   offsetSeconds: number,
@@ -52,7 +46,7 @@ const stopMetronomeTimer = () => {
 const playMetronomeClick = () => {
   if (import.meta.server) return;
 
-  const context = getAudioContext();
+  const context = getSharedAudioContext();
 
   if (!context) return;
 
@@ -116,7 +110,7 @@ const getBaseRhythmTransportTimeMs = (state: {
     isPlaying: boolean;
   };
 }) => {
-  const context = getAudioContext();
+  const context = getSharedAudioContext();
 
   if (!context || !state.baseRhythmLoop.isPlaying) {
     return state.baseRhythmLoop.currentOffsetSeconds * 1000;
@@ -132,7 +126,7 @@ const getBaseRhythmTransportTimeMs = (state: {
 
 export const useAudioStore = defineStore("audio", {
   state: () => ({
-    bpm: STORY_AUDIO_CONFIG.bpm,
+    bpm: STORY_AUDIO_CONFIG.bpm as number,
     isMetronomePlaying: false,
     beatIndex: 0,
     baseRhythmLoop: {
@@ -286,7 +280,7 @@ export const useAudioStore = defineStore("audio", {
 
       baseRhythmLoadPromise = (async () => {
         try {
-          const context = getAudioContext();
+          const context = getSharedAudioContext();
 
           if (!context) return;
 
@@ -321,55 +315,27 @@ export const useAudioStore = defineStore("audio", {
       await baseRhythmLoadPromise;
     },
     async loadSeasonalAudio(cue: { id: string; url: string }) {
-      if (import.meta.server || seasonalAudioBuffers.has(cue.id)) return;
-
-      const existingPromise = seasonalAudioLoadPromises.get(cue.id);
-
-      if (existingPromise) {
-        await existingPromise;
-        return;
-      }
+      if (import.meta.server || getSharedAudioBuffer(cue.id)) return;
 
       this.seasonalAudio.isLoading = true;
       this.seasonalAudio.error = null;
 
-      const loadPromise = (async () => {
-        try {
-          const context = getAudioContext();
-
-          if (!context) return;
-
-          const response = await fetch(cue.url);
-
-          if (!response.ok) {
-            throw new Error(`Could not load ${cue.id}.`);
-          }
-
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = await context.decodeAudioData(arrayBuffer);
-
-          seasonalAudioBuffers.set(cue.id, buffer);
-
-          if (!this.seasonalAudio.loadedCueIds.includes(cue.id)) {
-            this.seasonalAudio.loadedCueIds.push(cue.id);
-          }
-        } catch (error) {
-          seasonalAudioBuffers.delete(cue.id);
-          this.seasonalAudio.error = getErrorMessage(error);
-        } finally {
-          seasonalAudioLoadPromises.delete(cue.id);
-          this.seasonalAudio.isLoading = seasonalAudioLoadPromises.size > 0;
+      try {
+        await loadSharedAudioBuffer(cue);
+        if (!this.seasonalAudio.loadedCueIds.includes(cue.id)) {
+          this.seasonalAudio.loadedCueIds.push(cue.id);
         }
-      })();
-
-      seasonalAudioLoadPromises.set(cue.id, loadPromise);
-      await loadPromise;
+      } catch (error) {
+        this.seasonalAudio.error = getErrorMessage(error);
+      } finally {
+        this.seasonalAudio.isLoading = false;
+      }
     },
     async preloadSeasonalAudio(cues: Array<{ id: string; url: string }>) {
       await Promise.all(cues.map((cue) => this.loadSeasonalAudio(cue)));
     },
     syncBaseRhythmLoopOffset() {
-      const context = getAudioContext();
+      const context = getSharedAudioContext();
       const loopDurationSeconds = this.baseRhythmLoop.loopDurationSeconds;
 
       if (!context || !this.baseRhythmLoop.isPlaying || !loopDurationSeconds) {
@@ -386,7 +352,7 @@ export const useAudioStore = defineStore("audio", {
       return this.baseRhythmLoop.currentOffsetSeconds;
     },
     syncSeasonalAudioOffset() {
-      const context = getAudioContext();
+      const context = getSharedAudioContext();
 
       if (!context || !this.seasonalAudio.isPlaying) {
         return this.seasonalAudio.currentOffsetSeconds;
@@ -406,7 +372,7 @@ export const useAudioStore = defineStore("audio", {
 
       await this.loadBaseRhythmLoop();
 
-      const context = getAudioContext();
+      const context = getSharedAudioContext();
 
       if (!context || !baseRhythmBuffer) return;
 
@@ -472,8 +438,8 @@ export const useAudioStore = defineStore("audio", {
 
       await this.loadSeasonalAudio(cue);
 
-      const context = getAudioContext();
-      const buffer = seasonalAudioBuffers.get(cue.id);
+      const context = getSharedAudioContext();
+      const buffer = getSharedAudioBuffer(cue.id);
 
       if (!context || !buffer) return;
 

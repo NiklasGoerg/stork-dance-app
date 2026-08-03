@@ -1,10 +1,12 @@
 import type { StoryAct } from "~/story/types";
 import { act2 } from "~/story/acts/act2";
-import { act3EasternRouteCycleDefinition } from "~/utils/storkStoryCycles";
+import { migrationStoryCycleDefinitions as storyCycleDefinitions } from "~/utils/migrationStoryData";
+
+const comparisonCycle = storyCycleDefinitions[1]!;
 
 export const act3 = {
   id: "act-3",
-  title: "Act 3 - Western and Eastern Routes",
+  title: "Act 3 - Comparing African Routes",
   titleKey: "story.acts.act3.title",
   layout: "migration-stage",
   instructorMovementId: "test-dance",
@@ -14,15 +16,14 @@ export const act3 = {
       title: "The familiar route",
       titleKey: "story.acts.act3.scenes.standardCycle.title",
       narration:
-        "Begin with the standard migration cycle before comparing it to an eastern route.",
+        "Begin with the familiar migration cycle before comparing it to a later African route.",
       narrationKey: "story.acts.act3.scenes.standardCycle.narration",
     },
     {
-      id: "eastern-route",
-      title: "The eastern route",
+      id: "comparison-route",
+      title: "A later African route",
       titleKey: "story.acts.act3.scenes.easternRoute.title",
-      narration:
-        "Follow bird 7347 along its eastern migration into central Africa.",
+      narration: "Follow bird 3339 on the 2016-2017 route to Morocco.",
       narrationKey: "story.acts.act3.scenes.easternRoute.narration",
     },
   ],
@@ -35,12 +36,11 @@ export const act3 = {
       titleKey: "story.acts.act3.cycles.standard",
     },
     {
-      id: "eastern-route-7347",
-      cycleId: act3EasternRouteCycleDefinition.label,
-      cycleStartYear: act3EasternRouteCycleDefinition.targetYear,
-      title: "Bird 7347, 2020-2021",
+      id: "comparison-route-3339",
+      cycleId: comparisonCycle.label,
+      cycleStartYear: comparisonCycle.targetYear,
+      title: "Bird 3339, 2016-2017",
       titleKey: "story.acts.act3.cycles.eastern",
-      storyCycleDefinitions: [act3EasternRouteCycleDefinition],
     },
   ],
   nextActId: "act-4",

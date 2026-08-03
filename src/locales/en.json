@@ -216,7 +216,7 @@
       "act3": {
         "label": "Act III",
         "name": "Routes",
-        "title": "Act III - Western and Eastern Routes"
+        "title": "Act III - Comparing African Routes"
       },
       "act4": {
         "label": "Act IV",
@@ -269,19 +269,19 @@
         }
       },
       "act3": {
-        "title": "Act 3 - Western and Eastern Routes",
+        "title": "Act 3 - Comparing African Routes",
         "cycles": {
           "standard": "Standard cycle",
-          "eastern": "Bird 7347, 2020-2021"
+          "eastern": "Bird 3339, 2016-2017"
         },
         "scenes": {
           "standardCycle": {
             "title": "The familiar route",
-            "narration": "Begin with the standard migration cycle before comparing it to an eastern route."
+            "narration": "Begin with the familiar migration cycle before comparing it to a later African route."
           },
           "easternRoute": {
-            "title": "The eastern route",
-            "narration": "Follow bird 7347 along its eastern migration into central Africa."
+            "title": "A later African route",
+            "narration": "Follow bird 3339 on the 2016-2017 route to Morocco."
           }
         }
       },

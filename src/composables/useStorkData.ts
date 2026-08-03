@@ -2,6 +2,7 @@ import { computed, ref, unref, watch, type MaybeRef } from "vue";
 import storkDataUrl from "~/assets/storkdata/daily_stork_data.csv?url";
 import { parseCsvLine } from "~/utils/csv";
 import type {
+  StorkDataSource,
   StorkDataPoint,
   StorkMapMode,
   StorkStoryCycleDefinition,
@@ -10,7 +11,8 @@ import type {
   StorkYearPoint,
   StorkYearRoute,
 } from "~/types/stork";
-import { storyCycleDefinitions } from "~/utils/storkStoryCycles";
+import { migrationStoryPoints } from "~/utils/migrationStoryData";
+import { migrationStoryCycleDefinitions as storyCycleDefinitions } from "~/utils/migrationStoryData";
 import {
   formatStoryDate,
   getDayProgressInStoryCycle,
@@ -19,7 +21,7 @@ import {
   type StoryDateInput,
 } from "~/utils/storyCycle";
 
-const storkPoints = ref<StorkDataPoint[]>([]);
+const rawStorkPoints = ref<StorkDataPoint[]>([]);
 const selectedTag = ref("");
 const selectedYear = ref<number | null>(null);
 const isLoading = ref(false);
@@ -37,6 +39,7 @@ const selectedStoryCycleIds = ref(
 
 type UseStorkDataOptions = {
   storyCycleDefinitions?: MaybeRef<StorkStoryCycleDefinition[]>;
+  dataSource?: MaybeRef<StorkDataSource>;
 };
 
 const routeColors = [
@@ -119,11 +122,16 @@ const parseStorkCsv = (csv: string) => {
 };
 
 export const useStorkData = (options: UseStorkDataOptions = {}) => {
+  const dataSource = computed(() => unref(options.dataSource) ?? "raw");
+  const storkPoints = computed(() =>
+    dataSource.value === "story" ? migrationStoryPoints : rawStorkPoints.value,
+  );
   const activeStoryCycleDefinitions = computed(
     () => unref(options.storyCycleDefinitions) ?? storyCycleDefinitions,
   );
 
   const loadStorkData = async () => {
+    if (dataSource.value === "story") return;
     if (hasLoaded.value || isLoading.value) return;
 
     isLoading.value = true;
@@ -136,7 +144,7 @@ export const useStorkData = (options: UseStorkDataOptions = {}) => {
         throw new Error(`Could not load stork data (${response.status}).`);
       }
 
-      storkPoints.value = parseStorkCsv(await response.text());
+      rawStorkPoints.value = parseStorkCsv(await response.text());
       hasLoaded.value = true;
     } catch (loadError) {
       error.value =
@@ -237,20 +245,23 @@ export const useStorkData = (options: UseStorkDataOptions = {}) => {
       const startDate = `${cycle.targetYear}-06-01`;
       const endDate = `${cycle.targetYear + 1}-05-31`;
 
+      const points = storkPoints.value
+        .filter((point) =>
+          dataSource.value === "story"
+            ? point.story?.cycleId === cycle.label
+            : point.tag === cycle.tag &&
+              point.date >= startDate &&
+              point.date <= endDate,
+        )
+        .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
       return {
         ...cycle,
         id: cycle.label,
         color: getRouteColor(index),
         startDate,
         endDate,
-        points: storkPoints.value
-          .filter(
-            (point) =>
-              point.tag === cycle.tag &&
-              point.date >= startDate &&
-              point.date <= endDate,
-          )
-          .sort((a, b) => a.timestamp.localeCompare(b.timestamp)),
+        points,
       };
     }),
   );

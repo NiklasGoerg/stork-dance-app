@@ -7,6 +7,9 @@
         :story-cycle-ids="storyCycleIds"
         :story-cycle-definitions="storyCycleDefinitions"
         :single-story-cycle-mode="singleStoryCycleMode"
+        :data-source="dataSource"
+        :playback-source="playbackSource"
+        @story-frame="$emit('story-frame', $event)"
       />
       <template #fallback>
         <div class="map-fallback" />
@@ -17,7 +20,8 @@
 
 <script setup lang="ts">
 import LeafletMap from "~/components/map/LeafletMap.vue";
-import type { StorkStoryCycleDefinition } from "~/types/stork";
+import type { MigrationActMapFrame } from "~/types/migrationAct";
+import type { StorkDataSource, StorkStoryCycleDefinition } from "~/types/stork";
 
 withDefaults(
   defineProps<{
@@ -26,6 +30,8 @@ withDefaults(
     storyCycleIds?: string[];
     storyCycleDefinitions?: StorkStoryCycleDefinition[];
     singleStoryCycleMode?: boolean;
+    dataSource?: StorkDataSource;
+    playbackSource?: "story-playback" | "migration-runtime";
   }>(),
   {
     showControls: true,
@@ -33,8 +39,14 @@ withDefaults(
     storyCycleIds: undefined,
     storyCycleDefinitions: undefined,
     singleStoryCycleMode: false,
+    dataSource: "raw",
+    playbackSource: "migration-runtime",
   },
 );
+
+defineEmits<{
+  "story-frame": [frame: MigrationActMapFrame];
+}>();
 </script>
 
 <style scoped>

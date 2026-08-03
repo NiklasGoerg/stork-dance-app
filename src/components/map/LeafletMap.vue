@@ -45,10 +45,17 @@ import {
   type LeafletRouteMap,
   type LeafletRouteModule,
 } from "~/composables/useLeafletStorkRoute";
+import { useStoryMarkerInterpolation } from "~/composables/useStoryMarkerInterpolation";
 import { useStorkData } from "~/composables/useStorkData";
-import { useStoryPlaybackStore } from "~/store/storyPlayback";
-import type { StorkStoryCycleDefinition } from "~/types/stork";
-import { storyCycleDefinitions as defaultStoryCycleDefinitions } from "~/utils/storkStoryCycles";
+import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
+import type { MigrationActMapFrame } from "~/types/migrationAct";
+import type { StorkDataSource, StorkStoryCycleDefinition } from "~/types/stork";
+import { migrationStoryCycleDefinitions as defaultStoryCycleDefinitions } from "~/utils/migrationStoryData";
+import {
+  buildPreparedStoryTimeline,
+  getWeightedStoryTimelineDayAtElapsedMs,
+} from "~/utils/storyCycle";
+import { getMigrationTimelineDayAtElapsedMs } from "~/utils/migrationActs/timeline";
 
 type LeafletMapInstance = LeafletRouteMap & {
   remove: () => void;
@@ -71,6 +78,7 @@ type LeafletModule = LeafletRouteModule & {
 const mapContainer = ref<HTMLDivElement | null>(null);
 const leaflet = ref<LeafletModule | null>(null);
 const map = ref<LeafletMapInstance | null>(null);
+let lastEmittedStoryFrameKey = "";
 const props = withDefaults(
   defineProps<{
     showControls?: boolean;
@@ -78,6 +86,8 @@ const props = withDefaults(
     storyCycleIds?: string[];
     storyCycleDefinitions?: StorkStoryCycleDefinition[];
     singleStoryCycleMode?: boolean;
+    dataSource?: StorkDataSource;
+    playbackSource?: "story-playback" | "migration-runtime";
   }>(),
   {
     showControls: true,
@@ -85,8 +95,13 @@ const props = withDefaults(
     storyCycleIds: undefined,
     storyCycleDefinitions: undefined,
     singleStoryCycleMode: false,
+    dataSource: "raw",
+    playbackSource: "migration-runtime",
   },
 );
+const emit = defineEmits<{
+  "story-frame": [frame: MigrationActMapFrame];
+}>();
 const { t } = useI18n();
 
 const activeStoryCycleDefinitions = computed(
@@ -121,10 +136,25 @@ const {
   loadStorkData,
 } = useStorkData({
   storyCycleDefinitions: activeStoryCycleDefinitions,
+  dataSource: computed(() => props.dataSource),
 });
 
-const storyPlaybackStore = useStoryPlaybackStore();
-const { currentDate } = storeToRefs(storyPlaybackStore);
+const migrationActStore = useMigrationActStore();
+const migrationActRefs = storeToRefs(migrationActStore);
+const usesMigrationRuntime = computed(
+  () => props.playbackSource === "migration-runtime",
+);
+const activeCycleId = computed(() => migrationActRefs.activeCycleId.value);
+const currentDate = computed(() => migrationActRefs.currentDate.value);
+const currentElapsedMs = computed(
+  () => migrationActRefs.currentElapsedMs.value,
+);
+const cycleDurationMs = computed(() => migrationActRefs.cycleDurationMs.value);
+const isPlaying = computed(() => migrationActRefs.isPlaying.value);
+const playbackSessionId = computed(
+  () => migrationActRefs.playbackSessionId.value,
+);
+const seekRevision = computed(() => migrationActRefs.seekRevision.value);
 
 const {
   clearRoute,
@@ -132,7 +162,70 @@ const {
   drawYearRoutes,
   drawSelectedPoint,
   drawSelectedYearPoints,
+  drawSelectedStoryPoints,
+  setSelectedStoryMarkerPosition,
 } = useLeafletStorkRoute();
+
+const interpolationRoute = computed(() => {
+  if (props.dataSource !== "story") return null;
+  if (visibleStoryCycleRoutes.value.length !== 1) return null;
+
+  const route = visibleStoryCycleRoutes.value[0];
+  return route?.id === activeCycleId.value ? route : null;
+});
+
+const interpolationTimeline = computed(() => {
+  const route = interpolationRoute.value;
+
+  if (usesMigrationRuntime.value && migrationActStore.timeline.length) {
+    return migrationActStore.timeline;
+  }
+
+  return route
+    ? buildPreparedStoryTimeline(route.points, cycleDurationMs.value)
+    : [];
+});
+
+const getStoryMarkerFrame = () => {
+  const route = interpolationRoute.value;
+  const timeline = interpolationTimeline.value;
+  const elapsedMs = migrationActStore.currentElapsedMs;
+  const currentDay = usesMigrationRuntime.value
+    ? getMigrationTimelineDayAtElapsedMs(timeline, elapsedMs)
+    : getWeightedStoryTimelineDayAtElapsedMs(timeline, elapsedMs);
+
+  if (!route || !currentDay) return null;
+
+  const currentPoint = route.points[currentDay.relativeDay];
+  const nextPoint = route.points[currentDay.relativeDay + 1];
+
+  if (currentPoint) {
+    const frameKey = `${route.id}:${currentPoint.date}`;
+    if (frameKey !== lastEmittedStoryFrameKey) {
+      lastEmittedStoryFrameKey = frameKey;
+      emit("story-frame", {
+        cycleId: route.id,
+        date: currentPoint.date,
+        phase: currentDay.phase,
+        event: currentDay.event,
+      });
+    }
+  }
+
+  return {
+    cycleId: route.id,
+    currentDay,
+    currentPoint,
+    nextPoint,
+    elapsedMs,
+  };
+};
+
+const storyMarkerInterpolation = useStoryMarkerInterpolation({
+  getFrame: getStoryMarkerFrame,
+  isPlaybackActive: () => isPlaying.value,
+  setMarkerPosition: setSelectedStoryMarkerPosition,
+});
 
 const selectedRoutePointLabel = computed(() => {
   if (!selectedRoutePoint.value) return "";
@@ -184,18 +277,14 @@ const selectedStoryPointLabel = computed(() => {
   });
 });
 
-const selectedStoryMapPoints = computed(() =>
-  selectedStoryPoints.value.map((storyPoint) => ({
-    color: storyPoint.cycle.color,
-    point: storyPoint.point,
-  })),
-);
+const isDefinedString = (value: string | undefined): value is string =>
+  Boolean(value);
 
-const getConfiguredStoryCycleIds = () =>
+const getConfiguredStoryCycleIds = (): string[] =>
   props.storyCycleIds?.length
     ? [...props.storyCycleIds]
     : props.singleStoryCycleMode
-      ? [activeStoryCycleDefinitions.value[0]?.label].filter(Boolean)
+      ? [activeStoryCycleDefinitions.value[0]?.label].filter(isDefinedString)
       : activeStoryCycleDefinitions.value.map((cycle) => cycle.label);
 
 const configureStoryMode = () => {
@@ -218,10 +307,10 @@ const renderCurrentMode = () => {
 
   if (selectedMapMode.value === "story") {
     drawYearRoutes(map.value, leaflet.value, visibleStoryCycleRoutes.value);
-    drawSelectedYearPoints(
+    drawSelectedStoryPoints(
       map.value,
       leaflet.value,
-      selectedStoryMapPoints.value,
+      selectedStoryPoints.value,
     );
     return;
   }
@@ -271,6 +360,7 @@ onMounted(() => {
     requestAnimationFrame(() => {
       leafletMap.invalidateSize();
       renderCurrentMode();
+      storyMarkerInterpolation.updateImmediately();
     });
   };
 
@@ -345,10 +435,37 @@ watch(
   },
 );
 
-watch(selectedStoryMapPoints, (points) => {
+watch(selectedStoryPoints, (points) => {
   if (selectedMapMode.value !== "story") return;
 
-  drawSelectedYearPoints(map.value, leaflet.value, points);
+  const usesInterpolatedMarker = Boolean(interpolationRoute.value);
+  drawSelectedStoryPoints(map.value, leaflet.value, points, {
+    updatePositions: !usesInterpolatedMarker,
+  });
+
+  if (points[0]?.point.story?.isRestDay) {
+    storyMarkerInterpolation.updateImmediately();
+  } else {
+    storyMarkerInterpolation.start();
+  }
+});
+
+watch(isPlaying, () => {
+  storyMarkerInterpolation.updateImmediately();
+});
+
+watch(currentElapsedMs, () => {
+  storyMarkerInterpolation.update();
+});
+
+watch(seekRevision, () => {
+  storyMarkerInterpolation.updateImmediately();
+});
+
+watch([playbackSessionId, activeCycleId, cycleDurationMs], () => {
+  lastEmittedStoryFrameKey = "";
+  renderCurrentMode();
+  storyMarkerInterpolation.updateImmediately();
 });
 
 watch(selectedRoutePoint, (point) => {
@@ -370,6 +487,8 @@ watch([storyTimelinePoints, showStoryCyclesTogether], () => {
 });
 
 onBeforeUnmount(() => {
+  storyMarkerInterpolation.stop();
+  map.value?.stop?.();
   clearRoute(map.value);
   map.value?.remove();
   map.value = null;
@@ -396,5 +515,31 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   font-family: inherit;
+}
+
+:deep(.stork-route-div-icon) {
+  border: 0;
+  background: transparent;
+}
+
+:deep(.stork-route-marker) {
+  display: grid;
+  width: 84px;
+  height: 48px;
+  place-items: center;
+  pointer-events: none;
+}
+
+:deep(.stork-route-marker__image) {
+  display: block;
+  width: 84px;
+  height: 48px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 4px rgba(22, 22, 22, 0.32));
+  transform-origin: center;
+}
+
+:deep(.stork-route-marker__image--mirrored) {
+  transform: scaleX(-1);
 }
 </style>

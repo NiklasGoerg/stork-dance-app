@@ -32,6 +32,13 @@ export const useStoryRuntimeStore = defineStore("storyRuntime", {
     },
   },
   actions: {
+    prepareAct(actId: StoryActId) {
+      this.currentActId = actId;
+      this.currentSceneIndex = 0;
+      this.playbackState = "idle";
+      this.elapsedSceneMs = 0;
+      this.showContinueGate = false;
+    },
     startStory(actId: StoryActId = "prologue") {
       this.currentActId = actId;
       this.currentSceneIndex = 0;

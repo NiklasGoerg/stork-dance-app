@@ -1,14 +1,8 @@
 import { computed, ref } from "vue";
-import { storeToRefs } from "pinia";
 import { useMovementPlayback } from "~/composables/useMovementPlayback";
 import { useAudioStore } from "~/store/audioStore";
-import { useStoryPlaybackStore } from "~/store/storyPlayback";
 import type { MovementRecording } from "~/types/movement";
-import {
-  addStoryDays,
-  formatStoryDate,
-  STORY_CYCLE_DURATION_MS,
-} from "~/utils/storyCycle";
+import { addStoryDays, formatStoryDate } from "~/utils/storyCycle";
 import {
   getSeasonalCycleDurationMs,
   getSeasonalCycleProgress,
@@ -66,8 +60,9 @@ const getSeasonMovementLoopDurationMs = (
 
 export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
   const audioStore = useAudioStore();
-  const storyPlaybackStore = useStoryPlaybackStore();
-  const { currentDate } = storeToRefs(storyPlaybackStore);
+  const currentDate = ref(
+    formatStoryDate(config.seasons[0]?.date ?? "2022-06-01"),
+  );
   const {
     currentFrame,
     loadRecording,
@@ -174,11 +169,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
   };
 
   const syncStoryClock = () => {
-    storyPlaybackStore.$patch({
-      currentDate: getSeasonDate(),
-      currentElapsedMs: elapsedMs.value,
-      cycleDurationMs: totalDurationMs.value,
-    });
+    currentDate.value = getSeasonDate();
   };
 
   const loadSeasonMovement = async (season: SeasonalCycleSeasonConfig) => {
@@ -790,9 +781,6 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     audioStore.stopSeasonalAudio();
     audioStore.resetBaseRhythmLoop();
     stopMovementPlayback();
-    storyPlaybackStore.$patch({
-      cycleDurationMs: STORY_CYCLE_DURATION_MS,
-    });
   };
 
   return {

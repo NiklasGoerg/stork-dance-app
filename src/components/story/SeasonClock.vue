@@ -128,17 +128,15 @@
     <SeasonClockControls
       v-if="showControls"
       :is-playing="isPlaying"
-      @toggle-playback="playbackStore.togglePlayback"
-      @reset="playbackStore.resetToStoryStart"
+      @toggle-playback="$emit('toggle-playback')"
+      @reset="$emit('reset')"
     />
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { storeToRefs } from "pinia";
 import SeasonClockControls from "~/components/story/SeasonClockControls.vue";
-import { useStoryPlaybackStore } from "~/store/storyPlayback";
 import {
   dateToAngle,
   getMonthBoundariesForCycle,
@@ -148,12 +146,16 @@ import {
 
 const { t } = useI18n();
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     showControls?: boolean;
+    date?: string;
+    isPlaying?: boolean;
   }>(),
   {
     showControls: true,
+    date: "2013-06-01",
+    isPlaying: false,
   },
 );
 
@@ -166,8 +168,13 @@ const tickOuterRadius = 141;
 const labelRadius = 156;
 const seasonLabelRadius = 82;
 
-const playbackStore = useStoryPlaybackStore();
-const { currentDate, isPlaying } = storeToRefs(playbackStore);
+defineEmits<{
+  "toggle-playback": [];
+  reset: [];
+}>();
+
+const currentDate = computed(() => props.date || "2013-06-01");
+const isPlaying = computed(() => props.isPlaying);
 
 const displayedAngle = ref(dateToAngle(currentDate.value));
 

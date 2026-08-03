@@ -39,6 +39,11 @@ export const useStoryEngine = () => {
     scheduleCurrentScene();
   };
 
+  const prepareAct = (actId: StoryActId) => {
+    clearSceneTimer();
+    runtimeStore.prepareAct(actId);
+  };
+
   const goToNextScene = () => {
     const activeActId = runtimeStore.currentActId;
 
@@ -88,6 +93,7 @@ export const useStoryEngine = () => {
     currentAct,
     currentScene,
     loadActConfig,
+    prepareAct,
     startAct,
     goToNextScene,
     pauseStory,

@@ -1,9 +1,11 @@
+import { STORY_TIMING_CONFIG } from "~/story/storyTimingConfig";
+
 export const STORY_AUDIO_CONFIG = {
   bpm: 60,
   beatsPerBar: 4,
   barsPerLoop: 4,
   cycleBars: 24,
-  cycleDurationMs: 96_000,
+  cycleDurationMs: STORY_TIMING_CONFIG.cycleDurationMs,
   baseRhythmCueId: "base-rhythm-loop",
   baseRhythmFileName: "base-rhythm-60bpm-4bar.wav",
 } as const;

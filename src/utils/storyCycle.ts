@@ -1,5 +1,14 @@
-import type { StorkStoryCycleDefinition } from "~/types/stork";
-import { STORY_AUDIO_CONFIG } from "~/utils/storyAudioConfig";
+import {
+  getStoryReferenceFastWindow,
+  getStoryReferenceWeight,
+  STORY_TIMING_CONFIG,
+} from "~/story/storyTimingConfig";
+import type {
+  StorkDataPoint,
+  StorkMigrationEvent,
+  StorkMigrationPhase,
+  StorkStoryCycleDefinition,
+} from "~/types/stork";
 
 export type StorySeasonId = "summer" | "autumn" | "winter" | "spring";
 
@@ -34,7 +43,6 @@ export type StorySeasonBoundary = StoryBoundary & {
 };
 
 export type StoryDateInput = Date | string;
-export type PlaybackSpeedPhase = "fast" | "focus";
 export type CycleSegmentType =
   | "breedingResidence"
   | "autumnMigration"
@@ -50,31 +58,29 @@ export type CycleSegment = {
   endDate: string;
 };
 
-export type StoryWeightedTimelineDay = {
+export type StoryTimelineTimingClass = "migration" | "rest";
+
+export type StoryTimelineDay = {
   date: string;
-  phase: PlaybackSpeedPhase;
-  playbackPhase: PlaybackPhase;
-  segmentType: CycleSegmentType | "calendarFallback";
-  weight: number;
+  relativeDay: number;
+  phase: StorkMigrationPhase;
+  isMigrationDay: boolean;
+  isRestDay: boolean;
+  event: StorkMigrationEvent | null;
+  referenceWeight: number;
+  timingClass: StoryTimelineTimingClass;
   dayDurationMs: number;
   startMs: number;
   endMs: number;
 };
 
+/** @deprecated Use StoryTimelineDay. */
+export type StoryWeightedTimelineDay = StoryTimelineDay;
+
 export const STORY_CYCLE_START_MONTH = 5;
 export const STORY_CYCLE_START_DAY = 1;
 export const DAY_MS = 24 * 60 * 60 * 1000;
-export const STORY_CYCLE_DURATION_MS = STORY_AUDIO_CONFIG.cycleDurationMs;
-export const STORY_FOCUS_DAY_WEIGHT = 1.0;
-export const STORY_FAST_DAY_WEIGHT = 0.01;
-
-export type PlaybackSpeedWindow = {
-  // UTC month index, matching JavaScript Date: Jan = 0, Jun = 5.
-  startMonth: number;
-  startDay: number;
-  endMonth: number;
-  endDay: number;
-};
+export const STORY_CYCLE_DURATION_MS = STORY_TIMING_CONFIG.cycleDurationMs;
 
 const storyMonths = [
   { label: "Jun", labelKey: "seasonClock.months.jun", monthIndex: 5 },
@@ -117,12 +123,6 @@ const seasons: StorySeason[] = [
   autumnSeason,
   winterSeason,
   springSeason,
-];
-
-// Fixed global windows are the basis before residence segments are smoothed.
-export const STORY_FAST_PLAYBACK_WINDOWS: PlaybackSpeedWindow[] = [
-  { startMonth: 5, startDay: 1, endMonth: 6, endDay: 31 },
-  { startMonth: 10, startDay: 1, endMonth: 0, endDay: 15 },
 ];
 
 const toUtcDate = (date: StoryDateInput) => {
@@ -317,42 +317,6 @@ export const getNextStoryDate = (date: StoryDateInput) => {
   return nextDate;
 };
 
-const getMonthDayOrderValue = (month: number, day: number) => month * 100 + day;
-
-const isMonthDayInPlaybackWindow = (
-  month: number,
-  day: number,
-  window: PlaybackSpeedWindow,
-) => {
-  const dateValue = getMonthDayOrderValue(month, day);
-  const startValue = getMonthDayOrderValue(window.startMonth, window.startDay);
-  const endValue = getMonthDayOrderValue(window.endMonth, window.endDay);
-
-  if (startValue <= endValue) {
-    return dateValue >= startValue && dateValue <= endValue;
-  }
-
-  return dateValue >= startValue || dateValue <= endValue;
-};
-
-export const getGlobalPlaybackSpeedPhase = (
-  date: StoryDateInput,
-): PlaybackSpeedPhase => {
-  const utcDate = toUtcDate(date);
-  const month = utcDate.getUTCMonth();
-  const day = utcDate.getUTCDate();
-  const isFast = STORY_FAST_PLAYBACK_WINDOWS.some((window) =>
-    isMonthDayInPlaybackWindow(month, day, window),
-  );
-
-  return isFast ? "fast" : "focus";
-};
-
-export const getBaseCalendarWeight = (date: StoryDateInput) =>
-  getGlobalPlaybackSpeedPhase(date) === "focus"
-    ? STORY_FOCUS_DAY_WEIGHT
-    : STORY_FAST_DAY_WEIGHT;
-
 const clampStoryDateToCycle = (
   date: StoryDateInput,
   cycleStartDate: string,
@@ -440,139 +404,148 @@ export const getCycleSegments = (
   );
 };
 
-const getSegmentForDate = (segments: CycleSegment[], date: StoryDateInput) => {
-  const formattedDate = formatStoryDate(date);
-
-  return (
-    segments.find(
-      (segment) =>
-        formattedDate >= segment.startDate && formattedDate < segment.endDate,
-    ) ?? null
-  );
-};
-
-const buildCalendarFallbackTimeline = (year: number) => {
-  const cycleStart = new Date(
-    Date.UTC(year, STORY_CYCLE_START_MONTH, STORY_CYCLE_START_DAY),
-  );
-  const { totalDays } = getDayProgressInStoryCycle(cycleStart);
-
-  return Array.from({ length: totalDays }, (_, index) => {
-    const date = formatStoryDate(addStoryDays(cycleStart, index));
-    const phase = getGlobalPlaybackSpeedPhase(date);
-
-    return {
-      date,
-      phase,
-      playbackPhase: phase === "focus" ? "migration" : "residence",
-      segmentType: "calendarFallback",
-      weight: getBaseCalendarWeight(date),
-    };
-  });
-};
-
-export const buildPhaseSmoothedCycleTimeline = (
-  cycle: StorkStoryCycleDefinition | null | undefined,
-  options: {
-    year?: number;
-    cycleDurationMs?: number;
-  } = {},
-): StoryWeightedTimelineDay[] => {
-  const year = options.year ?? cycle?.targetYear ?? defaultStoryStartYear;
-  const cycleDurationMs = options.cycleDurationMs ?? STORY_CYCLE_DURATION_MS;
-  const cycleStart = new Date(
-    Date.UTC(year, STORY_CYCLE_START_MONTH, STORY_CYCLE_START_DAY),
-  );
-  const { totalDays } = getDayProgressInStoryCycle(cycleStart);
-  const segments = getCycleSegments(cycle, cycleStart);
-
-  if (!segments.length) {
-    return normalizeWeightedTimelineDays(
-      buildCalendarFallbackTimeline(year),
-      cycleDurationMs,
+export const buildPreparedStoryTimeline = (
+  points: StorkDataPoint[],
+  cycleDurationMs: number = STORY_CYCLE_DURATION_MS,
+): StoryTimelineDay[] => {
+  if (!Number.isFinite(cycleDurationMs) || cycleDurationMs <= 0) {
+    throw new Error(
+      `Story cycle duration must be positive: ${cycleDurationMs}`,
     );
   }
 
-  const baseDays = Array.from({ length: totalDays }, (_, index) => {
-    const date = formatStoryDate(addStoryDays(cycleStart, index));
-    const segment = getSegmentForDate(segments, date);
-
-    return {
-      date,
-      phase: getGlobalPlaybackSpeedPhase(date),
-      playbackPhase: segment?.playbackPhase ?? "residence",
-      segmentType: segment?.type ?? "calendarFallback",
-      weight: getBaseCalendarWeight(date),
-    };
-  });
-  const residenceSegmentWeights = new Map<CycleSegmentType, number>();
-
-  for (const segment of segments) {
-    if (segment.playbackPhase !== "residence") continue;
-
-    const segmentDays = baseDays.filter(
-      (day) => day.segmentType === segment.type,
+  const preparedPoints = [...points]
+    .filter((point) => point.story)
+    .sort(
+      (first, second) =>
+        (first.story?.relativeDay ?? 0) - (second.story?.relativeDay ?? 0),
     );
+  const firstPoint = preparedPoints[0];
+  const firstStory = firstPoint?.story;
 
-    if (!segmentDays.length) continue;
-
-    const segmentBaseWeightSum = segmentDays.reduce(
-      (sum, day) => sum + day.weight,
-      0,
+  if (!firstPoint || !firstStory) {
+    throw new Error("Prepared story timeline requires story data points.");
+  }
+  if (preparedPoints.length !== 365) {
+    throw new Error(
+      `Story cycle ${firstStory.cycleId} must contain 365 days; received ${preparedPoints.length}.`,
     );
-
-    residenceSegmentWeights.set(
-      segment.type,
-      segmentBaseWeightSum / segmentDays.length,
+  }
+  if (
+    !firstPoint.date.endsWith("-06-01") ||
+    !preparedPoints[preparedPoints.length - 1]?.date.endsWith("-05-31")
+  ) {
+    throw new Error(
+      `Story cycle ${firstStory.cycleId} must cover June 1 through May 31.`,
     );
   }
 
-  return normalizeWeightedTimelineDays(
-    baseDays.map((day) => {
-      if (day.playbackPhase === "migration") {
-        return {
-          ...day,
-          phase: "focus",
-          weight: STORY_FOCUS_DAY_WEIGHT,
-        };
-      }
+  const cycleId = firstStory.cycleId;
+  const timingInputs = preparedPoints.map((point, index) => {
+    const story = point.story!;
+    const expectedDate = formatStoryDate(addStoryDays(firstPoint.date, index));
+    const isMigrationPhase =
+      story.phase === "autumn_migration" || story.phase === "spring_migration";
 
-      const smoothedResidenceWeight =
-        day.segmentType === "calendarFallback"
-          ? day.weight
-          : (residenceSegmentWeights.get(day.segmentType) ?? day.weight);
+    if (story.cycleId !== cycleId) {
+      throw new Error(
+        `Prepared story timeline mixes ${cycleId} with ${story.cycleId}.`,
+      );
+    }
+    if (story.relativeDay !== index || point.date !== expectedDate) {
+      throw new Error(
+        `Story cycle ${cycleId} has invalid day ${point.date}: array index ${index}, ` +
+          `relative-day ${story.relativeDay}, expected date ${expectedDate}.`,
+      );
+    }
+    if (
+      story.isMigrationDay === story.isRestDay ||
+      story.isMigrationDay !== isMigrationPhase
+    ) {
+      throw new Error(
+        `Story cycle ${cycleId} has inconsistent phase flags on ${point.date}.`,
+      );
+    }
 
-      return {
-        ...day,
-        weight: smoothedResidenceWeight,
-      };
-    }),
-    cycleDurationMs,
+    const referenceWindow = getStoryReferenceFastWindow(point.date);
+    if (referenceWindow && story.isMigrationDay) {
+      throw new Error(
+        `Story cycle ${cycleId} has migration on ${point.date} ` +
+          `(phase ${story.phase}) inside reference window ${referenceWindow.id}.`,
+      );
+    }
+
+    return {
+      point,
+      story,
+      referenceWeight: getStoryReferenceWeight(point.date),
+    };
+  });
+
+  const migrationDayCount = timingInputs.filter(
+    ({ story }) => story.isMigrationDay,
+  ).length;
+  const restDayCount = timingInputs.length - migrationDayCount;
+  if (restDayCount <= 0) {
+    throw new Error(
+      `Story cycle ${cycleId} must contain at least one rest day.`,
+    );
+  }
+
+  const referenceTotalWeight = timingInputs.reduce(
+    (sum, day) => sum + day.referenceWeight,
+    0,
   );
-};
+  const migrationDayDurationMs = cycleDurationMs / referenceTotalWeight;
+  const migrationBudgetMs = migrationDayCount * migrationDayDurationMs;
+  const restBudgetMs = cycleDurationMs - migrationBudgetMs;
 
-const normalizeWeightedTimelineDays = (
-  days: Omit<StoryWeightedTimelineDay, "dayDurationMs" | "startMs" | "endMs">[],
-  cycleDurationMs: number,
-): StoryWeightedTimelineDay[] => {
-  const totalWeight = days.reduce((sum, day) => sum + day.weight, 0);
+  if (restBudgetMs <= 0) {
+    throw new Error(
+      `Story cycle ${cycleId} has no positive rest budget: ${restBudgetMs} ms.`,
+    );
+  }
 
-  if (!days.length || totalWeight <= 0) return [];
+  const baseRestBudgetMs = timingInputs.reduce(
+    (sum, day) =>
+      day.story.isRestDay
+        ? sum + migrationDayDurationMs * day.referenceWeight
+        : sum,
+    0,
+  );
+  const budgetToleranceMs = Math.max(1e-7, cycleDurationMs * 1e-10);
+  if (Math.abs(restBudgetMs - baseRestBudgetMs) > budgetToleranceMs) {
+    throw new Error(
+      `Story cycle ${cycleId} has inconsistent rest budgets: remaining=${restBudgetMs} ms, ` +
+        `reference=${baseRestBudgetMs} ms.`,
+    );
+  }
 
+  const restDayDurationMs = restBudgetMs / restDayCount;
   let cursorMs = 0;
 
-  return days.map((day, index) => {
+  return timingInputs.map(({ point, story, referenceWeight }, index) => {
     const startMs = cursorMs;
-    const dayDurationMs =
-      index === days.length - 1
-        ? cycleDurationMs - startMs
-        : (day.weight / totalWeight) * cycleDurationMs;
-    const endMs = startMs + dayDurationMs;
+    const plannedDayDurationMs = story.isMigrationDay
+      ? migrationDayDurationMs
+      : restDayDurationMs;
+    const endMs =
+      index === timingInputs.length - 1
+        ? cycleDurationMs
+        : startMs + plannedDayDurationMs;
+    const dayDurationMs = endMs - startMs;
 
     cursorMs = endMs;
 
     return {
-      ...day,
+      date: point.date,
+      relativeDay: story.relativeDay,
+      phase: story.phase,
+      isMigrationDay: story.isMigrationDay,
+      isRestDay: story.isRestDay,
+      event: story.event,
+      referenceWeight,
+      timingClass: story.isMigrationDay ? "migration" : "rest",
       dayDurationMs,
       startMs,
       endMs,
@@ -580,19 +553,97 @@ const normalizeWeightedTimelineDays = (
   });
 };
 
-const defaultStoryStartYear = 2022;
+export type StoryTimelinePhaseDiagnostic = {
+  phase: StorkMigrationPhase;
+  startDate: string;
+  endDate: string;
+  dayCount: number;
+  plannedDurationMs: number;
+};
 
-export const buildGlobalWeightedCalendarTimeline = (
-  year: number,
-  cycleDurationMs = STORY_CYCLE_DURATION_MS,
-): StoryWeightedTimelineDay[] =>
-  normalizeWeightedTimelineDays(
-    buildCalendarFallbackTimeline(year),
-    cycleDurationMs,
-  );
+export type StoryTimelineDiagnostic = {
+  cycleId: string;
+  cycleDurationMs: number;
+  migrationDayCount: number;
+  restDayCount: number;
+  referenceFastDayCount: number;
+  referenceNormalDayCount: number;
+  referenceTotalWeight: number;
+  migrationDayDurationMs: number;
+  referenceFastDayDurationMs: number;
+  restDayDurationMs: number;
+  migrationBudgetMs: number;
+  restBudgetMs: number;
+  firstTimelineDate: string;
+  lastTimelineDate: string;
+  phases: StoryTimelinePhaseDiagnostic[];
+};
+
+export const getPreparedStoryTimelineDiagnostic = (
+  points: StorkDataPoint[],
+  timeline: StoryTimelineDay[],
+): StoryTimelineDiagnostic => {
+  const firstDay = timeline[0];
+  const lastDay = timeline[timeline.length - 1];
+  const cycleId = points.find((point) => point.story)?.story?.cycleId;
+
+  if (!firstDay || !lastDay || !cycleId) {
+    throw new Error("Cannot diagnose an empty prepared story timeline.");
+  }
+
+  const migrationDays = timeline.filter((day) => day.isMigrationDay);
+  const restDays = timeline.filter((day) => day.isRestDay);
+  const referenceFastDayCount = timeline.filter(
+    (day) => day.referenceWeight === STORY_TIMING_CONFIG.referenceFastDayWeight,
+  ).length;
+  const phases: StoryTimelinePhaseDiagnostic[] = [];
+
+  for (const day of timeline) {
+    const current = phases[phases.length - 1];
+    if (current?.phase === day.phase) {
+      current.endDate = day.date;
+      current.dayCount++;
+      current.plannedDurationMs += day.dayDurationMs;
+    } else {
+      phases.push({
+        phase: day.phase,
+        startDate: day.date,
+        endDate: day.date,
+        dayCount: 1,
+        plannedDurationMs: day.dayDurationMs,
+      });
+    }
+  }
+
+  return {
+    cycleId,
+    cycleDurationMs: lastDay.endMs,
+    migrationDayCount: migrationDays.length,
+    restDayCount: restDays.length,
+    referenceFastDayCount,
+    referenceNormalDayCount: timeline.length - referenceFastDayCount,
+    referenceTotalWeight: timeline.reduce(
+      (sum, day) => sum + day.referenceWeight,
+      0,
+    ),
+    migrationDayDurationMs: migrationDays[0]?.dayDurationMs ?? 0,
+    referenceFastDayDurationMs:
+      (migrationDays[0]?.dayDurationMs ?? 0) *
+      STORY_TIMING_CONFIG.referenceFastDayWeight,
+    restDayDurationMs: restDays[0]?.dayDurationMs ?? 0,
+    migrationBudgetMs: migrationDays.reduce(
+      (sum, day) => sum + day.dayDurationMs,
+      0,
+    ),
+    restBudgetMs: restDays.reduce((sum, day) => sum + day.dayDurationMs, 0),
+    firstTimelineDate: firstDay.date,
+    lastTimelineDate: lastDay.date,
+    phases,
+  };
+};
 
 export const getWeightedStoryTimelineDayAtElapsedMs = (
-  timeline: StoryWeightedTimelineDay[],
+  timeline: StoryTimelineDay[],
   elapsedMs: number,
 ) => {
   const lastDay = timeline[timeline.length - 1];
@@ -603,21 +654,40 @@ export const getWeightedStoryTimelineDayAtElapsedMs = (
   const normalizedElapsedMs =
     ((elapsedMs % cycleDurationMs) + cycleDurationMs) % cycleDurationMs;
 
-  return (
-    timeline.find(
-      (day) =>
-        normalizedElapsedMs >= day.startMs && normalizedElapsedMs < day.endMs,
-    ) ?? lastDay
-  );
+  let low = 0;
+  let high = timeline.length - 1;
+
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const day = timeline[middle];
+
+    if (!day) break;
+    if (normalizedElapsedMs < day.startMs) {
+      high = middle - 1;
+      continue;
+    }
+    if (normalizedElapsedMs >= day.endMs) {
+      low = middle + 1;
+      continue;
+    }
+
+    return day;
+  }
+
+  return lastDay;
 };
 
 export const getWeightedStoryTimelineElapsedMsForDate = (
-  timeline: StoryWeightedTimelineDay[],
+  timeline: StoryTimelineDay[],
   date: StoryDateInput,
 ) => {
   const firstDay = timeline[0];
 
   if (!firstDay) return 0;
+
+  const exactDay = timeline.find((day) => day.date === formatStoryDate(date));
+
+  if (exactDay) return exactDay.startMs;
 
   const { elapsedDays } = getDayProgressInStoryCycle(date);
   const timelineDate = formatStoryDate(

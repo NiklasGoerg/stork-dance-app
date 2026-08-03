@@ -1,4 +1,5 @@
 import type { SeasonalCycleConfig } from "~/utils/seasonalCycle";
+import { SEASON_THEME_CONFIG } from "~/utils/seasonAudio/config";
 
 const movementPrerollMs = 1_000;
 // Every seasonal avatar JSON includes the approach into Beat 1. Repeat from
@@ -21,8 +22,7 @@ export const act5IntroCycleConfig = {
         "../assets/movement_library/seasons/winter-100-percent.json",
         import.meta.url,
       ).href,
-      audioUrl: new URL("../assets/audio/music/winter.wav", import.meta.url)
-        .href,
+      audioUrl: SEASON_THEME_CONFIG.winter.url,
       movementLoopDurationMs: 4_000,
       movementPrerollMs,
       movementReplayPrerollMs,
@@ -36,8 +36,7 @@ export const act5IntroCycleConfig = {
         "../assets/movement_library/seasons/spring-100-percent.json",
         import.meta.url,
       ).href,
-      audioUrl: new URL("../assets/audio/music/spring.wav", import.meta.url)
-        .href,
+      audioUrl: SEASON_THEME_CONFIG.spring.url,
       movementLoopDurationMs: 8_000,
       movementPrerollMs,
       movementReplayPrerollMs,
@@ -51,8 +50,7 @@ export const act5IntroCycleConfig = {
         "../assets/movement_library/seasons/summer-100-percent.json",
         import.meta.url,
       ).href,
-      audioUrl: new URL("../assets/audio/music/summer.wav", import.meta.url)
-        .href,
+      audioUrl: SEASON_THEME_CONFIG.summer.url,
       movementLoopDurationMs: 8_000,
       movementPrerollMs,
       movementReplayPrerollMs,
@@ -66,8 +64,7 @@ export const act5IntroCycleConfig = {
         "../assets/movement_library/seasons/autumn-100-percent.json",
         import.meta.url,
       ).href,
-      audioUrl: new URL("../assets/audio/music/autumn.wav", import.meta.url)
-        .href,
+      audioUrl: SEASON_THEME_CONFIG.autumn.url,
       movementLoopDurationMs: 8_000,
       movementPrerollMs,
       movementReplayPrerollMs,

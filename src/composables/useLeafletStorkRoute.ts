@@ -1,9 +1,23 @@
-import type { StorkDataPoint } from "~/types/stork";
+import type {
+  StorkDataPoint,
+  StorkMarkerKind,
+  StorkMarkerVisual,
+  StorkStoryPoint,
+} from "~/types/stork";
+import {
+  resolveStorkMarkerVisual,
+  resolveStorkMarkerVisualForPhase,
+} from "~/utils/storkMarker";
 
 type LatLng = [number, number];
 
 export type LeafletRouteLayer = {
   addTo: (map: LeafletRouteMap) => LeafletRouteLayer;
+};
+
+export type LeafletStoryMarker = LeafletRouteLayer & {
+  setIcon: (icon: unknown) => LeafletStoryMarker;
+  setLatLng: (point: LatLng) => LeafletStoryMarker;
 };
 
 export type LeafletRoutePolyline = LeafletRouteLayer & {
@@ -12,6 +26,7 @@ export type LeafletRoutePolyline = LeafletRouteLayer & {
 
 export type LeafletRouteMap = {
   remove?: () => void;
+  stop?: () => void;
   invalidateSize?: () => void;
   removeLayer: (layer: LeafletRouteLayer) => void;
   fitBounds: (
@@ -19,6 +34,7 @@ export type LeafletRouteMap = {
     options?: {
       padding?: [number, number];
       maxZoom?: number;
+      animate?: boolean;
     },
   ) => void;
 };
@@ -32,6 +48,16 @@ export type LeafletRouteModule = {
     point: LatLng,
     options: Record<string, unknown>,
   ) => LeafletRouteLayer;
+  divIcon: (options: Record<string, unknown>) => unknown;
+  marker: (
+    point: LatLng,
+    options: Record<string, unknown>,
+  ) => LeafletStoryMarker;
+};
+
+type SelectedStoryMarker = {
+  layer: LeafletStoryMarker;
+  visualKey: string;
 };
 
 type ColoredRoute = {
@@ -44,9 +70,31 @@ type ColoredPoint = {
   point: StorkDataPoint;
 };
 
+const storkMarkerUrls: Record<StorkMarkerKind, string> = {
+  nesting: new URL("../assets/images/stork_nesting.png", import.meta.url).href,
+  eating: new URL("../assets/images/stork_eating.png", import.meta.url).href,
+  flying: new URL("../assets/images/stork_flying.png", import.meta.url).href,
+};
+
+const createStorkMarkerElement = ({ kind, mirrored }: StorkMarkerVisual) => {
+  const markerElement = document.createElement("div");
+  const markerImage = document.createElement("img");
+
+  markerElement.className = "stork-route-marker";
+  markerImage.className = "stork-route-marker__image";
+  markerImage.classList.toggle("stork-route-marker__image--mirrored", mirrored);
+  markerImage.src = storkMarkerUrls[kind];
+  markerImage.alt = "";
+  markerImage.setAttribute("aria-hidden", "true");
+  markerElement.append(markerImage);
+
+  return markerElement;
+};
+
 export const useLeafletStorkRoute = () => {
   const routeLayers: LeafletRouteLayer[] = [];
   const selectedPointLayers: LeafletRouteLayer[] = [];
+  const selectedStoryMarkers = new Map<string, SelectedStoryMarker>();
 
   const clearSelectedPoint = (map: LeafletRouteMap | null) => {
     if (!map) return;
@@ -55,7 +103,12 @@ export const useLeafletStorkRoute = () => {
       map.removeLayer(layer);
     }
 
+    for (const { layer } of selectedStoryMarkers.values()) {
+      map.removeLayer(layer);
+    }
+
     selectedPointLayers.length = 0;
+    selectedStoryMarkers.clear();
   };
 
   const clearRoute = (map: LeafletRouteMap | null) => {
@@ -111,6 +164,7 @@ export const useLeafletStorkRoute = () => {
       map.fitBounds(routeLine.getBounds(), {
         padding: [32, 32],
         maxZoom: 7,
+        animate: false,
       });
     }
   };
@@ -170,6 +224,7 @@ export const useLeafletStorkRoute = () => {
       map.fitBounds(boundsLine.getBounds(), {
         padding: [32, 32],
         maxZoom: 7,
+        animate: false,
       });
     }
   };
@@ -222,11 +277,91 @@ export const useLeafletStorkRoute = () => {
     }
   };
 
+  const drawSelectedStoryPoints = (
+    map: LeafletRouteMap | null,
+    leaflet: LeafletRouteModule | null,
+    storyPoints: StorkStoryPoint[],
+    options: { updatePositions?: boolean } = {},
+  ) => {
+    if (!map || !leaflet) return;
+
+    for (const [cycleId, marker] of selectedStoryMarkers) {
+      if (storyPoints.some((storyPoint) => storyPoint.cycle.id === cycleId)) {
+        continue;
+      }
+
+      map.removeLayer(marker.layer);
+      selectedStoryMarkers.delete(cycleId);
+    }
+
+    for (const storyPoint of storyPoints) {
+      const markerVisual = storyPoint.point.story
+        ? resolveStorkMarkerVisualForPhase(storyPoint.point.story.phase)
+        : resolveStorkMarkerVisual(
+            storyPoint.cycle,
+            storyPoint.point.date,
+            storyPoint.cycle.startDate,
+          );
+      const visualKey = `${markerVisual.kind}:${markerVisual.mirrored}`;
+      const existingMarker = selectedStoryMarkers.get(storyPoint.cycle.id);
+
+      if (existingMarker) {
+        if (options.updatePositions !== false) {
+          existingMarker.layer.setLatLng([
+            storyPoint.point.lat,
+            storyPoint.point.lng,
+          ]);
+        }
+        if (existingMarker.visualKey !== visualKey) {
+          existingMarker.layer.setIcon(
+            leaflet.divIcon({
+              className: "stork-route-div-icon",
+              html: createStorkMarkerElement(markerVisual),
+              iconSize: [84, 48],
+              iconAnchor: [42, 24],
+            }),
+          );
+          existingMarker.visualKey = visualKey;
+        }
+        continue;
+      }
+
+      const layer = leaflet
+        .marker([storyPoint.point.lat, storyPoint.point.lng], {
+          icon: leaflet.divIcon({
+            className: "stork-route-div-icon",
+            html: createStorkMarkerElement(markerVisual),
+            iconSize: [84, 48],
+            iconAnchor: [42, 24],
+          }),
+          interactive: false,
+          keyboard: false,
+        })
+        .addTo(map) as LeafletStoryMarker;
+
+      selectedStoryMarkers.set(storyPoint.cycle.id, { layer, visualKey });
+    }
+  };
+
+  const setSelectedStoryMarkerPosition = (
+    cycleId: string,
+    lat: number,
+    lng: number,
+  ) => {
+    const marker = selectedStoryMarkers.get(cycleId);
+    if (!marker) return false;
+
+    marker.layer.setLatLng([lat, lng]);
+    return true;
+  };
+
   return {
     clearRoute,
     drawRoute,
     drawYearRoutes,
     drawSelectedPoint,
     drawSelectedYearPoints,
+    drawSelectedStoryPoints,
+    setSelectedStoryMarkerPosition,
   };
 };

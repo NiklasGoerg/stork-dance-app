@@ -7,7 +7,6 @@ import {
   type StoryGestureId,
 } from "~/story/gestures";
 import { useAudioStore } from "~/store/audioStore";
-import { useStoryPlaybackStore } from "~/store/storyPlayback";
 import type {
   PoseCalibrationState,
   PoseConditionResult,
@@ -49,7 +48,6 @@ type GestureInteractionSession = {
   branchFeedbackUntilSourceMs: number;
 };
 
-const storyGesturePauseReason = "story-gesture";
 const leadInBeat = 4;
 const poseEvaluationIntervalMs = 80;
 const retryFeedbackDurationMs = 650;
@@ -58,7 +56,6 @@ const countdownMaxBeats = 3;
 const poseDebugLogIntervalMs = 500;
 const checkpointLateGraceMs = 160;
 
-let scheduledLeadInCancel: (() => void) | null = null;
 let lastPoseDebugLogAt = Number.NEGATIVE_INFINITY;
 let lastPoseDebugCheckpointId: string | null = null;
 let gestureCompletionResolver: ((result: StoryGestureResult) => void) | null =
@@ -111,13 +108,6 @@ const translateOptionalStoryText = (
   key: string | undefined,
   fallback: string,
 ) => (key ? translateStoryText(key) : fallback);
-
-const clearScheduledLeadIn = () => {
-  if (!scheduledLeadInCancel) return;
-
-  scheduledLeadInCancel();
-  scheduledLeadInCancel = null;
-};
 
 const getCheckpointWindow = (checkpoint: GestureCheckpoint) => ({
   start: checkpoint.targetMovementTimeMs - checkpoint.windowBeforeMs,
@@ -392,7 +382,7 @@ export const useStoryGestureStore = defineStore("storyGesture", {
     },
   },
   actions: {
-    // Starts a gesture session and pauses the story while the base beat keeps running.
+    // Starts a serializable gesture session. Runtime side effects live in a composable.
     async startGesture(id: StoryGestureId): Promise<StoryGestureResult> {
       if (this.state !== "inactive") {
         logStoryGesture(`Ignored ${id}; another gesture is active.`);
@@ -400,54 +390,32 @@ export const useStoryGestureStore = defineStore("storyGesture", {
       }
 
       const gesture = getStoryGestureDefinition(id);
-      const audioStore = useAudioStore();
-      const storyPlaybackStore = useStoryPlaybackStore();
       const completionPromise = new Promise<StoryGestureResult>((resolve) => {
         gestureCompletionResolver = resolve;
       });
-      const shouldResumeStoryPlayback = storyPlaybackStore.pauseStoryPlayback(
-        storyGesturePauseReason,
-      );
 
       logStoryGesture(`${gesture.label} requested`);
-      clearScheduledLeadIn();
 
       this.$patch({
         ...getInitialSession(),
         activeGestureId: id,
         state: "loading-movement",
         startedAt: Date.now(),
-        shouldResumeStoryPlayback,
-        isStoryPaused: true,
+        shouldResumeStoryPlayback: false,
+        isStoryPaused: false,
       });
-
-      if (!audioStore.baseRhythmLoop.isPlaying) {
-        await audioStore.startBaseRhythmLoop(
-          audioStore.baseRhythmLoop.currentOffsetSeconds,
-        );
-      }
-
-      this.currentTransportTimeMs = audioStore.getBaseRhythmTransportTimeMs();
 
       return completionPromise;
     },
     // Arms the loaded avatar movement on the next musically useful lead-in beat.
-    async markMovementLoaded(source: GestureMovementPlaybackSource) {
+    markMovementLoaded(
+      source: GestureMovementPlaybackSource,
+      currentTransportTimeMs: number,
+      msUntilLeadIn: number,
+    ) {
       if (this.state !== "loading-movement") return;
 
-      const audioStore = useAudioStore();
-
-      if (!audioStore.baseRhythmLoop.isPlaying) {
-        await audioStore.startBaseRhythmLoop(
-          audioStore.baseRhythmLoop.currentOffsetSeconds,
-        );
-      }
-
-      if (this.state !== "loading-movement") return;
-
-      const msUntilLeadIn = audioStore.getMsUntilNextBaseRhythmBeat(leadInBeat);
-
-      this.currentTransportTimeMs = audioStore.getBaseRhythmTransportTimeMs();
+      this.currentTransportTimeMs = currentTransportTimeMs;
       this.leadInTransportTimeMs = this.currentTransportTimeMs + msUntilLeadIn;
       this.movementLoaded = true;
       this.movementPlaybackSource = source;
@@ -457,15 +425,6 @@ export const useStoryGestureStore = defineStore("storyGesture", {
         leadInBeat,
         msUntilLeadIn,
       });
-
-      clearScheduledLeadIn();
-      scheduledLeadInCancel = audioStore.scheduleAtNextBaseRhythmBeat(
-        leadInBeat,
-        () => {
-          scheduledLeadInCancel = null;
-          this.beginAttempt(audioStore.getBaseRhythmTransportTimeMs());
-        },
-      );
     },
     abortGestureSetup(error: unknown) {
       if (this.state === "inactive") return;
@@ -478,7 +437,6 @@ export const useStoryGestureStore = defineStore("storyGesture", {
     beginAttempt(transportTimeMs: number, feedbackText: string | null = null) {
       if (!this.activeGesture) return;
 
-      clearScheduledLeadIn();
       this.state = "attempt-playing";
       this.attemptCount = Math.max(1, this.attemptCount + 1);
       this.completedCheckpointIds = [];
@@ -517,7 +475,15 @@ export const useStoryGestureStore = defineStore("storyGesture", {
 
       if (!this.activeGesture) return;
 
-      if (this.state === "waiting-for-lead-in") return;
+      if (this.state === "waiting-for-lead-in") {
+        if (
+          this.leadInTransportTimeMs !== null &&
+          transportTimeMs >= this.leadInTransportTimeMs
+        ) {
+          this.beginAttempt(this.leadInTransportTimeMs);
+        }
+        return;
+      }
 
       if (
         this.state !== "attempt-playing" &&
@@ -732,24 +698,12 @@ export const useStoryGestureStore = defineStore("storyGesture", {
       if (this.state === "inactive") return;
 
       logStoryGesture("Cancelled");
-      clearScheduledLeadIn();
       this.state = "cancelled";
       this.finishGesture("cancelled");
     },
-    // Restores story playback ownership and clears the transient gesture session.
+    // Resolves the runtime-owned gesture request and clears serializable state.
     finishGesture(result: StoryGestureResult = "completed") {
-      const storyPlaybackStore = useStoryPlaybackStore();
-      const shouldResumeStoryPlayback = this.shouldResumeStoryPlayback;
-
-      clearScheduledLeadIn();
-
-      if (shouldResumeStoryPlayback) {
-        storyPlaybackStore.resumeStoryPlayback(storyGesturePauseReason);
-      } else {
-        storyPlaybackStore.releaseStoryPlaybackPause(storyGesturePauseReason);
-      }
-
-      logStoryGesture("Story resumed");
+      logStoryGesture("Gesture finished");
       resolveGestureCompletion(result);
       this.$patch(getInitialSession());
     },

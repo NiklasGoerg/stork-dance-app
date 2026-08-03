@@ -103,12 +103,20 @@ onMounted(async () => {
 
   ctx = canvas.value.getContext("2d");
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      width: WIDTH,
-      height: HEIGHT,
-    },
-  });
+  let stream: MediaStream;
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: WIDTH,
+        height: HEIGHT,
+      },
+    });
+  } catch (error) {
+    console.warn("[MovementCamera] Camera unavailable.", error);
+    emit("poseLandmarks", null);
+    return;
+  }
 
   mediaStream = stream;
   video.value.srcObject = stream;

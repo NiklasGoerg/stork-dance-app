@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
+    "data:preprocess:migration": "python scripts/preprocess_migration_story_cycles.py",
     "dev": "nuxt dev",
     "dev:host": "nuxt dev --host 0.0.0.0 --https",
     "generate": "nuxt generate",
