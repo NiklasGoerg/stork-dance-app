@@ -13,6 +13,18 @@ export type LandmarkFrame = RecordedPoseFrame;
 
 export type MovementRecording = RecordedMovement;
 
+export interface MovementLoopRegion {
+  startMs: number;
+  endMs: number;
+}
+
+export interface MovementPlaybackTiming {
+  sourceFps: 30;
+  prerollMs: number;
+  loopStartMs: number;
+  loopEndMs: number;
+}
+
 export type MovementRecognitionPhase =
   | "idle"
   | "demonstrating"

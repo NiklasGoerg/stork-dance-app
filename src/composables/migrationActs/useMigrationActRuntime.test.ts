@@ -34,6 +34,7 @@ const flushPromises = async () => {
 const createFakeRaf = () => {
   let currentTimeMs = 0;
   let nextId = 1;
+  let onStep: ((deltaMs: number) => void) | null = null;
   const callbacks = new Map<number, FrameRequestCallback>();
 
   const driver: MigrationActRuntimeDriver = {
@@ -49,6 +50,7 @@ const createFakeRaf = () => {
 
   const step = (deltaMs: number) => {
     currentTimeMs += deltaMs;
+    onStep?.(deltaMs);
     const pending = [...callbacks.values()];
     callbacks.clear();
     pending.forEach((callback) => callback(currentTimeMs));
@@ -59,6 +61,9 @@ const createFakeRaf = () => {
     step,
     now: () => currentTimeMs,
     pendingCount: () => callbacks.size,
+    setStepHook: (hook: (deltaMs: number) => void) => {
+      onStep = hook;
+    },
   };
 };
 
@@ -93,6 +98,8 @@ const createFakeAudio = () => {
       state.currentOffsetSeconds = 0;
     },
     getBaseRhythmTransportTimeMs: () => state.currentOffsetSeconds * 1_000,
+    getBeatDurationMs: () => 1_000,
+    getMsUntilNextBaseRhythmBeat: () => 0,
   } as unknown as MigrationActAudioService;
 
   return { service, state };
@@ -169,7 +176,8 @@ const createFakeGestures = (
   start: () => Promise<StoryGestureResult> = async () => "completed",
 ) => {
   const state = {
-    state: "idle",
+    state: "inactive",
+    isActive: false,
     currentSourceTimeMs: 0,
   };
   const calls = {
@@ -177,6 +185,10 @@ const createFakeGestures = (
     cancel: 0,
     cleanup: 0,
     tick: 0,
+    starts: [] as Array<{
+      id: "departure" | "arrival";
+      countdownStartTransportMs?: number;
+    }>,
   };
   const service = {
     store: state,
@@ -184,7 +196,16 @@ const createFakeGestures = (
     preload: async () => {
       calls.preload++;
     },
-    start,
+    start: async (
+      id: "departure" | "arrival",
+      options: { countdownStartTransportMs?: number } = {},
+    ) => {
+      calls.starts.push({ id, ...options });
+      state.isActive = true;
+      const result = await start();
+      state.isActive = false;
+      return result;
+    },
     tick: () => {
       calls.tick++;
       state.state = "attempt-playing";
@@ -194,10 +215,12 @@ const createFakeGestures = (
     cancel: () => {
       calls.cancel++;
       state.state = "idle";
+      state.isActive = false;
     },
     cleanup: () => {
       calls.cleanup++;
       state.state = "idle";
+      state.isActive = false;
     },
   } as unknown as MigrationActGestureService;
 
@@ -221,6 +244,11 @@ const createHarness = ({
 } = {}) => {
   const raf = createFakeRaf();
   const audio = createFakeAudio();
+  raf.setStepHook((deltaMs) => {
+    if (audio.state.isPlaying) {
+      audio.state.currentOffsetSeconds += deltaMs / 1_000;
+    }
+  });
   const seasonAudio = createFakeSeasonAudio();
   const gestures = createFakeGestures(gestureStart);
   const controller = useMigrationActRuntime({
@@ -236,8 +264,65 @@ const createHarness = ({
   return { controller, raf, audio, seasonAudio, gestures };
 };
 
+const finishInitialCountdown = async (
+  raf: ReturnType<typeof createFakeRaf>,
+) => {
+  raf.step(0);
+  raf.step(4_000);
+  await flushPromises();
+};
+
 describe("migration act runtime", () => {
   beforeEach(() => setActivePinia(createPinia()));
+
+  it("uses the final countdown beat as preroll before story recognition starts", async () => {
+    const { controller, raf } = createHarness();
+
+    await controller.initialize();
+    await controller.startStory();
+    expect(controller.store.playbackState).toBe("initial_countdown");
+    expect(controller.store.initialCountdownNumber).toBe(4);
+    expect(controller.store.currentElapsedMs).toBe(0);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+
+    raf.step(0);
+    raf.step(3_000);
+    expect(controller.store.initialCountdownNumber).toBe(1);
+    expect(controller.movement.movementSourceTimeMs.value).toBe(0);
+
+    raf.step(1_000);
+    expect(controller.store.playbackState).toBe("playing");
+    expect(controller.store.currentElapsedMs).toBe(0);
+    expect(controller.movement.movementSourceTimeMs.value).toBe(1_000);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(true);
+  });
+
+  it("starts gesture preview four beats before the event without dimming the map", async () => {
+    const gesture = createDeferred<StoryGestureResult>();
+    const { controller, raf, gestures } = createHarness({
+      gestureStart: () => gesture.promise,
+    });
+
+    await controller.initialize();
+    await controller.startStory();
+    await finishInitialCountdown(raf);
+    const boundaryMs = controller.store.events[0]!.boundaryTimeMs;
+
+    raf.step(boundaryMs - 4_000);
+    await flushPromises();
+
+    expect(controller.store.currentElapsedMs).toBe(boundaryMs - 4_000);
+    expect(controller.store.isGestureActive).toBe(false);
+    expect(gestures.calls.starts).toEqual([
+      { id: "departure", countdownStartTransportMs: boundaryMs },
+    ]);
+
+    raf.step(4_000);
+    expect(controller.store.currentElapsedMs).toBe(boundaryMs);
+    expect(controller.store.isGestureActive).toBe(true);
+    gesture.resolve("completed");
+    await flushPromises();
+  });
 
   it("initializes idle and uses exactly one delta-based RAF across pause and resume", async () => {
     const { controller, raf, seasonAudio } = createHarness();
@@ -249,13 +334,14 @@ describe("migration act runtime", () => {
     expect(raf.pendingCount()).toBe(0);
 
     await controller.startStory();
+    await finishInitialCountdown(raf);
     expect(seasonAudio.calls.starts).toEqual(["summer"]);
     expect(seasonAudio.state.isPlaying).toBe(true);
     expect(raf.pendingCount()).toBe(1);
 
     raf.step(1_000);
     raf.step(1_000);
-    expect(controller.store.currentElapsedMs).toBe(1_000);
+    expect(controller.store.currentElapsedMs).toBe(2_000);
     expect(raf.pendingCount()).toBe(1);
 
     controller.pause();
@@ -282,6 +368,7 @@ describe("migration act runtime", () => {
 
     await controller.initialize();
     await controller.startStory();
+    await finishInitialCountdown(raf);
     controller.store.addPauseReason("system");
     controller.pause();
 
@@ -303,6 +390,7 @@ describe("migration act runtime", () => {
 
     await controller.initialize();
     await controller.startStory();
+    await finishInitialCountdown(raf);
     controller.store.replaceEvents(
       controller.store.events.map((event) => ({
         ...event,
@@ -342,6 +430,8 @@ describe("migration act runtime", () => {
 
     await controller.initialize();
     await controller.startStory();
+    await finishInitialCountdown(raf);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(true);
     const boundaryMs = controller.store.events[0]!.boundaryTimeMs;
     raf.step(0);
     raf.step(boundaryMs + 500);
@@ -349,6 +439,7 @@ describe("migration act runtime", () => {
     expect(controller.store.playbackState).toBe("gesture_lead_in");
     expect(controller.store.currentElapsedMs).toBe(boundaryMs);
     expect(controller.store.events[0]!.status).toBe("triggered");
+    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
     expect(seasonAudio.state.isPlaying).toBe(true);
     expect(seasonAudio.calls.pauses).toBe(0);
 
@@ -361,6 +452,7 @@ describe("migration act runtime", () => {
 
     expect(controller.store.playbackState).toBe("idle");
     expect(controller.store.currentElapsedMs).toBe(0);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
     expect(
       controller.store.events.every((event) => event.status === "pending"),
     ).toBe(true);
@@ -374,6 +466,7 @@ describe("migration act runtime", () => {
     await controller.initialize();
     const runId = controller.store.cycleRuns[0]!.id;
     await controller.startSingleCycle(runId);
+    await finishInitialCountdown(raf);
     controller.store.replaceEvents(
       controller.store.events.map((event) => ({
         ...event,
@@ -401,6 +494,7 @@ describe("migration act runtime", () => {
     await controller.initialize();
     const runId = controller.store.cycleRuns[0]!.id;
     await controller.startSingleCycle(runId);
+    await finishInitialCountdown(raf);
     raf.step(0);
 
     const expectedEventTypes = controller.store.events.map(
@@ -445,6 +539,7 @@ describe("migration act runtime", () => {
 
     await controller.initialize();
     await controller.startStory();
+    await finishInitialCountdown(raf);
     const boundaryMs = controller.store.events[0]!.boundaryTimeMs;
     raf.step(0);
     raf.step(boundaryMs + 1);

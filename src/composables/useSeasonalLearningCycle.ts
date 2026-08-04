@@ -2,6 +2,11 @@ import { computed, ref } from "vue";
 import { useMovementPlayback } from "~/composables/useMovementPlayback";
 import { useAudioStore } from "~/store/audioStore";
 import type { MovementRecording } from "~/types/movement";
+import {
+  getMovementRecordingDurationMs,
+  normalizeMovementRecordingFrameTimes,
+  resolveMovementPlaybackPosition,
+} from "~/utils/movementPlaybackTiming";
 import { addStoryDays, formatStoryDate } from "~/utils/storyCycle";
 import {
   getSeasonalCycleDurationMs,
@@ -40,14 +45,6 @@ const seasonCalendarDurations: Record<SeasonalCycleSeasonConfig["id"], number> =
     winter: 90,
   };
 
-const getRecordingDurationMs = (recording: MovementRecording) => {
-  const firstFrameTime = recording.frames[0]?.time ?? 0;
-  const lastFrameTime =
-    recording.frames[recording.frames.length - 1]?.time ?? firstFrameTime;
-
-  return Math.max(lastFrameTime - firstFrameTime, 1);
-};
-
 const getSeasonMovementPrerollMs = (
   season: SeasonalCycleSeasonConfig,
   fallbackPrerollMs: number,
@@ -73,7 +70,20 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
   const playbackState = ref<SeasonalCyclePlaybackState>("idle");
   const timelineMs = ref(0);
   const currentMovementSourceAspect = ref(4 / 3);
-  const loadedMovements = new Map<string, LoadedSeasonMovement>();
+  const loadedMovements = new Map<string, LoadedSeasonMovement | null>();
+  const warnedMovementIds = new Set<string>();
+  const movementSourceFps = ref<number | null>(null);
+  const movementFrameCount = ref(0);
+  const movementSourceDurationMs = ref(0);
+  const movementPrerollMsDebug = ref(0);
+  const movementLoopStartMs = ref(0);
+  const movementLoopEndMs = ref(0);
+  const movementSourceTimeMs = ref(0);
+  const movementLoopCount = ref(0);
+  const movementLoaded = ref(false);
+  const configuredMovementId = ref<string | null>(null);
+  const movementIntensity = ref<number | null>(null);
+  const usingFallbackMovement = ref(false);
   const activeConfig = ref<SeasonalCycleConfig>(config);
   const totalDurationMs = computed(() =>
     getSeasonalCycleDurationMs(activeConfig.value),
@@ -91,7 +101,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
   let animationFrameId = 0;
   let playbackStartedAtMs = 0;
   let playbackStartedFromMs = 0;
-  let activeMovementSeasonId: string | null = null;
+  let activeMovementKey: string | null = null;
   let activeAudioSeasonId: string | null = null;
   let activeAudioSeasonIndex: number | null = null;
   let hasRestartedBaseRhythmForCycle = false;
@@ -127,6 +137,12 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
       : 0,
   );
   const isCountingDown = computed(() => playbackState.value === "countdown");
+  const movementPlaying = computed(
+    () =>
+      movementLoaded.value &&
+      (playbackState.value === "playing" ||
+        playbackState.value === "countdown"),
+  );
   const showInstructorAvatar = computed(
     () => timelineMs.value >= -movementPrerollMs.value,
   );
@@ -172,32 +188,101 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     currentDate.value = getSeasonDate();
   };
 
-  const loadSeasonMovement = async (season: SeasonalCycleSeasonConfig) => {
-    const cachedMovement = loadedMovements.get(season.id);
+  const getMovementKey = (season: SeasonalCycleSeasonConfig) =>
+    season.configuredMovementId ?? season.movementUrl;
 
-    if (cachedMovement) return cachedMovement;
-
-    const response = await fetch(season.movementUrl);
-
-    if (!response.ok) {
-      throw new Error(`Could not load ${season.id} movement.`);
-    }
-
-    const recording = (await response.json()) as MovementRecording;
-    const movement = {
-      recording,
-      durationMs: getRecordingDurationMs(recording),
-    };
-
-    loadedMovements.set(season.id, movement);
-
-    return movement;
+  const clearMovementDebug = (season?: SeasonalCycleSeasonConfig) => {
+    movementSourceFps.value = null;
+    movementFrameCount.value = 0;
+    movementSourceDurationMs.value = 0;
+    movementPrerollMsDebug.value = season?.movementTiming?.prerollMs ?? 0;
+    movementLoopStartMs.value = season?.movementTiming?.loopStartMs ?? 0;
+    movementLoopEndMs.value = season?.movementTiming?.loopEndMs ?? 0;
+    movementSourceTimeMs.value = 0;
+    movementLoopCount.value = 0;
+    movementLoaded.value = false;
+    configuredMovementId.value = season?.configuredMovementId ?? null;
+    movementIntensity.value = season?.movementIntensity ?? null;
+    usingFallbackMovement.value = season?.usingFallbackMovement ?? false;
   };
 
-  const getNextSeason = (seasonIndex: number) =>
-    activeConfig.value.seasons[
-      (seasonIndex + 1) % activeConfig.value.seasons.length
-    ] ?? activeConfig.value.seasons[0];
+  const updateMovementDebug = (
+    season: SeasonalCycleSeasonConfig,
+    movement: LoadedSeasonMovement,
+  ) => {
+    movementSourceFps.value = movement.recording.fps;
+    movementFrameCount.value = movement.recording.frames.length;
+    movementSourceDurationMs.value = movement.durationMs;
+    movementPrerollMsDebug.value =
+      season.movementTiming?.prerollMs ??
+      getSeasonMovementPrerollMs(season, movementPrerollMs.value);
+    movementLoopStartMs.value =
+      season.movementTiming?.loopStartMs ?? movementPrerollMsDebug.value;
+    movementLoopEndMs.value = Math.min(
+      season.movementTiming?.loopEndMs ??
+        movementLoopStartMs.value +
+          getSeasonMovementLoopDurationMs(
+            season,
+            activeConfig.value.barDurationMs,
+          ),
+      movement.durationMs,
+    );
+    movementLoaded.value = true;
+    configuredMovementId.value = season.configuredMovementId ?? null;
+    movementIntensity.value = season.movementIntensity ?? null;
+    usingFallbackMovement.value = season.usingFallbackMovement ?? false;
+  };
+
+  const loadSeasonMovement = async (season: SeasonalCycleSeasonConfig) => {
+    const movementKey = getMovementKey(season);
+
+    if (loadedMovements.has(movementKey)) {
+      return loadedMovements.get(movementKey) ?? null;
+    }
+
+    try {
+      const response = await fetch(season.movementUrl);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const recording = normalizeMovementRecordingFrameTimes(
+        (await response.json()) as MovementRecording,
+      );
+      const movement = {
+        recording,
+        durationMs: getMovementRecordingDurationMs(recording),
+      };
+
+      loadedMovements.set(movementKey, movement);
+      return movement;
+    } catch (error) {
+      loadedMovements.set(movementKey, null);
+      if (import.meta.dev && !warnedMovementIds.has(movementKey)) {
+        warnedMovementIds.add(movementKey);
+        console.warn(
+          `[Act5] Movement "${season.configuredMovementId ?? movementKey}" could not be loaded from ${season.movementUrl}; Act 5 will continue without the instructor clip.`,
+          error,
+        );
+      }
+
+      return null;
+    }
+  };
+
+  const getNextSeason = (seasonIndex: number) => {
+    const nextSeason =
+      activeConfig.value.seasons[
+        (seasonIndex + 1) % activeConfig.value.seasons.length
+      ] ?? activeConfig.value.seasons[0];
+
+    if (!nextSeason) {
+      throw new Error("Seasonal cycle needs at least one season.");
+    }
+
+    return nextSeason;
+  };
 
   const getQueuedSeasonIndex = (
     request: Pick<QueuedSeasonRestart, "seasonId" | "seasonIndex">,
@@ -216,16 +301,24 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
 
   const showMovementFirstFrame = async (season: SeasonalCycleSeasonConfig) => {
     const movement = await loadSeasonMovement(season);
+    if (!movement) {
+      clearMovementDebug(season);
+      return;
+    }
+    const movementKey = getMovementKey(season);
 
-    if (activeMovementSeasonId !== season.id) {
+    if (activeMovementKey !== movementKey) {
       loadRecording(movement.recording);
-      activeMovementSeasonId = season.id;
+      activeMovementKey = movementKey;
       currentMovementSourceAspect.value =
         movement.recording.source?.width && movement.recording.source.height
           ? movement.recording.source.width / movement.recording.source.height
           : 4 / 3;
     }
 
+    updateMovementDebug(season, movement);
+    movementSourceTimeMs.value = 0;
+    movementLoopCount.value = 0;
     seekToTime(0);
   };
 
@@ -234,16 +327,24 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     sourceTimeMs: number,
   ) => {
     const movement = await loadSeasonMovement(season);
+    if (!movement) {
+      clearMovementDebug(season);
+      return;
+    }
+    const movementKey = getMovementKey(season);
 
-    if (activeMovementSeasonId !== season.id) {
+    if (activeMovementKey !== movementKey) {
       loadRecording(movement.recording);
-      activeMovementSeasonId = season.id;
+      activeMovementKey = movementKey;
       currentMovementSourceAspect.value =
         movement.recording.source?.width && movement.recording.source.height
           ? movement.recording.source.width / movement.recording.source.height
           : 4 / 3;
     }
 
+    updateMovementDebug(season, movement);
+    movementSourceTimeMs.value = sourceTimeMs;
+    movementLoopCount.value = 0;
     seekToTime(sourceTimeMs);
   };
 
@@ -269,6 +370,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
 
     if (timelineMs.value < 0) {
       const firstSeason = activeConfig.value.seasons[0];
+      if (!firstSeason) return;
       const seasonPrerollMs = getSeasonMovementPrerollMs(
         firstSeason,
         movementPrerollMs.value,
@@ -293,41 +395,48 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     }
 
     const movement = await loadSeasonMovement(currentProgress.season);
+    if (!movement) {
+      clearMovementDebug(currentProgress.season);
+      return;
+    }
+    const movementKey = getMovementKey(currentProgress.season);
 
-    if (activeMovementSeasonId !== currentProgress.season.id) {
+    if (activeMovementKey !== movementKey) {
       loadRecording(movement.recording);
-      activeMovementSeasonId = currentProgress.season.id;
+      activeMovementKey = movementKey;
       currentMovementSourceAspect.value =
         movement.recording.source?.width && movement.recording.source.height
           ? movement.recording.source.width / movement.recording.source.height
           : 4 / 3;
     }
 
-    const movementStartMs = Math.min(
-      getSeasonMovementPrerollMs(
-        currentProgress.season,
-        movementPrerollMs.value,
-      ),
-      movement.durationMs,
-    );
-    const movementLoopDurationMs = getSeasonMovementLoopDurationMs(
+    const prerollMs = getSeasonMovementPrerollMs(
       currentProgress.season,
-      activeConfig.value.barDurationMs,
+      movementPrerollMs.value,
     );
-    const movementElapsedMs =
-      currentProgress.seasonElapsedMs % movementLoopDurationMs;
-    const replayPrerollMs = currentProgress.season.movementReplayPrerollMs ?? 0;
-    const isReplayPreroll =
-      replayPrerollMs > 0 &&
-      movementStartMs > 0 &&
-      movementElapsedMs >= movementLoopDurationMs - replayPrerollMs;
-    const movementTimeMs = isReplayPreroll
-      ? Math.max(movementStartMs - replayPrerollMs, 0) +
-        movementElapsedMs -
-        (movementLoopDurationMs - replayPrerollMs)
-      : Math.min(movementStartMs + movementElapsedMs, movement.durationMs);
+    const timing = currentProgress.season.movementTiming ?? {
+      sourceFps: 30,
+      prerollMs,
+      loopStartMs: prerollMs,
+      loopEndMs:
+        prerollMs +
+        getSeasonMovementLoopDurationMs(
+          currentProgress.season,
+          activeConfig.value.barDurationMs,
+        ),
+    };
+    const position = resolveMovementPlaybackPosition({
+      // The countdown already played the lead-in. Season time zero therefore
+      // starts at the first beat of the configured movement loop.
+      elapsedMs: currentProgress.seasonElapsedMs + timing.prerollMs,
+      sourceDurationMs: movement.durationMs,
+      timing,
+    });
 
-    seekToTime(movementTimeMs);
+    updateMovementDebug(currentProgress.season, movement);
+    movementSourceTimeMs.value = position.sourceTimeMs;
+    movementLoopCount.value = position.loopCount;
+    seekToTime(position.sourceTimeMs);
   };
 
   const syncSeasonalAudio = async () => {
@@ -565,7 +674,8 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     audioLockedAfterCompletion = false;
     playbackState.value = "idle";
     timelineMs.value = 0;
-    activeMovementSeasonId = null;
+    activeMovementKey = null;
+    clearMovementDebug();
     activeAudioSeasonId = null;
     activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = false;
@@ -637,7 +747,8 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     activeConfig.value = getSingleSeasonConfig(seasonId);
     playbackState.value = "idle";
     timelineMs.value = 0;
-    activeMovementSeasonId = null;
+    activeMovementKey = null;
+    clearMovementDebug();
     activeAudioSeasonId = null;
     activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = false;
@@ -660,7 +771,8 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     activeConfig.value = nextConfig;
     playbackState.value = "idle";
     timelineMs.value = 0;
-    activeMovementSeasonId = null;
+    activeMovementKey = null;
+    clearMovementDebug();
     activeAudioSeasonId = null;
     activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = false;
@@ -694,7 +806,8 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
 
     clearAnimationFrame();
     playbackState.value = "idle";
-    activeMovementSeasonId = null;
+    activeMovementKey = null;
+    clearMovementDebug();
     activeAudioSeasonId = null;
     activeAudioSeasonIndex = null;
     hasRestartedBaseRhythmForCycle = nextTimelineMs > 0;
@@ -781,6 +894,8 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     audioStore.stopSeasonalAudio();
     audioStore.resetBaseRhythmLoop();
     stopMovementPlayback();
+    activeMovementKey = null;
+    clearMovementDebug();
   };
 
   return {
@@ -805,6 +920,19 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
     seasonElapsedMs,
     seasonPhase,
     showInstructorAvatar,
+    movementSourceFps,
+    movementFrameCount,
+    movementSourceDurationMs,
+    movementPrerollMs: movementPrerollMsDebug,
+    movementLoopStartMs,
+    movementLoopEndMs,
+    movementSourceTimeMs,
+    movementLoopCount,
+    movementLoaded,
+    movementPlaying,
+    configuredMovementId,
+    movementIntensity,
+    usingFallbackMovement,
     totalDurationMs,
     initialize,
     complete,

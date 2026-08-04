@@ -405,12 +405,17 @@ export const useBeatWindowMovementRecognition = <
       return;
     }
 
-    collectBeatSample({
-      landmarks,
-      measureIndex: repetitionIndex,
-      beat,
-      barElapsedMs,
-      timestamp,
+    // Collect for every window that contains this frame. This preserves the
+    // best pose shortly before or after a checkpoint instead of limiting all
+    // beats to samples taken only after their nominal timestamp.
+    options.beats.forEach((sampleBeat) => {
+      collectBeatSample({
+        landmarks,
+        measureIndex: repetitionIndex,
+        beat: sampleBeat,
+        barElapsedMs,
+        timestamp,
+      });
     });
     finalizeExpiredBeatWindows({
       measureIndex: repetitionIndex,

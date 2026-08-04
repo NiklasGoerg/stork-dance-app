@@ -350,6 +350,10 @@ export const autumnCriterionFeedbackMetadata: MetadataMap = {
     bodyRegion: "hands",
     trackingCode: "HANDS_NOT_VISIBLE",
   }),
+  "sweep-direction": metadata("direction", 20, {
+    bodyRegion: "hands",
+    trackingCode: "HANDS_NOT_VISIBLE",
+  }),
   "endpoint-value-range": metadata("intensity", 31, {
     bodyRegion: "hands",
     trackingCode: "HANDS_NOT_VISIBLE",
@@ -358,11 +362,11 @@ export const autumnCriterionFeedbackMetadata: MetadataMap = {
     bodyRegion: "upperBody",
     trackingCode: "UPPER_BODY_NOT_VISIBLE",
   }),
-  "outer-wrist-endpoint-side": metadata("form", 41, {
+  "outer-wrist-endpoint-side": metadata("intensity", 32, {
     bodyRegion: "hands",
     trackingCode: "HANDS_NOT_VISIBLE",
   }),
-  "outer-arm-oriented-endpoint": metadata("form", 42, {
+  "outer-arm-oriented-endpoint": metadata("direction", 21, {
     bodyRegion: "upperBody",
     trackingCode: "UPPER_BODY_NOT_VISIBLE",
   }),

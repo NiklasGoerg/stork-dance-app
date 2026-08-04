@@ -16,7 +16,10 @@ export type SeasonalCycleSeasonConfig = {
   audioUrl: string;
   movementLoopDurationMs?: number;
   movementPrerollMs?: number;
-  movementReplayPrerollMs?: number;
+  configuredMovementId?: string;
+  movementIntensity?: number;
+  usingFallbackMovement?: boolean;
+  movementTiming?: import("~/types/movement").MovementPlaybackTiming;
 };
 
 export type SeasonalCycleConfig = {

@@ -163,24 +163,43 @@ const outerArmExtensionCriterion = (
   context: BeatContext,
 ) => {
   const reference = AUTUMN_MOVEMENT_REFERENCE[context.expectedValueClass];
+  const requiresStraightArm =
+    context.expectedValueClass === "100" || context.expectedValueClass === "80";
 
   return criterion({
     id: "outer-arm-extension",
     label: "Outer arm reaches toward the endpoint",
-    importance:
-      context.expectedValueClass === "100" ||
-      context.expectedValueClass === "80"
-        ? "essential"
-        : "supporting",
-    value: metrics.outerArmExtensionClass,
-    passed: hasAtLeastExtension(
-      metrics.outerArmExtensionClass,
-      reference.outerArmExtension,
-    ),
-    expectedRange: reference.outerArmExtension,
+    importance: requiresStraightArm ? "essential" : "supporting",
+    value: requiresStraightArm
+      ? metrics.armExtended
+      : metrics.outerArmExtensionClass,
+    passed: requiresStraightArm
+      ? metrics.armExtended === true
+      : hasAtLeastExtension(
+          metrics.outerArmExtensionClass,
+          reference.outerArmExtension,
+        ),
+    expectedRange: requiresStraightArm
+      ? `elbow >= ${autumnMovementConfig.thresholds.outerElbowExtendedMin} or elbow >= ${autumnMovementConfig.thresholds.outerElbowNearExtendedMin} with shoulder-wrist distance >= ${autumnMovementConfig.thresholds.normalizedShoulderWristDistanceMin}`
+      : reference.outerArmExtension,
     feedbackCode: "EXTEND_OUTER_ARM",
   });
 };
+
+const sweepDirectionCriterion = (metrics: AutumnRecognitionMetrics) =>
+  criterion({
+    id: "sweep-direction",
+    label: "Sweep changes toward the expected side",
+    importance: "essential",
+    value: metrics.detectedDirection,
+    passed:
+      metrics.directionLocked &&
+      metrics.directionResult !== "negativeProgress" &&
+      metrics.detectedDirection !== "unknown",
+    expectedRange:
+      metrics.expectedStartSide === "left" ? "leftToRight" : "rightToLeft",
+    feedbackCode: "WRONG_SWEEP_DIRECTION",
+  });
 
 const outerWristCriterion = (
   metrics: AutumnRecognitionMetrics,
@@ -209,7 +228,7 @@ const outerWristCriterion = (
     feedbackCode:
       context.expectedValueClass === "25" || context.expectedValueClass === "40"
         ? undefined
-        : "EXTEND_OUTER_ARM",
+        : "ENDPOINT_TOO_SHORT",
   });
 };
 
@@ -239,7 +258,7 @@ const armDirectionCriteria = (
         outerDirectionTowardEndpoint !== null &&
         outerDirectionTowardEndpoint >= 0.1,
       expectedRange: "toward endpoint",
-      feedbackCode: "EXTEND_OUTER_ARM",
+      feedbackCode: "WRONG_SWEEP_DIRECTION",
     }),
     criterion({
       id: "inner-forearm-oriented-endpoint",
@@ -360,6 +379,7 @@ export const buildAutumnBeatCriteria = (
       : [];
 
     return [
+      sweepDirectionCriterion(metrics),
       endpointRegionCriterion(metrics, context),
       ...(reference.requireProgressFromBeat1
         ? [endpointProgressCriterion(metrics, context)]
@@ -440,6 +460,7 @@ export const getAutumnBeatFeedbackCode = (
 
   const priority = [
     "hands-start-side",
+    "sweep-direction",
     "progress-from-start",
     "endpoint-value-range",
     "outer-arm-extension",

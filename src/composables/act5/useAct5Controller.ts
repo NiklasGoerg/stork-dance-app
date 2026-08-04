@@ -4,7 +4,10 @@ import { useAct5Store } from "~/store/act5";
 import { useClimateSeasonData } from "~/composables/useClimateSeasonData";
 import { useStoryEngine } from "~/composables/useStoryEngine";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
-import { act5IntroCycleConfig } from "~/story/act5IntroCycle";
+import {
+  act5IntroCycleConfig,
+  resolveAct5SeasonMovementConfig,
+} from "~/story/act5IntroCycle";
 import {
   buildAct5ClimateStorySequence,
   buildAct5DebugSeasonValueSequence,
@@ -100,13 +103,14 @@ type Act5ControllerOptions = {
 
 const getSeasonConfig = (
   seasonId: ClimateSeason,
+  movementValue: number,
 ): SeasonalCycleSeasonConfig => {
-  const season = act5IntroCycleConfig.seasons.find(
-    (item) => item.id === seasonId,
-  );
+  const season = resolveAct5SeasonMovementConfig(seasonId, movementValue);
 
   if (!season) {
-    throw new Error(`Unknown Act 5 season "${seasonId}".`);
+    throw new Error(
+      `Unknown Act 5 movement "${seasonId}-${movementValue}-percent".`,
+    );
   }
 
   return season;
@@ -116,7 +120,9 @@ export const buildAct5TargetsCycleConfig = (
   targets: Act5SequenceTarget[],
 ): SeasonalCycleConfig => ({
   ...act5IntroCycleConfig,
-  seasons: targets.map((target) => getSeasonConfig(target.season)),
+  seasons: targets.map((target) =>
+    getSeasonConfig(target.season, target.movementValue),
+  ),
   seasonDurationMs:
     act5IntroCycleConfig.repetitionCount * act5IntroCycleConfig.barDurationMs,
   repetitionCount: act5IntroCycleConfig.repetitionCount,

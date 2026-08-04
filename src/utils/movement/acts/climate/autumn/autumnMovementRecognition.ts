@@ -64,9 +64,7 @@ export type AutumnStartReference = {
 const getExpectedDirectionForRepetition = (
   repetitionIndex: number | null | undefined,
 ): AutumnDirection =>
-  repetitionIndex === 0 || repetitionIndex === 1
-    ? "leftToRight"
-    : "rightToLeft";
+  (repetitionIndex ?? 0) % 2 === 0 ? "rightToLeft" : "leftToRight";
 
 const destinationSignForDirection = (direction: AutumnDirection) =>
   direction === "leftToRight" ? 1 : -1;
@@ -164,6 +162,30 @@ const getDirectionResult = (
   }
 
   return "matched";
+};
+
+const getDetectedSweepDirection = (
+  currentHandCenterXOffset: number | null,
+  startReference?: AutumnStartReference | null,
+): AutumnDirection | "unknown" => {
+  if (
+    currentHandCenterXOffset === null ||
+    startReference?.handCenterXOffset === null ||
+    startReference?.handCenterXOffset === undefined
+  ) {
+    return "unknown";
+  }
+
+  const delta = currentHandCenterXOffset - startReference.handCenterXOffset;
+
+  if (delta > autumnMovementConfig.thresholds.negativeProgressTolerance) {
+    return "leftToRight";
+  }
+  if (delta < -autumnMovementConfig.thresholds.negativeProgressTolerance) {
+    return "rightToLeft";
+  }
+
+  return "unknown";
 };
 
 const getDirectionFailureReason = ({
@@ -273,21 +295,45 @@ const cosineSimilarity = (
   b: { x: number; y: number } | null,
 ) => (a && b ? a.x * b.x + a.y * b.y : null);
 
-const classifyOuterArmExtension = (
+export const isAutumnArmExtended = (
   outerElbowAngle: number | null,
-  outerWristRelativeToOuterShoulder: number | null,
-): AutumnArmExtensionClass => {
-  if (outerElbowAngle === null || outerWristRelativeToOuterShoulder === null) {
-    return "unknown";
+  normalizedShoulderWristDistance: number | null,
+): boolean | null => {
+  if (outerElbowAngle === null || normalizedShoulderWristDistance === null) {
+    return null;
   }
 
-  if (outerElbowAngle >= 142 && outerWristRelativeToOuterShoulder >= 0.18) {
+  return (
+    outerElbowAngle >= autumnMovementConfig.thresholds.outerElbowExtendedMin ||
+    (outerElbowAngle >=
+      autumnMovementConfig.thresholds.outerElbowNearExtendedMin &&
+      normalizedShoulderWristDistance >=
+        autumnMovementConfig.thresholds.normalizedShoulderWristDistanceMin)
+  );
+};
+
+const classifyOuterArmExtension = (
+  outerElbowAngle: number | null,
+  normalizedShoulderWristDistance: number | null,
+): AutumnArmExtensionClass => {
+  const armExtended = isAutumnArmExtended(
+    outerElbowAngle,
+    normalizedShoulderWristDistance,
+  );
+
+  if (armExtended === null) return "unknown";
+  if (armExtended) {
     return "maximum";
   }
-  if (outerElbowAngle >= 124 && outerWristRelativeToOuterShoulder >= -0.04) {
+  if (
+    outerElbowAngle !== null &&
+    normalizedShoulderWristDistance !== null &&
+    outerElbowAngle >= 124 &&
+    normalizedShoulderWristDistance >= 0.8
+  ) {
     return "large";
   }
-  if (outerElbowAngle >= 82) return "forward";
+  if (outerElbowAngle !== null && outerElbowAngle >= 82) return "forward";
 
   return "compact";
 };
@@ -301,6 +347,7 @@ const createEmptyMetrics = (): AutumnRecognitionMetrics => ({
   startSidePassed: null,
   directionLocked: false,
   directionResult: "unknown",
+  detectedDirection: "unknown",
   directionFailureReason: "unknown",
   signedProgressFromBeat1: null,
   normalizedProgress: null,
@@ -319,6 +366,9 @@ const createEmptyMetrics = (): AutumnRecognitionMetrics => ({
   outerWristXOffset: null,
   outerWristProgressToCenter: null,
   outerElbowAngle: null,
+  normalizedShoulderWristDistance: null,
+  activeArm: "unknown",
+  armExtended: null,
   outerArmExtensionClass: "unknown",
   outerArmDirectionX: null,
   outerArmDirectionY: null,
@@ -328,6 +378,7 @@ const createEmptyMetrics = (): AutumnRecognitionMetrics => ({
   torsoFacingScore: null,
   progressFromStartingPose: null,
   detectedValueClass: "unknown",
+  sweepPositionValid: null,
   landmarkConfidence: "missing-body-reference",
 });
 
@@ -388,6 +439,10 @@ export const extractAutumnRecognitionMetrics = (
   const directionResult = directionLocked
     ? getDirectionResult(signedProgressFromBeat1)
     : "unknown";
+  const detectedDirection = getDetectedSweepDirection(
+    handCenterXOffset,
+    context.startReference,
+  );
   const directionFailureReason = getDirectionFailureReason({
     startSidePassed: directionLocked
       ? (context.startReference?.startSidePassed ?? null)
@@ -431,6 +486,14 @@ export const extractAutumnRecognitionMetrics = (
   const outerElbowAngle = leftArmIsOuter
     ? bodyMetrics.leftElbowAngle
     : bodyMetrics.rightElbowAngle;
+  const normalizedShoulderWristDistance =
+    outerShoulder && outerWrist
+      ? distance2D(outerShoulder, outerWrist)! / shoulderWidth
+      : null;
+  const armExtended = isAutumnArmExtended(
+    outerElbowAngle,
+    normalizedShoulderWristDistance,
+  );
   const outerArmDirection = normalizeVector(
     vectorFrom(outerShoulder, outerWrist),
   );
@@ -443,7 +506,7 @@ export const extractAutumnRecognitionMetrics = (
   );
   const outerArmExtensionClass = classifyOuterArmExtension(
     outerElbowAngle,
-    outerWristRelativeToOuterShoulder,
+    normalizedShoulderWristDistance,
   );
   const torsoCenterOffset =
     bodyMetrics.torsoCenterXOffset === null
@@ -465,6 +528,7 @@ export const extractAutumnRecognitionMetrics = (
     startSidePassed,
     directionLocked,
     directionResult,
+    detectedDirection,
     directionFailureReason,
     signedProgressFromBeat1,
     normalizedProgress: handTravelProgress,
@@ -486,6 +550,14 @@ export const extractAutumnRecognitionMetrics = (
     outerWristXOffset,
     outerWristProgressToCenter,
     outerElbowAngle,
+    normalizedShoulderWristDistance,
+    activeArm:
+      leftShoulder && rightShoulder
+        ? leftArmIsOuter
+          ? "left"
+          : "right"
+        : "unknown",
+    armExtended,
     outerArmExtensionClass,
     outerArmDirectionX: outerArmDirection?.x ?? null,
     outerArmDirectionY: outerArmDirection?.y ?? null,
@@ -498,6 +570,10 @@ export const extractAutumnRecognitionMetrics = (
       signedProgressFromBeat1 ?? handTravelProgress,
     ),
     detectedValueClass,
+    sweepPositionValid:
+      directionLocked && detectedEndpointRegion !== "unknown"
+        ? directionResult !== "negativeProgress"
+        : null,
     landmarkConfidence: "ok",
   };
 };
@@ -629,10 +705,12 @@ export const getPrioritizedAutumnProblemEvaluation = (
       "hands-start-side",
     ]) ??
     findAutumnProblemByBeatAndCriteria(beatEvaluations, 3, [
+      "sweep-direction",
+      "outer-arm-oriented-endpoint",
       "endpoint-value-range",
       "progress-from-start",
-      "outer-arm-extension",
       "outer-wrist-endpoint-side",
+      "outer-arm-extension",
       "inner-forearm-oriented-endpoint",
       "shared-arm-direction",
       "hands-chest-shoulder-height",

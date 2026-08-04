@@ -51,14 +51,6 @@ type Act5BeatEvaluation = MovementBeatEvaluationLike & {
 
 export type Act5Recognition = ReturnType<typeof useAct5Recognition>;
 
-const mirrorLandmarksHorizontally = <T extends { x: number }>(
-  landmarks: T[] | null | undefined,
-): T[] | null =>
-  landmarks?.map((landmark) => ({
-    ...landmark,
-    x: 1 - landmark.x,
-  })) ?? null;
-
 const getRecognitionRules = (target: Act5SequenceTarget) => ({
   measuresPerValue: Math.max(target.rules.measuresPerStep - 1, 1),
   requiredSuccessfulMeasures: target.rules.requiredSuccessfulMeasures,
@@ -176,10 +168,7 @@ export const useAct5Recognition = ({
     };
 
     summer.updateFrame(recognitionFrame);
-    autumn.updateFrame({
-      ...recognitionFrame,
-      landmarks: mirrorLandmarksHorizontally(frame.landmarks),
-    });
+    autumn.updateFrame(recognitionFrame);
     spring.updateFrame(recognitionFrame);
     winter.updateFrame(recognitionFrame);
   };

@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, getCurrentInstance, onBeforeUnmount, ref } from "vue";
 import {
   SKELETON_SUCCESS_PULSE_DURATION_MS,
   type BeatSkeletonFeedbackEvent,
@@ -12,12 +12,16 @@ export type SkeletonFeedbackState = {
   sourceEvaluationId?: string;
 };
 
-export const useSkeletonVisualFeedback = () => {
+export const useSkeletonVisualFeedback = ({
+  successPulseDurationMs = SKELETON_SUCCESS_PULSE_DURATION_MS,
+}: {
+  successPulseDurationMs?: number;
+} = {}) => {
   const nowMs = ref(0);
   const handledEvaluationIds = new Set<string>();
   const skeletonFeedbackState = ref<SkeletonFeedbackState>({
     mode: "neutral",
-    pulseDurationMs: SKELETON_SUCCESS_PULSE_DURATION_MS,
+    pulseDurationMs: successPulseDurationMs,
   });
 
   let animationFrameId = 0;
@@ -73,12 +77,13 @@ export const useSkeletonVisualFeedback = () => {
 
     clearAnimationFrame();
     const startedAt = performance.now();
+    const pulseDurationMs = event.pulseDurationMs ?? successPulseDurationMs;
 
     nowMs.value = startedAt;
     skeletonFeedbackState.value = {
       mode: "successPulse",
       pulseStartedAt: startedAt,
-      pulseDurationMs: SKELETON_SUCCESS_PULSE_DURATION_MS,
+      pulseDurationMs,
       sourceEvaluationId: event.evaluationId,
     };
     animationFrameId = requestAnimationFrame(tickPulse);
@@ -111,9 +116,11 @@ export const useSkeletonVisualFeedback = () => {
     setNeutral();
   };
 
-  onBeforeUnmount(() => {
-    clearAnimationFrame();
-  });
+  if (getCurrentInstance()) {
+    onBeforeUnmount(() => {
+      clearAnimationFrame();
+    });
+  }
 
   return {
     skeletonFeedbackState,

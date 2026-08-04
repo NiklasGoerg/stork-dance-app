@@ -1,7 +1,15 @@
 import { ref } from "vue";
 
-import type { MovementRecording, LandmarkFrame } from "~/types/movement";
+import type {
+  MovementLoopRegion,
+  MovementRecording,
+  LandmarkFrame,
+} from "~/types/movement";
 import { getInterpolatedMovementFrame } from "~/utils/movementFrames";
+import {
+  getMovementRecordingDurationMs,
+  normalizeMovementRecordingFrameTimes,
+} from "~/utils/movementPlaybackTiming";
 
 export const useMovementPlayback = () => {
   const recording = ref<MovementRecording | null>(null);
@@ -17,10 +25,12 @@ export const useMovementPlayback = () => {
   let animationFrameId = 0;
   let playbackStart = 0;
   let shouldLoop = false;
+  let loopRegion: MovementLoopRegion | null = null;
   let onComplete: (() => void) | null = null;
 
   type PlayOptions = {
     loop?: boolean;
+    loopRegion?: MovementLoopRegion;
     restart?: boolean;
     onComplete?: () => void;
   };
@@ -29,18 +39,19 @@ export const useMovementPlayback = () => {
   const loadRecording = (data: MovementRecording) => {
     pause();
 
-    recording.value = data;
+    const normalizedRecording = normalizeMovementRecordingFrameTimes(data);
+
+    recording.value = normalizedRecording;
 
     frameIndex = 0;
     shouldLoop = false;
+    loopRegion = null;
     currentTimeMs.value = 0;
-    durationMs.value =
-      (data.frames[data.frames.length - 1]?.time ?? 0) -
-      (data.frames[0]?.time ?? 0);
+    durationMs.value = getMovementRecordingDurationMs(normalizedRecording);
     hasCompleted.value = false;
     onComplete = null;
 
-    currentFrame.value = data.frames[0] || null;
+    currentFrame.value = normalizedRecording.frames[0] || null;
   };
 
   // Starts RAF-driven playback from the current frame or from the beginning.
@@ -49,6 +60,7 @@ export const useMovementPlayback = () => {
     if (isPlaying.value) return;
 
     shouldLoop = options.loop ?? false;
+    loopRegion = options.loopRegion ?? null;
     onComplete = options.onComplete ?? null;
 
     if (options.restart) {
@@ -79,6 +91,21 @@ export const useMovementPlayback = () => {
     const firstFrameTime = frames[0]?.time ?? 0;
     const lastFrameTime = frames[frames.length - 1]?.time ?? firstFrameTime;
     const targetTime = firstFrameTime + (now - playbackStart);
+
+    if (loopRegion && targetTime - firstFrameTime >= loopRegion.endMs) {
+      const loopDurationMs = Math.max(loopRegion.endMs - loopRegion.startMs, 1);
+      const sourceTimeMs =
+        loopRegion.startMs +
+        ((targetTime - firstFrameTime - loopRegion.startMs) % loopDurationMs);
+
+      currentTimeMs.value = sourceTimeMs;
+      currentFrame.value = getInterpolatedMovementFrame(
+        recording.value,
+        sourceTimeMs,
+      );
+      animationFrameId = requestAnimationFrame(loop);
+      return;
+    }
 
     if (shouldLoop && targetTime >= lastFrameTime) {
       frameIndex = 0;
@@ -124,7 +151,10 @@ export const useMovementPlayback = () => {
   const pause = () => {
     isPlaying.value = false;
 
-    cancelAnimationFrame(animationFrameId);
+    if (typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(animationFrameId);
+    }
+    animationFrameId = 0;
   };
 
   const stop = () => {
@@ -132,6 +162,7 @@ export const useMovementPlayback = () => {
 
     frameIndex = 0;
     shouldLoop = false;
+    loopRegion = null;
     currentTimeMs.value = 0;
     hasCompleted.value = false;
     onComplete = null;

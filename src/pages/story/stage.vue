@@ -19,14 +19,11 @@
           @story-frame="controller.reportMapFrame"
         />
         <StoryProgressSidebar />
-        <StoryGestureOverlay
-          :gesture-label="gestureLabel"
-          :state="gestureStore.state"
-          :feedback-text="gestureStore.feedbackText"
-          :show-dev-controls="true"
-          @mark="gestureStore.markGestureSuccessful"
-          @repeat="gestureStore.repeatAttempt"
-          @cancel="gestureStore.cancelGesture"
+        <MigrationGestureCountdown
+          v-if="countdownNumber"
+          :gesture-id="gestureStore.activeGestureId ?? undefined"
+          :count="countdownNumber"
+          :initial="Boolean(store.initialCountdownNumber)"
         />
       </section>
     </template>
@@ -39,7 +36,7 @@
         <MovementStage
           :landmarks="instructorLandmarks"
           source-mode="recorded-motion"
-          :source-aspect="controller.gestures.instructorSourceAspect.value"
+          :source-aspect="instructorSourceAspect"
           :fill-frame="true"
         />
       </section>
@@ -54,6 +51,8 @@
           mode="camera"
           :fixed="false"
           :show-hands="false"
+          :skeleton-visual-mode="skeletonVisualMode"
+          :skeleton-pulse-progress="skeletonPulseProgress"
           @pose-landmarks="controller.handlePoseFrame"
         />
       </section>
@@ -64,59 +63,21 @@
         class="season-clock-panel"
         :aria-label="t('story.aria.seasonClock')"
       >
-        <SeasonClock :show-controls="false" :date="store.currentDate">
+        <SeasonClock
+          fill-container
+          :show-controls="false"
+          :date="store.currentDate"
+        >
           <span class="season-clock-panel__date">{{ store.currentDate }}</span>
         </SeasonClock>
       </section>
     </template>
 
     <template #guidance>
-      <section
-        class="story-info-panel"
-        :aria-label="t('storyStage.aria.gestureDebug')"
-      >
-        <p class="story-info-panel__eyebrow">{{ store.currentDate }}</p>
-        <h1>{{ gestureLabel }}</h1>
-        <p>{{ gestureStore.feedbackText || playbackLabel }}</p>
-        <dl class="story-info-panel__debug">
-          <div>
-            <dt>State</dt>
-            <dd>{{ store.playbackState }}</dd>
-          </div>
-          <div>
-            <dt>Mode</dt>
-            <dd>{{ store.playbackMode }}</dd>
-          </div>
-          <div>
-            <dt>Phase</dt>
-            <dd>{{ store.currentPhase }}</dd>
-          </div>
-          <div>
-            <dt>Event</dt>
-            <dd>{{ activeEventLabel }}</dd>
-          </div>
-          <div>
-            <dt>Pauses</dt>
-            <dd>{{ store.pauseReasons.join(", ") || "none" }}</dd>
-          </div>
-          <div>
-            <dt>Beat</dt>
-            <dd>
-              {{ audioStore.baseRhythmPosition.currentBar }}:{{
-                audioStore.baseRhythmPosition.currentBeat
-              }}
-            </dd>
-          </div>
-          <div>
-            <dt>Calendar season</dt>
-            <dd>{{ store.seasonAudio.currentSeason ?? "none" }}</dd>
-          </div>
-          <div>
-            <dt>Theme load</dt>
-            <dd>{{ themeLoadLabel }}</dd>
-          </div>
-        </dl>
-      </section>
+      <MigrationActInfoPanel
+        :model="infoPanel.model.value"
+        @action="handlePanelAction"
+      />
     </template>
 
     <template #controls>
@@ -178,6 +139,15 @@
             @input="seekFromInput"
           />
         </label>
+        <details class="story-stage-controls__diagnostics">
+          <summary>Diagnostics</summary>
+          <dl>
+            <div v-for="row in diagnosticRows" :key="row.label">
+              <dt>{{ row.label }}</dt>
+              <dd>{{ row.value }}</dd>
+            </div>
+          </dl>
+        </details>
       </section>
     </template>
   </MigrationStoryLayout>
@@ -188,14 +158,20 @@ import { computed, onBeforeUnmount, onMounted } from "vue";
 import BirdMap from "~/components/map/BirdMap.vue";
 import MovementCamera from "~/components/movement/MovementCamera.vue";
 import MovementStage from "~/components/movement/MovementStage.vue";
+import MigrationActInfoPanel from "~/components/story/MigrationActInfoPanel.vue";
+import MigrationGestureCountdown from "~/components/story/MigrationGestureCountdown.vue";
 import MigrationStoryLayout from "~/components/story/MigrationStoryLayout.vue";
 import SeasonClock from "~/components/story/SeasonClock.vue";
-import StoryGestureOverlay from "~/components/story/StoryGestureOverlay.vue";
 import StoryProgressSidebar from "~/components/story/StoryProgressSidebar.vue";
+import { useMigrationActInfoPanelModel } from "~/composables/migrationActs/useMigrationActInfoPanelModel";
+import { useMigrationGestureDiagnostics } from "~/composables/migrationActs/useMigrationGestureDiagnostics";
 import { useMigrationActRuntime } from "~/composables/migrationActs/useMigrationActRuntime";
 import { useAudioStore } from "~/store/audioStore";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
-import type { MigrationActCycleRun } from "~/types/migrationAct";
+import type {
+  MigrationActCycleRun,
+  MigrationInfoPanelActionId,
+} from "~/types/migrationAct";
 import { getMigrationCycleButtonLabel } from "~/utils/migrationActs/config";
 import { migrationStoryCycleDefinitions as storyCycleDefinitions } from "~/utils/migrationStoryData";
 import { getSeasonForDate } from "~/utils/storyCycle";
@@ -221,25 +197,39 @@ const controller = useMigrationActRuntime({
   cycleRuns,
 });
 const gestureStore = controller.gestures.store;
+const gestureDiagnosticRows = useMigrationGestureDiagnostics();
+const infoPanel = useMigrationActInfoPanelModel({
+  showDevActions: true,
+  completed: computed(() => store.playbackState === "completed"),
+});
 
 const activeSeasonId = computed(() =>
   store.currentDate ? getSeasonForDate(store.currentDate).id : "summer",
 );
+const countdownNumber = computed(
+  () => store.initialCountdownNumber ?? gestureStore.countdownNumber,
+);
 const instructorLandmarks = computed(
-  () => controller.gestures.instructorFrame.value?.landmarks ?? null,
-);
-const gestureLabel = computed(
   () =>
-    controller.activeEvent.value?.eventType.replace("_", " ") ??
-    gestureStore.activeGesture?.label ??
-    "Migration Runtime",
+    (gestureStore.isActive
+      ? controller.gestures.instructorFrame.value
+      : controller.movement.instructorFrame.value
+    )?.landmarks ?? null,
 );
-const activeEventLabel = computed(
-  () => controller.activeEvent.value?.eventType ?? "none",
+const instructorSourceAspect = computed(() =>
+  gestureStore.isActive
+    ? controller.gestures.instructorSourceAspect.value
+    : controller.movement.sourceAspect.value,
 );
-const playbackLabel = computed(
-  () =>
-    `${store.playbackState} at ${(store.currentElapsedMs / 1000).toFixed(2)} s`,
+const skeletonVisualMode = computed(() =>
+  gestureStore.isActive
+    ? controller.gestures.skeletonFeedbackState.value.mode
+    : controller.movementRecognition.skeletonFeedbackState.value.mode,
+);
+const skeletonPulseProgress = computed(() =>
+  gestureStore.isActive
+    ? controller.gestures.pulseProgress.value
+    : controller.movementRecognition.pulseProgress.value,
 );
 const themeLoadLabel = computed(
   () =>
@@ -253,6 +243,31 @@ const playbackButtonLabel = computed(() => {
   if (store.playbackState === "completed") return "Restart";
   return t("storyStage.controls.playStory");
 });
+const diagnosticRows = computed(() => [
+  ...gestureDiagnosticRows.value,
+  { label: "State", value: store.playbackState },
+  { label: "Mode", value: store.playbackMode },
+  { label: "Phase", value: store.currentPhase ?? "none" },
+  {
+    label: "Event",
+    value: controller.activeEvent.value?.eventType ?? "none",
+  },
+  { label: "Pauses", value: store.pauseReasons.join(", ") || "none" },
+  {
+    label: "Failed criteria",
+    value:
+      gestureStore.latestEvaluationResult?.failedCriteria.join(", ") || "none",
+  },
+  {
+    label: "Beat",
+    value: `${audioStore.baseRhythmPosition.currentBar}:${audioStore.baseRhythmPosition.currentBeat}`,
+  },
+  {
+    label: "Calendar season",
+    value: store.seasonAudio.currentSeason ?? "none",
+  },
+  { label: "Theme load", value: themeLoadLabel.value },
+]);
 
 const togglePlayback = () => {
   if (store.playbackState === "playing") controller.pause();
@@ -264,6 +279,15 @@ const togglePlayback = () => {
 const seekFromInput = (event: Event) => {
   const value = Number((event.target as HTMLInputElement).value);
   void controller.seekToElapsedMs(value);
+};
+
+const handlePanelAction = (actionId: MigrationInfoPanelActionId) => {
+  if (actionId === "cancelGesture") gestureStore.cancelGesture();
+  if (actionId === "markGestureSuccessful") {
+    gestureStore.markGestureSuccessful();
+  }
+  if (actionId === "repeatGesture") gestureStore.repeatAttempt();
+  if (actionId === "continueGesture") gestureStore.continueGesture();
 };
 
 onMounted(() => void controller.initialize());
@@ -288,8 +312,9 @@ onBeforeUnmount(() => controller.dispose());
   background: #121714;
 }
 
-.map-panel--gesture-active :deep(.leaflet-container) {
+.map-panel--gesture-active :deep(.bird-map) {
   filter: saturate(0.7) brightness(0.82);
+  pointer-events: none;
 }
 
 .season-clock-panel {
@@ -297,26 +322,8 @@ onBeforeUnmount(() => controller.dispose());
   place-items: center;
 }
 
-.season-clock-panel__date,
-.story-info-panel__eyebrow {
+.season-clock-panel__date {
   font-weight: 700;
-}
-
-.story-info-panel__debug {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.story-info-panel__debug div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.story-info-panel__debug dd {
-  margin: 0;
-  text-align: right;
 }
 
 .story-stage-controls {
@@ -344,6 +351,36 @@ onBeforeUnmount(() => controller.dispose());
   display: grid;
   gap: 3px;
   font-size: 0.8rem;
+}
+
+.story-stage-controls__diagnostics {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+}
+
+.story-stage-controls__diagnostics summary {
+  width: max-content;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.story-stage-controls__diagnostics dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+
+.story-stage-controls__diagnostics dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.story-stage-controls__diagnostics dd {
+  margin: 0;
+  text-align: right;
 }
 
 @media (max-width: 1050px) {

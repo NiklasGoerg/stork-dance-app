@@ -9,6 +9,7 @@ export type BeatSkeletonFeedbackEvent = {
   measureIndex: number;
   beatIndex: number;
   result: BeatSkeletonFeedbackResult;
+  pulseDurationMs?: number;
 };
 
 export const SKELETON_SUCCESS_PULSE_DURATION_MS = 450;

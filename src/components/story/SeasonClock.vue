@@ -1,6 +1,7 @@
 <template>
   <section
     class="season-clock"
+    :class="{ 'season-clock--fill-container': fillContainer }"
     :style="seasonClockStyle"
     :aria-label="t('seasonClock.aria.clock')"
   >
@@ -149,11 +150,13 @@ const { t } = useI18n();
 const props = withDefaults(
   defineProps<{
     showControls?: boolean;
+    fillContainer?: boolean;
     date?: string;
     isPlaying?: boolean;
   }>(),
   {
     showControls: true,
+    fillContainer: false,
     date: "2013-06-01",
     isPlaying: false,
   },
@@ -307,6 +310,23 @@ watch(currentDate, (date) => {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.season-clock--fill-container {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: 1;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.season-clock--fill-container .season-clock__svg {
+  width: 100%;
+  height: 100%;
 }
 
 .season-clock__base-disc {

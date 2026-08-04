@@ -148,6 +148,12 @@
           <dt>{{ t("story.acts.act5.status.time") }}</dt>
           <dd>{{ timeLabel }}</dd>
         </div>
+        <template v-if="isDebugMode">
+          <div v-for="item in movementDebugRows" :key="item.label">
+            <dt>{{ item.label }}</dt>
+            <dd>{{ item.value }}</dd>
+          </div>
+        </template>
       </dl>
 
       <button
@@ -220,6 +226,17 @@ const {
   seasonElapsedMs,
   seasonPhase,
   showInstructorAvatar,
+  configuredMovementId,
+  movementFrameCount,
+  movementIntensity,
+  movementLoaded,
+  movementLoopCount,
+  movementLoopEndMs,
+  movementLoopStartMs,
+  movementPrerollMs,
+  movementSourceDurationMs,
+  movementSourceFps,
+  movementSourceTimeMs,
   totalDurationMs,
 } = cycle;
 
@@ -306,27 +323,10 @@ const {
   dispose: disposeSkeletonFeedback,
 } = useAct5SkeletonFeedback({ recognition });
 
-const mirrorLandmarksHorizontally = <T extends { x: number }>(
-  landmarks: T[] | null | undefined,
-): T[] | null =>
-  landmarks?.map((landmark) => ({
-    ...landmark,
-    x: 1 - landmark.x,
-  })) ?? null;
-const shouldMirrorAutumnInstructor = computed(
-  () =>
-    (act5Store.currentSeason ?? currentSeason.value.id) === "autumn" &&
-    repetitionIndex.value !== null &&
-    repetitionIndex.value >= 2,
-);
 const instructorLandmarks = computed(() => {
-  if (!showInstructorAvatar.value) return null;
+  if (!showInstructorAvatar.value || !movementLoaded.value) return null;
 
-  const landmarks = instructorFrame.value?.landmarks ?? null;
-
-  return shouldMirrorAutumnInstructor.value
-    ? mirrorLandmarksHorizontally(landmarks)
-    : landmarks;
+  return instructorFrame.value?.landmarks ?? null;
 });
 const repetitionLabel = computed(() =>
   repetitionIndex.value === null
@@ -340,6 +340,106 @@ const timeLabel = computed(
   () =>
     `${(elapsedMs.value / 1000).toFixed(1)} / ${(totalDurationMs.value / 1000).toFixed(0)} s`,
 );
+type AutumnDebugMetrics = {
+  expectedStartSide?: string;
+  detectedDirection?: string;
+  activeArm?: string;
+  outerElbowAngle?: number | null;
+  normalizedShoulderWristDistance?: number | null;
+  armExtended?: boolean | null;
+  sweepPositionValid?: boolean | null;
+};
+type AutumnDebugSnapshot = {
+  currentRepetitionIndex?: number | null;
+  metrics?: AutumnDebugMetrics;
+};
+const formatDebugNumber = (value: number | null | undefined) =>
+  typeof value === "number" ? value.toFixed(3) : "n/a";
+const autumnDebugSnapshot = computed(
+  () =>
+    recognition.debugSnapshots.value.autumn as AutumnDebugSnapshot | undefined,
+);
+const currentAutumnMetrics = computed(() => autumnDebugSnapshot.value?.metrics);
+const lastCriterionFailure = computed(
+  () =>
+    recognition.currentEvaluation.value?.criteria.find(
+      (criterion) => criterion.status === "failed",
+    )?.id ?? "none",
+);
+const movementDebugRows = computed(() => {
+  const isAutumn =
+    (act5Store.currentSeason ?? currentSeason.value.id) === "autumn";
+  const metrics = isAutumn ? currentAutumnMetrics.value : undefined;
+
+  return [
+    {
+      label: "activeSeason",
+      value: act5Store.currentSeason ?? currentSeason.value.id,
+    },
+    { label: "activeIntensity", value: movementIntensity.value ?? "n/a" },
+    { label: "movementId", value: configuredMovementId.value ?? "none" },
+    { label: "sourceFps", value: movementSourceFps.value ?? "n/a" },
+    { label: "frameCount", value: movementFrameCount.value },
+    {
+      label: "sourceDurationMs",
+      value: formatDebugNumber(movementSourceDurationMs.value),
+    },
+    { label: "prerollMs", value: movementPrerollMs.value },
+    { label: "loopStartMs", value: movementLoopStartMs.value },
+    {
+      label: "loopEndMs",
+      value: formatDebugNumber(movementLoopEndMs.value),
+    },
+    {
+      label: "sourceTimeMs",
+      value: formatDebugNumber(movementSourceTimeMs.value),
+    },
+    { label: "loopCount", value: movementLoopCount.value },
+    {
+      label: "currentMeasure",
+      value:
+        recognition.currentMeasureEvaluation.value?.measureIndex ??
+        repetitionIndex.value ??
+        "n/a",
+    },
+    {
+      label: "currentSweepIndex",
+      value:
+        isAutumn && repetitionIndex.value !== null
+          ? repetitionIndex.value + 1
+          : "n/a",
+    },
+    {
+      label: "expectedSweepDirection",
+      value: isAutumn
+        ? ((
+            recognition.currentEvaluation.value as {
+              expectedDirection?: string;
+            } | null
+          )?.expectedDirection ?? "n/a")
+        : "n/a",
+    },
+    {
+      label: "detectedSweepDirection",
+      value: metrics?.detectedDirection ?? "n/a",
+    },
+    { label: "activeArm", value: metrics?.activeArm ?? "n/a" },
+    {
+      label: "elbowAngle",
+      value: formatDebugNumber(metrics?.outerElbowAngle),
+    },
+    {
+      label: "normalizedShoulderWristDistance",
+      value: formatDebugNumber(metrics?.normalizedShoulderWristDistance),
+    },
+    { label: "armExtended", value: metrics?.armExtended ?? "n/a" },
+    {
+      label: "sweepPositionValid",
+      value: metrics?.sweepPositionValid ?? "n/a",
+    },
+    { label: "lastCriterionFailure", value: lastCriterionFailure.value },
+  ];
+});
 
 const togglePlayback = async () => {
   if (act5Store.isCompleted) return;

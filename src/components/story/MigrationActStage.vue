@@ -21,14 +21,11 @@
           @story-frame="controller.reportMapFrame"
         />
         <StoryProgressSidebar />
-        <StoryGestureOverlay
-          :gesture-label="gestureLabel"
-          :state="gestureStore.state"
-          :feedback-text="gestureStore.feedbackText"
-          :show-dev-controls="showDevControls"
-          @mark="gestureStore.markGestureSuccessful"
-          @repeat="gestureStore.repeatAttempt"
-          @cancel="gestureStore.cancelGesture"
+        <MigrationGestureCountdown
+          v-if="countdownNumber"
+          :gesture-id="gestureStore.activeGestureId ?? undefined"
+          :count="countdownNumber"
+          :initial="Boolean(store.initialCountdownNumber)"
         />
       </section>
     </template>
@@ -41,30 +38,9 @@
         <MovementStage
           :landmarks="instructorLandmarks"
           source-mode="recorded-motion"
-          :source-aspect="controller.gestures.instructorSourceAspect.value"
+          :source-aspect="instructorSourceAspect"
           :fill-frame="true"
         />
-        <div
-          v-if="store.playbackState === 'cycle_transition'"
-          class="migration-overlay"
-        >
-          {{ t("story.acts.act2.cycleCompleted") }}
-        </div>
-        <div v-if="store.playbackState === 'error'" class="migration-overlay">
-          {{ store.error }}
-        </div>
-        <div v-if="runtimeStore.showContinueGate" class="migration-overlay">
-          <strong>{{
-            t("story.acts.act2.actCompleted", { title: actTitle })
-          }}</strong>
-          <button
-            class="btn btn--primary"
-            type="button"
-            @click="continueToNextAct"
-          >
-            {{ t("common.continue") }}
-          </button>
-        </div>
       </section>
     </template>
 
@@ -77,6 +53,8 @@
           mode="camera"
           :fixed="false"
           :show-hands="false"
+          :skeleton-visual-mode="skeletonVisualMode"
+          :skeleton-pulse-progress="skeletonPulseProgress"
           @pose-landmarks="controller.handlePoseFrame"
         />
       </section>
@@ -84,50 +62,44 @@
 
     <template #clock>
       <div class="migration-clock">
-        <SeasonClock :show-controls="false" :date="store.currentDate">
+        <SeasonClock
+          fill-container
+          :show-controls="false"
+          :date="store.currentDate"
+        >
           <span class="migration-clock__date">{{ store.currentDate }}</span>
         </SeasonClock>
       </div>
     </template>
 
     <template #guidance>
-      <section class="migration-guidance" :aria-label="activeSceneTitle">
-        <p class="migration-guidance__eyebrow">{{ store.currentDate }}</p>
-        <h1>{{ activeSceneTitle }}</h1>
-        <p>{{ activeSceneNarration }}</p>
-        <dl class="migration-guidance__meta">
-          <div>
-            <dt>{{ actTitle }}</dt>
-            <dd>{{ activeCycleCountLabel }}</dd>
-          </div>
-          <div v-if="store.activeCycleRun">
-            <dt>{{ t("map.storyCycles") }}</dt>
-            <dd>{{ activeCycleTitle }}</dd>
-          </div>
-        </dl>
-        <dl v-if="showDevControls" class="migration-guidance__debug">
-          <div>
-            <dt>Season</dt>
-            <dd>{{ store.seasonAudio.currentSeason ?? "none" }}</dd>
-          </div>
-          <div>
-            <dt>Theme assets</dt>
-            <dd>{{ themeLoadLabel }}</dd>
-          </div>
-        </dl>
-      </section>
+      <MigrationActInfoPanel
+        :model="infoPanel.model.value"
+        @action="handlePanelAction"
+      />
     </template>
 
     <template #controls>
-      <MigrationActControls
-        :cycle-runs="cycleRuns"
-        :allow-single-cycle="act.id === 'act-3' || act.id === 'act-4'"
-        @start-story="controller.startStory"
-        @start-cycle="controller.startSingleCycle"
-        @pause="controller.pause"
-        @resume="controller.resume"
-        @reset="controller.reset"
-      />
+      <div class="migration-controls-stack">
+        <MigrationActControls
+          :cycle-runs="cycleRuns"
+          :allow-single-cycle="act.id === 'act-3' || act.id === 'act-4'"
+          @start-story="controller.startStory"
+          @start-cycle="controller.startSingleCycle"
+          @pause="controller.pause"
+          @resume="controller.resume"
+          @reset="controller.reset"
+        />
+        <details v-if="showDevControls" class="migration-diagnostics">
+          <summary>Diagnostics</summary>
+          <dl>
+            <div v-for="row in diagnosticRows" :key="row.label">
+              <dt>{{ row.label }}</dt>
+              <dd>{{ row.value }}</dd>
+            </div>
+          </dl>
+        </details>
+      </div>
     </template>
   </MigrationStoryLayout>
 </template>
@@ -138,10 +110,13 @@ import BirdMap from "~/components/map/BirdMap.vue";
 import MovementCamera from "~/components/movement/MovementCamera.vue";
 import MovementStage from "~/components/movement/MovementStage.vue";
 import MigrationActControls from "~/components/story/MigrationActControls.vue";
+import MigrationActInfoPanel from "~/components/story/MigrationActInfoPanel.vue";
+import MigrationGestureCountdown from "~/components/story/MigrationGestureCountdown.vue";
 import MigrationStoryLayout from "~/components/story/MigrationStoryLayout.vue";
 import SeasonClock from "~/components/story/SeasonClock.vue";
-import StoryGestureOverlay from "~/components/story/StoryGestureOverlay.vue";
 import StoryProgressSidebar from "~/components/story/StoryProgressSidebar.vue";
+import { useMigrationActInfoPanelModel } from "~/composables/migrationActs/useMigrationActInfoPanelModel";
+import { useMigrationGestureDiagnostics } from "~/composables/migrationActs/useMigrationGestureDiagnostics";
 import { useMigrationActRuntime } from "~/composables/migrationActs/useMigrationActRuntime";
 import { useStoryEngine } from "~/composables/useStoryEngine";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
@@ -150,17 +125,25 @@ import { migrationStoryCycleDefinitions as storyCycleDefinitions } from "~/utils
 import { getSeasonForDate } from "~/utils/storyCycle";
 import { resolveMigrationActCycleRuns } from "~/utils/migrationActs/config";
 import type { StoryAct } from "~/story/types";
+import type { MigrationInfoPanelActionId } from "~/types/migrationAct";
 
 const props = defineProps<{ act: StoryAct }>();
-const { t, getActTitle, getSceneTitle, getSceneNarration } =
-  useStoryTranslations();
+const { t, getActTitle } = useStoryTranslations();
 const store = useMigrationActStore();
 const runtimeStore = useStoryRuntimeStore();
 const storyEngine = useStoryEngine();
 const cycleRuns = resolveMigrationActCycleRuns(props.act);
 const controller = useMigrationActRuntime({ act: props.act, cycleRuns });
 const gestureStore = controller.gestures.store;
+const gestureDiagnosticRows = useMigrationGestureDiagnostics();
 const showDevControls = import.meta.dev;
+const infoPanel = useMigrationActInfoPanelModel({
+  showDevActions: showDevControls,
+  completed: computed(
+    () => runtimeStore.showContinueGate || store.playbackState === "completed",
+  ),
+  showContinueAction: computed(() => runtimeStore.showContinueGate),
+});
 
 const actTitle = computed(() => getActTitle(props.act));
 const activeCycleId = computed(() => store.activeCycleId);
@@ -170,44 +153,86 @@ const activeCycleDefinitions = computed(() =>
 const activeSeasonId = computed(() =>
   store.currentDate ? getSeasonForDate(store.currentDate).id : "summer",
 );
-const activeScene = computed(
-  () =>
-    props.act.scenes[
-      Math.min(store.activeCycleIndex, props.act.scenes.length - 1)
-    ] ?? null,
-);
-const activeSceneTitle = computed(() =>
-  activeScene.value ? getSceneTitle(activeScene.value) : actTitle.value,
-);
-const activeSceneNarration = computed(() =>
-  activeScene.value ? getSceneNarration(activeScene.value) : "",
-);
-const activeCycleTitle = computed(() => store.activeCycleRun?.title ?? "");
-const activeCycleCountLabel = computed(() =>
-  t("story.acts.act2.cycleCount", {
-    current: store.activeCycleIndex + 1,
-    total: store.cycleRuns.length,
-  }),
+const countdownNumber = computed(
+  () => store.initialCountdownNumber ?? gestureStore.countdownNumber,
 );
 const instructorLandmarks = computed(
-  () => controller.gestures.instructorFrame.value?.landmarks ?? null,
-);
-const gestureLabel = computed(
   () =>
-    controller.activeEvent.value?.eventType.replace("_", " ") ??
-    gestureStore.activeGesture?.label ??
-    "Gesture",
+    (gestureStore.isActive
+      ? controller.gestures.instructorFrame.value
+      : controller.movement.instructorFrame.value
+    )?.landmarks ?? null,
 );
+const instructorSourceAspect = computed(() =>
+  gestureStore.isActive
+    ? controller.gestures.instructorSourceAspect.value
+    : controller.movement.sourceAspect.value,
+);
+const skeletonVisualMode = computed(() =>
+  gestureStore.isActive
+    ? controller.gestures.skeletonFeedbackState.value.mode
+    : controller.movementRecognition.skeletonFeedbackState.value.mode,
+);
+const skeletonPulseProgress = computed(() =>
+  gestureStore.isActive
+    ? controller.gestures.pulseProgress.value
+    : controller.movementRecognition.pulseProgress.value,
+);
+const formatDebugNumber = (value: number | null, digits = 3) =>
+  value === null ? "none" : value.toFixed(digits);
 const themeLoadLabel = computed(
   () =>
     store.seasonAudio.error ||
     (store.seasonAudio.isReady ? "ready" : "loading"),
 );
+const diagnosticRows = computed(() => [
+  ...gestureDiagnosticRows.value,
+  { label: "playbackState", value: store.playbackState },
+  { label: "currentStoryPhase", value: store.currentPhase ?? "none" },
+  {
+    label: "currentMovement",
+    value: controller.movement.resolvedMovement.value?.movementId ?? "none",
+  },
+  {
+    label: "recognitionProfile",
+    value: controller.movementRecognition.recognitionProfile.value ?? "none",
+  },
+  {
+    label: "movementEvaluationStatus",
+    value: controller.movementRecognition.lastEvaluationStatus.value,
+  },
+  {
+    label: "failedCriteria",
+    value:
+      gestureStore.latestEvaluationResult?.failedCriteria.join(", ") || "none",
+  },
+  { label: "pauseReasons", value: store.pauseReasons.join(", ") || "none" },
+  {
+    label: "movementSourceTimeMs",
+    value: formatDebugNumber(controller.movement.movementSourceTimeMs.value, 1),
+  },
+  {
+    label: "currentBeatWindow",
+    value: controller.movementRecognition.currentBeatWindow.value,
+  },
+  { label: "season", value: store.seasonAudio.currentSeason ?? "none" },
+  { label: "themeAssets", value: themeLoadLabel.value },
+]);
 
 const continueToNextAct = async () => {
   const nextActId = runtimeStore.currentAct?.nextActId;
   storyEngine.continueFromGate();
   if (nextActId) await navigateTo(`/story/${nextActId}`);
+};
+
+const handlePanelAction = (actionId: MigrationInfoPanelActionId) => {
+  if (actionId === "cancelGesture") gestureStore.cancelGesture();
+  if (actionId === "markGestureSuccessful") {
+    gestureStore.markGestureSuccessful();
+  }
+  if (actionId === "repeatGesture") gestureStore.repeatAttempt();
+  if (actionId === "continueGesture") gestureStore.continueGesture();
+  if (actionId === "continueToNextAct") void continueToNextAct();
 };
 
 onMounted(() => void controller.initialize());
@@ -227,8 +252,9 @@ onBeforeUnmount(() => controller.dispose());
   overflow: hidden;
 }
 
-.migration-map--gesture-active :deep(.leaflet-container) {
+.migration-map--gesture-active :deep(.bird-map) {
   filter: saturate(0.7) brightness(0.82);
+  pointer-events: none;
 }
 
 .migration-avatar,
@@ -236,62 +262,47 @@ onBeforeUnmount(() => controller.dispose());
   background: #121714;
 }
 
-.migration-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  display: grid;
-  place-content: center;
-  gap: var(--space-3);
-  padding: var(--space-5);
-  background: rgba(18, 23, 20, 0.82);
-  color: white;
-  text-align: center;
-}
-
 .migration-clock {
   display: grid;
   place-items: center;
 }
 
-.migration-clock__date,
-.migration-guidance__eyebrow {
+.migration-clock__date {
   font-weight: 700;
 }
 
-.migration-guidance__meta {
+.migration-controls-stack {
   display: grid;
   gap: var(--space-2);
-  margin: var(--space-4) 0 0;
 }
 
-.migration-guidance__debug {
+.migration-diagnostics {
+  font-size: 0.76rem;
+}
+
+.migration-diagnostics summary {
+  width: max-content;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.migration-diagnostics dl {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-1) var(--space-3);
-  margin: var(--space-3) 0 0;
-  font-size: 0.72rem;
+  margin: var(--space-2) 0 0;
 }
 
-.migration-guidance__debug div {
+.migration-diagnostics dl div {
   display: flex;
   justify-content: space-between;
   gap: var(--space-2);
 }
 
-.migration-guidance__debug dd {
+.migration-diagnostics dd {
   margin: 0;
-  text-align: right;
-}
-
-.migration-guidance__meta div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.migration-guidance__meta dd {
-  margin: 0;
+  overflow-wrap: anywhere;
   text-align: right;
 }
 </style>

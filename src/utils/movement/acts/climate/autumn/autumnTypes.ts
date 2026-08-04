@@ -80,6 +80,7 @@ export type AutumnRecognitionMetrics = {
   startSidePassed: boolean | null;
   directionLocked: boolean;
   directionResult: AutumnDirectionResult;
+  detectedDirection: AutumnDirection | "unknown";
   directionFailureReason: AutumnDirectionFailureReason;
   signedProgressFromBeat1: number | null;
   normalizedProgress: number | null;
@@ -98,6 +99,9 @@ export type AutumnRecognitionMetrics = {
   outerWristXOffset: number | null;
   outerWristProgressToCenter: number | null;
   outerElbowAngle: number | null;
+  normalizedShoulderWristDistance: number | null;
+  activeArm: "left" | "right" | "unknown";
+  armExtended: boolean | null;
   outerArmExtensionClass: AutumnArmExtensionClass;
   outerArmDirectionX: number | null;
   outerArmDirectionY: number | null;
@@ -107,6 +111,7 @@ export type AutumnRecognitionMetrics = {
   torsoFacingScore: number | null;
   progressFromStartingPose: number | null;
   detectedValueClass: AutumnValueClass | "unknown";
+  sweepPositionValid: boolean | null;
   landmarkConfidence: string;
 };
 
@@ -160,8 +165,9 @@ export type AutumnThresholds = {
   outerWristBeyondShoulderMin: number;
   outerWristNearShoulderMin: number;
   outerWristAutumn80Min: number;
-  outerElbowLargeMin: number;
-  outerElbowMaximumMin: number;
+  outerElbowExtendedMin: number;
+  outerElbowNearExtendedMin: number;
+  normalizedShoulderWristDistanceMin: number;
   armDirectionSimilarityMin: number;
   innerForearmDestinationMin: number;
   torsoFacingMinScore: number;

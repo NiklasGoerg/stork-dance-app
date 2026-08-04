@@ -194,6 +194,80 @@
     "overview": {
       "title": "Story Overview"
     },
+    "migrationPanel": {
+      "ariaLabel": "Migration movement guidance",
+      "current": "Now",
+      "next": "Next",
+      "completedMovement": "Done",
+      "systemError": "Something went wrong",
+      "nextCycle": "The next migration cycle is about to begin.",
+      "completed": "Migration act completed",
+      "movements": {
+        "summerRest": "Summer Stay",
+        "autumnMigration": "Autumn Migration",
+        "winterRest": "Winter Stay",
+        "springMigration": "Spring Migration",
+        "departure": "Departure",
+        "arrival": "Arrival"
+      },
+      "instructions": {
+        "summerRest": "Step gently from side to side.",
+        "winterRest": "Keep stepping with a soft bounce.",
+        "autumnMigration": "Move diagonally backward.",
+        "springMigration": "Move diagonally forward.",
+        "followRhythm": "Follow the rhythm.",
+        "flapAndStep": "Flap your arms and keep stepping.",
+        "returnStart": "Return toward the starting position."
+      },
+      "gestures": {
+        "attempt": "Attempt {count}",
+        "demonstration": "Watch the avatar",
+        "startCountdown": "Story begins in",
+        "countdownHeading": "{gesture} in",
+        "departure": {
+          "preparation": "Bend your knees and prepare for take-off.",
+          "instruction": "Follow the avatar on the beat, then raise your arms."
+        },
+        "arrival": {
+          "preparation": "Lower your body into a comfortable landing position.",
+          "instruction": "Follow the avatar on the beat and bend your knees clearly."
+        }
+      },
+      "success": {
+        "departure": {
+          "title": "Bravo!",
+          "text": "Great take-off."
+        },
+        "arrival": {
+          "title": "Good!",
+          "text": "You landed successfully."
+        }
+      },
+      "feedback": {
+        "tryAgain": "Try again",
+        "notEvaluable": {
+          "title": "Movement could not be evaluated",
+          "text": "Keep your shoulders, hips, knees, and arms visible to the camera."
+        },
+        "crouchLower": "Bend your knees a little more.",
+        "riseUp": "Rise up as you lift your arms.",
+        "handsUp": "Raise your hands above your head.",
+        "armsOut": "Stretch your arms out to the sides.",
+        "lowerArms": "Bring your arms down as you land.",
+        "genericRetry": "Follow the avatar and try the movement again."
+      },
+      "narration": {
+        "departureSuccess": "Bravo! Great take-off.",
+        "arrivalSuccess": "Good! You landed successfully.",
+        "notEvaluable": "Movement could not be evaluated. Keep your shoulders, hips, knees, and arms visible to the camera.",
+        "crouchLower": "Try again. Bend your knees a little more.",
+        "riseUp": "Try again. Rise up as you lift your arms.",
+        "handsUp": "Try again. Raise your hands above your head.",
+        "armsOut": "Try again. Stretch your arms out to the sides.",
+        "lowerArms": "Try again. Bring your arms down as you land.",
+        "genericRetry": "Follow the avatar and try the movement again."
+      }
+    },
     "runtime": {
       "layout": "Layout",
       "scene": "Scene",

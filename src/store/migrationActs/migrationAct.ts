@@ -37,6 +37,8 @@ type MigrationActState = {
   lastMapFrame: MigrationActMapFrame | null;
   diagnostics: MigrationActEventDiagnostic[];
   seasonAudio: MigrationSeasonAudioState;
+  temporaryMovementFeedbackId: string | null;
+  initialCountdownNumber: number | null;
   error: string;
 };
 
@@ -69,6 +71,8 @@ const getInitialState = (): MigrationActState => ({
   lastMapFrame: null,
   diagnostics: [],
   seasonAudio: getInitialSeasonAudioState(),
+  temporaryMovementFeedbackId: null,
+  initialCountdownNumber: null,
   error: "",
 });
 
@@ -200,6 +204,12 @@ export const useMigrationActStore = defineStore("migrationAct", {
     },
     setSeasonAudioState(patch: Partial<MigrationSeasonAudioState>) {
       Object.assign(this.seasonAudio, patch);
+    },
+    setTemporaryMovementFeedback(id: string | null) {
+      this.temporaryMovementFeedbackId = id;
+    },
+    setInitialCountdownNumber(count: number | null) {
+      this.initialCountdownNumber = count;
     },
     setError(error: string) {
       this.error = error;
