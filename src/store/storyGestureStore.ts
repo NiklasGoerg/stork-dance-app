@@ -15,6 +15,14 @@ export type GestureSessionDiagnostics = {
   movementScheduledStartMs: number | null;
   movementSourceTimeMs: number;
   recognitionSourceTimeMs: number;
+  sourceTimeDifferenceMs: number;
+  gestureAttemptNumber: number;
+  gestureAttemptScheduled: boolean;
+  gestureAttemptStartedAtTransportMs: number | null;
+  baselineCollectionStartMs: number | null;
+  baselineCollectionEndMs: number | null;
+  attemptBeat1TransportMs: number | null;
+  attemptBeat1SourceTimeMs: number | null;
   currentCheckpointId: string | null;
   checkpointTargetSourceTimeMs: number | null;
   checkpointWindowStartMs: number | null;
@@ -35,6 +43,14 @@ const emptyDiagnostics = (): GestureSessionDiagnostics => ({
   movementScheduledStartMs: null,
   movementSourceTimeMs: 0,
   recognitionSourceTimeMs: 0,
+  sourceTimeDifferenceMs: 0,
+  gestureAttemptNumber: 0,
+  gestureAttemptScheduled: false,
+  gestureAttemptStartedAtTransportMs: null,
+  baselineCollectionStartMs: null,
+  baselineCollectionEndMs: null,
+  attemptBeat1TransportMs: null,
+  attemptBeat1SourceTimeMs: null,
   currentCheckpointId: null,
   checkpointTargetSourceTimeMs: null,
   checkpointWindowStartMs: null,
@@ -79,7 +95,11 @@ export const useStoryGestureStore = defineStore("storyGesture", {
         : null,
     gesturePhase: (state): "countdown" | "attempt" | "feedback" | "idle" => {
       if (state.state === "waiting-for-lead-in") return "countdown";
-      if (state.state === "attempt-playing") return "attempt";
+      if (
+        state.state === "attempt-preroll" ||
+        state.state === "attempt-playing"
+      )
+        return "attempt";
       if (state.state === "retry-scheduled" || state.state === "success-exit") {
         return "feedback";
       }
@@ -105,7 +125,8 @@ export const useStoryGestureStore = defineStore("storyGesture", {
       if (state.state === "success-exit") {
         return translate("gestures.feedback.recognized");
       }
-      return state.state === "attempt-playing"
+      return state.state === "attempt-preroll" ||
+        state.state === "attempt-playing"
         ? translate(
             `story.migrationPanel.gestures.${state.activeGestureId}.instruction`,
           )

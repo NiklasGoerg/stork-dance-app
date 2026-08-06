@@ -23,6 +23,10 @@ export interface MovementPlaybackTiming {
   prerollMs: number;
   loopStartMs: number;
   loopEndMs: number;
+  loopTransition?: {
+    cutAtMs: number;
+    resumeAtMs: number;
+  };
 }
 
 export type MovementRecognitionPhase =

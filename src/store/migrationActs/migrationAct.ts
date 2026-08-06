@@ -9,6 +9,7 @@ import type {
   MigrationActPlaybackMode,
   MigrationActPlaybackState,
   MigrationActSurfaceId,
+  GuidedMigrationState,
   MigrationSeasonAudioState,
 } from "~/types/migrationAct";
 import type { StoryTimelineDay } from "~/utils/storyCycle";
@@ -40,7 +41,22 @@ type MigrationActState = {
   temporaryMovementFeedbackId: string | null;
   initialCountdownNumber: number | null;
   error: string;
+  guided: GuidedMigrationState;
 };
+
+const getInitialGuidedState = (): GuidedMigrationState => ({
+  phase: "idle",
+  activeMovementId: null,
+  activeGestureId: null,
+  demonstrationIndex: 0,
+  demonstrationCount: 2,
+  successfulBars: 0,
+  requiredSuccessfulBars: 3,
+  learnedMovementIds: [],
+  facilitatorCompletedPhases: [],
+  completionCount: 0,
+  status: "idle",
+});
 
 const getInitialSeasonAudioState = (): MigrationSeasonAudioState => ({
   currentSeason: null,
@@ -74,6 +90,7 @@ const getInitialState = (): MigrationActState => ({
   temporaryMovementFeedbackId: null,
   initialCountdownNumber: null,
   error: "",
+  guided: getInitialGuidedState(),
 });
 
 export const useMigrationActStore = defineStore("migrationAct", {
@@ -214,6 +231,22 @@ export const useMigrationActStore = defineStore("migrationAct", {
     setError(error: string) {
       this.error = error;
       this.playbackState = "error";
+    },
+    setGuidedState(patch: Partial<GuidedMigrationState>) {
+      Object.assign(this.guided, patch);
+    },
+    markGuidedMovementLearned(movementId: string) {
+      if (!this.guided.learnedMovementIds.includes(movementId)) {
+        this.guided.learnedMovementIds.push(movementId);
+      }
+    },
+    markGuidedPhaseFacilitatorCompleted(phase: GuidedMigrationState["phase"]) {
+      if (!this.guided.facilitatorCompletedPhases.includes(phase)) {
+        this.guided.facilitatorCompletedPhases.push(phase);
+      }
+    },
+    resetGuidedState() {
+      this.guided = getInitialGuidedState();
     },
     resetRuntime() {
       const actId = this.actId;

@@ -91,6 +91,14 @@ export const migrationGestureMovementDefinitions = {
         criteria: ["arms_out"],
       },
       {
+        id: "arrival-descent",
+        targetSourceTimeMs: 2_000,
+        windowBeforeMs: 350,
+        windowAfterMs: 550,
+        required: false,
+        criteria: ["arms_lowered_or_closer"],
+      },
+      {
         id: "arrival-landing",
         targetSourceTimeMs: 2_600,
         windowBeforeMs: 600,
@@ -111,3 +119,28 @@ export const getMigrationCheckpointWindow = (
   startMs: checkpoint.targetSourceTimeMs - checkpoint.windowBeforeMs,
   endMs: checkpoint.targetSourceTimeMs + checkpoint.windowAfterMs,
 });
+
+export const getMigrationGestureBeatForCheckpoint = (checkpointId: string) => {
+  const beats: Record<string, 1 | 2 | 3> = {
+    "departure-crouch": 1,
+    "departure-rise-hands": 2,
+    "departure-arms-out": 3,
+    "arrival-arms-out": 1,
+    "arrival-descent": 2,
+    "arrival-landing": 3,
+  };
+  return beats[checkpointId] ?? null;
+};
+
+export const resolveGestureCountdownSourceTime = ({
+  definition,
+  elapsedMs,
+  durationMs,
+}: {
+  definition: MigrationGestureMovementDefinition;
+  elapsedMs: number;
+  durationMs: number;
+}) =>
+  definition.prerollMs +
+  Math.min(Math.max(elapsedMs / Math.max(durationMs, 1), 0), 1) *
+    (definition.attemptEndSourceTimeMs - definition.prerollMs);

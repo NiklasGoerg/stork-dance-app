@@ -27,7 +27,7 @@
     </section>
 
     <footer
-      v-if="$slots.controls"
+      v-if="showControls && $slots.controls"
       class="migration-layout__controls"
       :aria-label="controlsAriaLabel"
     >
@@ -45,11 +45,13 @@ withDefaults(
     mapAriaLabel?: string;
     stageAriaLabel?: string;
     controlsAriaLabel?: string;
+    showControls?: boolean;
   }>(),
   {
     mapAriaLabel: undefined,
     stageAriaLabel: undefined,
     controlsAriaLabel: undefined,
+    showControls: true,
   },
 );
 </script>

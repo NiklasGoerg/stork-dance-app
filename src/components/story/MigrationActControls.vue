@@ -2,12 +2,24 @@
   <section class="migration-act-controls">
     <div class="migration-act-controls__actions">
       <button
+        v-if="showStoryAction"
         class="btn btn--primary"
         type="button"
         :disabled="store.isGestureActive"
         @click="onStoryAction"
       >
         {{ storyActionLabel }}
+      </button>
+      <button
+        v-for="action in actions"
+        :key="action.id"
+        class="btn"
+        :class="{ 'btn--primary': action.primary }"
+        type="button"
+        :disabled="action.disabled"
+        @click="$emit('action', action.id)"
+      >
+        {{ action.label }}
       </button>
       <button
         v-if="store.playbackMode === 'single_cycle' && isActivePlayback"
@@ -18,7 +30,14 @@
       >
         {{ store.playbackState === "paused" ? "Resume" : "Pause" }}
       </button>
-      <button class="btn" type="button" @click="$emit('reset')">Reset</button>
+      <button
+        v-if="showResetAction"
+        class="btn"
+        type="button"
+        @click="$emit('reset')"
+      >
+        Reset
+      </button>
     </div>
 
     <div v-if="allowSingleCycle" class="migration-act-controls__cycles">
@@ -62,13 +81,23 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
-import type { MigrationActCycleRun } from "~/types/migrationAct";
+import type {
+  MigrationActCycleRun,
+  MigrationInfoPanelAction,
+  MigrationInfoPanelActionId,
+} from "~/types/migrationAct";
 import { getMigrationCycleButtonLabel } from "~/utils/migrationActs/config";
 
-defineProps<{
-  cycleRuns: MigrationActCycleRun[];
-  allowSingleCycle: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    cycleRuns: MigrationActCycleRun[];
+    allowSingleCycle: boolean;
+    showStoryAction?: boolean;
+    showResetAction?: boolean;
+    actions?: readonly MigrationInfoPanelAction[];
+  }>(),
+  { showStoryAction: true, showResetAction: true, actions: () => [] },
+);
 
 const emit = defineEmits<{
   "start-story": [];
@@ -76,6 +105,7 @@ const emit = defineEmits<{
   pause: [];
   resume: [];
   reset: [];
+  action: [actionId: MigrationInfoPanelActionId];
 }>();
 
 const store = useMigrationActStore();

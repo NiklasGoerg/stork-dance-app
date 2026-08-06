@@ -80,6 +80,34 @@ export const resolveMovementPlaybackPosition = ({
 
   const movementElapsedMs = normalizedElapsedMs - prerollMs;
 
+  if (timing.loopTransition) {
+    const cutAtMs = Math.min(
+      Math.max(timing.loopTransition.cutAtMs, loopStartMs + 1),
+      durationMs,
+    );
+    const resumeAtMs = Math.min(
+      Math.max(timing.loopTransition.resumeAtMs, 0),
+      loopStartMs,
+    );
+    const firstSegmentMs = cutAtMs - loopStartMs;
+    const secondSegmentMs = loopStartMs - resumeAtMs;
+    const transitionLoopDurationMs = Math.max(
+      firstSegmentMs + secondSegmentMs,
+      1,
+    );
+    const barTimeMs = movementElapsedMs % transitionLoopDurationMs;
+
+    return {
+      sourceTimeMs:
+        barTimeMs < firstSegmentMs
+          ? loopStartMs + barTimeMs
+          : resumeAtMs + (barTimeMs - firstSegmentMs),
+      loopCount: Math.floor(movementElapsedMs / transitionLoopDurationMs),
+      isPreroll: false,
+      loopRegion: { startMs: resumeAtMs, endMs: cutAtMs },
+    };
+  }
+
   return {
     sourceTimeMs: loopStartMs + (movementElapsedMs % loopDurationMs),
     loopCount: Math.floor(movementElapsedMs / loopDurationMs),

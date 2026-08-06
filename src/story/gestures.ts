@@ -6,6 +6,7 @@ export type GestureInteractionState =
   | "inactive"
   | "loading-movement"
   | "waiting-for-lead-in"
+  | "attempt-preroll"
   | "attempt-playing"
   | "retry-scheduled"
   | "success-exit"

@@ -21,6 +21,17 @@ export interface NarrationSpeakOptions {
   pitch?: number;
   volume?: number;
   behavior?: NarrationSpeakBehavior;
+  onStart?: (details: NarrationSpeechStartDetails) => void;
+  onEnd?: (details: NarrationSpeechEndDetails) => void;
+}
+
+export interface NarrationSpeechStartDetails {
+  rate: number;
+  voiceName: string | null;
+}
+
+export interface NarrationSpeechEndDetails extends NarrationSpeechStartDetails {
+  status: NarrationResultStatus;
 }
 
 export type NarrationResultStatus =

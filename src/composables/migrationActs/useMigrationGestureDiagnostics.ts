@@ -21,6 +21,12 @@ export const buildMigrationGestureDiagnostics = ({
   transportTimeMs,
   scheduledStartMs,
   sourceTimeMs,
+  attemptBeat1TransportMs,
+  attemptBeat1SourceTimeMs,
+  baselineCollectionStartMs,
+  baselineCollectionEndMs,
+  attemptStarted,
+  attemptCount,
   poseSampleTimestampMs,
   checkpoint,
   samples,
@@ -31,6 +37,12 @@ export const buildMigrationGestureDiagnostics = ({
   transportTimeMs: number;
   scheduledStartMs: number | null;
   sourceTimeMs: number;
+  attemptBeat1TransportMs: number | null;
+  attemptBeat1SourceTimeMs: number | null;
+  baselineCollectionStartMs: number | null;
+  baselineCollectionEndMs: number | null;
+  attemptStarted: boolean;
+  attemptCount: number;
   poseSampleTimestampMs: number | null;
   checkpoint: MigrationMovementCheckpointDefinition | null;
   samples: TimedMigrationPoseSample[];
@@ -51,6 +63,16 @@ export const buildMigrationGestureDiagnostics = ({
     movementScheduledStartMs: scheduledStartMs,
     movementSourceTimeMs: sourceTimeMs,
     recognitionSourceTimeMs: sourceTimeMs,
+    sourceTimeDifferenceMs: 0,
+    gestureAttemptNumber: attemptCount,
+    gestureAttemptScheduled: scheduledStartMs !== null,
+    gestureAttemptStartedAtTransportMs: attemptStarted
+      ? attemptBeat1TransportMs
+      : null,
+    baselineCollectionStartMs,
+    baselineCollectionEndMs,
+    attemptBeat1TransportMs,
+    attemptBeat1SourceTimeMs,
     currentCheckpointId: checkpoint?.id ?? null,
     checkpointTargetSourceTimeMs: checkpoint?.targetSourceTimeMs ?? null,
     checkpointWindowStartMs: window?.startMs ?? null,
@@ -93,6 +115,38 @@ export const useMigrationGestureDiagnostics = () => {
         value: diagnostics.movementScheduledStartMs ?? "none",
       },
       { label: "gestureSourceTimeMs", value: store.currentSourceTimeMs },
+      {
+        label: "recognitionSourceTimeMs",
+        value: diagnostics.recognitionSourceTimeMs,
+      },
+      {
+        label: "sourceTimeDifferenceMs",
+        value: diagnostics.sourceTimeDifferenceMs,
+      },
+      {
+        label: "gestureAttemptNumber",
+        value: diagnostics.gestureAttemptNumber,
+      },
+      {
+        label: "gestureAttemptScheduled",
+        value: diagnostics.gestureAttemptScheduled ? "yes" : "no",
+      },
+      {
+        label: "gestureAttemptStartedAtTransportMs",
+        value: diagnostics.gestureAttemptStartedAtTransportMs ?? "none",
+      },
+      {
+        label: "attemptBeat1SourceTimeMs",
+        value: diagnostics.attemptBeat1SourceTimeMs ?? "none",
+      },
+      {
+        label: "baselineCollectionStartMs",
+        value: diagnostics.baselineCollectionStartMs ?? "none",
+      },
+      {
+        label: "baselineCollectionEndMs",
+        value: diagnostics.baselineCollectionEndMs ?? "none",
+      },
       {
         label: "currentCheckpoint",
         value: diagnostics.currentCheckpointId ?? "none",

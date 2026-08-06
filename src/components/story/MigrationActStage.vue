@@ -4,6 +4,7 @@
     :map-aria-label="t('story.aria.map', { title: actTitle })"
     :stage-aria-label="t('story.aria.stage', { title: actTitle })"
     :controls-aria-label="t('story.aria.runtimeMetadata')"
+    :show-controls="showBottomControls"
   >
     <template #map>
       <section
@@ -74,32 +75,25 @@
 
     <template #guidance>
       <MigrationActInfoPanel
-        :model="infoPanel.model.value"
-        @action="handlePanelAction"
+        :model="activeInfoPanelModel"
+        :show-actions="false"
       />
     </template>
 
     <template #controls>
-      <div class="migration-controls-stack">
-        <MigrationActControls
-          :cycle-runs="cycleRuns"
-          :allow-single-cycle="act.id === 'act-3' || act.id === 'act-4'"
-          @start-story="controller.startStory"
-          @start-cycle="controller.startSingleCycle"
-          @pause="controller.pause"
-          @resume="controller.resume"
-          @reset="controller.reset"
-        />
-        <details v-if="showDevControls" class="migration-diagnostics">
-          <summary>Diagnostics</summary>
-          <dl>
-            <div v-for="row in diagnosticRows" :key="row.label">
-              <dt>{{ row.label }}</dt>
-              <dd>{{ row.value }}</dd>
-            </div>
-          </dl>
-        </details>
-      </div>
+      <MigrationActControls
+        :cycle-runs="cycleRuns"
+        :allow-single-cycle="act.id === 'act-3' || act.id === 'act-4'"
+        :show-story-action="showStoryAction"
+        :show-reset-action="!guidedController.enabled"
+        :actions="activeInfoPanelModel.actions"
+        @start-story="handleStartStory"
+        @start-cycle="controller.startSingleCycle"
+        @pause="handlePause"
+        @resume="handleResume"
+        @reset="handleReset"
+        @action="handlePanelAction"
+      />
     </template>
   </MigrationStoryLayout>
 </template>
@@ -116,8 +110,9 @@ import MigrationStoryLayout from "~/components/story/MigrationStoryLayout.vue";
 import SeasonClock from "~/components/story/SeasonClock.vue";
 import StoryProgressSidebar from "~/components/story/StoryProgressSidebar.vue";
 import { useMigrationActInfoPanelModel } from "~/composables/migrationActs/useMigrationActInfoPanelModel";
-import { useMigrationGestureDiagnostics } from "~/composables/migrationActs/useMigrationGestureDiagnostics";
 import { useMigrationActRuntime } from "~/composables/migrationActs/useMigrationActRuntime";
+import { useGuidedMigrationController } from "~/composables/act2/useGuidedMigrationController";
+import { useNarration } from "~/composables/narration/useNarration";
 import { useStoryEngine } from "~/composables/useStoryEngine";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
@@ -134,11 +129,17 @@ const runtimeStore = useStoryRuntimeStore();
 const storyEngine = useStoryEngine();
 const cycleRuns = resolveMigrationActCycleRuns(props.act);
 const controller = useMigrationActRuntime({ act: props.act, cycleRuns });
+const instructionNarration = useNarration();
+const { t: translateGuidedNarration } = useI18n();
+const guidedController = useGuidedMigrationController({
+  runtime: controller,
+  enabled: props.act.id === "act-2",
+  instructionNarration,
+  translate: (key) => translateGuidedNarration(key),
+});
 const gestureStore = controller.gestures.store;
-const gestureDiagnosticRows = useMigrationGestureDiagnostics();
-const showDevControls = import.meta.dev;
 const infoPanel = useMigrationActInfoPanelModel({
-  showDevActions: showDevControls,
+  showDevActions: false,
   completed: computed(
     () => runtimeStore.showContinueGate || store.playbackState === "completed",
   ),
@@ -146,6 +147,16 @@ const infoPanel = useMigrationActInfoPanelModel({
 });
 
 const actTitle = computed(() => getActTitle(props.act));
+const activeInfoPanelModel = computed(() =>
+  guidedController.isGuidedUiActive.value
+    ? guidedController.panelModel.value
+    : infoPanel.model.value,
+);
+const showStoryAction = computed(() => !guidedController.enabled);
+const showBottomControls = computed(
+  () =>
+    !guidedController.enabled || activeInfoPanelModel.value.actions.length > 0,
+);
 const activeCycleId = computed(() => store.activeCycleId);
 const activeCycleDefinitions = computed(() =>
   storyCycleDefinitions.filter((cycle) => cycle.label === activeCycleId.value),
@@ -157,17 +168,9 @@ const countdownNumber = computed(
   () => store.initialCountdownNumber ?? gestureStore.countdownNumber,
 );
 const instructorLandmarks = computed(
-  () =>
-    (gestureStore.isActive
-      ? controller.gestures.instructorFrame.value
-      : controller.movement.instructorFrame.value
-    )?.landmarks ?? null,
+  () => controller.instructorFrame.value?.landmarks ?? null,
 );
-const instructorSourceAspect = computed(() =>
-  gestureStore.isActive
-    ? controller.gestures.instructorSourceAspect.value
-    : controller.movement.sourceAspect.value,
-);
+const instructorSourceAspect = controller.instructorSourceAspect;
 const skeletonVisualMode = computed(() =>
   gestureStore.isActive
     ? controller.gestures.skeletonFeedbackState.value.mode
@@ -178,47 +181,6 @@ const skeletonPulseProgress = computed(() =>
     ? controller.gestures.pulseProgress.value
     : controller.movementRecognition.pulseProgress.value,
 );
-const formatDebugNumber = (value: number | null, digits = 3) =>
-  value === null ? "none" : value.toFixed(digits);
-const themeLoadLabel = computed(
-  () =>
-    store.seasonAudio.error ||
-    (store.seasonAudio.isReady ? "ready" : "loading"),
-);
-const diagnosticRows = computed(() => [
-  ...gestureDiagnosticRows.value,
-  { label: "playbackState", value: store.playbackState },
-  { label: "currentStoryPhase", value: store.currentPhase ?? "none" },
-  {
-    label: "currentMovement",
-    value: controller.movement.resolvedMovement.value?.movementId ?? "none",
-  },
-  {
-    label: "recognitionProfile",
-    value: controller.movementRecognition.recognitionProfile.value ?? "none",
-  },
-  {
-    label: "movementEvaluationStatus",
-    value: controller.movementRecognition.lastEvaluationStatus.value,
-  },
-  {
-    label: "failedCriteria",
-    value:
-      gestureStore.latestEvaluationResult?.failedCriteria.join(", ") || "none",
-  },
-  { label: "pauseReasons", value: store.pauseReasons.join(", ") || "none" },
-  {
-    label: "movementSourceTimeMs",
-    value: formatDebugNumber(controller.movement.movementSourceTimeMs.value, 1),
-  },
-  {
-    label: "currentBeatWindow",
-    value: controller.movementRecognition.currentBeatWindow.value,
-  },
-  { label: "season", value: store.seasonAudio.currentSeason ?? "none" },
-  { label: "themeAssets", value: themeLoadLabel.value },
-]);
-
 const continueToNextAct = async () => {
   const nextActId = runtimeStore.currentAct?.nextActId;
   storyEngine.continueFromGate();
@@ -226,6 +188,13 @@ const continueToNextAct = async () => {
 };
 
 const handlePanelAction = (actionId: MigrationInfoPanelActionId) => {
+  if (
+    actionId === "startGuidedJourney" ||
+    actionId === "forceCompleteGuidedStep"
+  ) {
+    guidedController.handleAction(actionId);
+    return;
+  }
   if (actionId === "cancelGesture") gestureStore.cancelGesture();
   if (actionId === "markGestureSuccessful") {
     gestureStore.markGestureSuccessful();
@@ -235,8 +204,22 @@ const handlePanelAction = (actionId: MigrationInfoPanelActionId) => {
   if (actionId === "continueToNextAct") void continueToNextAct();
 };
 
-onMounted(() => void controller.initialize());
-onBeforeUnmount(() => controller.dispose());
+const handleStartStory = () => controller.startStory();
+const handlePause = () => guidedController.pause();
+const handleResume = () => void guidedController.resume();
+const handleReset = () => {
+  if (guidedController.enabled) void guidedController.resetAct();
+  else void controller.reset();
+};
+
+onMounted(async () => {
+  await controller.initialize();
+  guidedController.initialize();
+});
+onBeforeUnmount(() => {
+  guidedController.dispose();
+  controller.dispose();
+});
 </script>
 
 <style scoped>
@@ -269,40 +252,5 @@ onBeforeUnmount(() => controller.dispose());
 
 .migration-clock__date {
   font-weight: 700;
-}
-
-.migration-controls-stack {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.migration-diagnostics {
-  font-size: 0.76rem;
-}
-
-.migration-diagnostics summary {
-  width: max-content;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-weight: 800;
-}
-
-.migration-diagnostics dl {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-1) var(--space-3);
-  margin: var(--space-2) 0 0;
-}
-
-.migration-diagnostics dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.migration-diagnostics dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  text-align: right;
 }
 </style>

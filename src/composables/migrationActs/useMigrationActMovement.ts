@@ -27,6 +27,7 @@ export const useMigrationActMovement = () => {
   const movementLoopStartMs = ref(0);
   const movementLoopEndMs = ref(0);
   const movementSourceTimeMs = ref(0);
+  const movementLoadError = ref<string | null>(null);
   const sourceAspect = ref(1);
   const cachedRecordings = new Map<string, MovementRecording>();
   const warnedMovementIds = new Set<string>();
@@ -65,6 +66,7 @@ export const useMigrationActMovement = () => {
     const loader = movementLoaders[path];
 
     if (!loader) {
+      movementLoadError.value = `Movement "${movementId}" is unavailable.`;
       warnUnavailable(movementId);
       return null;
     }
@@ -74,12 +76,20 @@ export const useMigrationActMovement = () => {
         targetAspect: 1,
       });
       cachedRecordings.set(movementId, recording);
+      movementLoadError.value = null;
       return recording;
     } catch (error) {
+      movementLoadError.value =
+        error instanceof Error
+          ? error.message
+          : `Failed to load ${movementId}.`;
       warnUnavailable(movementId, error);
       return null;
     }
   };
+
+  const preload = async (movement: ResolvedMigrationMovement) =>
+    Boolean(await loadMovement(movement.movementId));
 
   const select = (movement: ResolvedMigrationMovement | null) => {
     if (resolvedMovement.value?.movementId === movement?.movementId) {
@@ -125,7 +135,7 @@ export const useMigrationActMovement = () => {
     playback.seekToTime(movementSourceTimeMs.value);
   };
 
-  const start = async (
+  const activate = (
     movement: ResolvedMigrationMovement,
     phaseElapsedMs = 0,
   ) => {
@@ -134,20 +144,12 @@ export const useMigrationActMovement = () => {
     movementPrerollMs.value = movement.playbackTiming.prerollMs;
     movementLoopStartMs.value = movement.playbackTiming.loopStartMs;
     movementLoopEndMs.value = movement.playbackTiming.loopEndMs;
-    const revision = ++activeLoadRevision;
-    const recording = await loadMovement(movement.movementId);
-
-    if (
-      revision !== activeLoadRevision ||
-      resolvedMovement.value?.movementId !== movement.movementId
-    ) {
-      return;
-    }
-
+    const recording = cachedRecordings.get(movement.movementId) ?? null;
     if (!recording) {
       movementLoaded.value = false;
       movementPlaying.value = false;
-      return;
+      movementLoadError.value = `Movement "${movement.movementId}" was not preloaded.`;
+      return false;
     }
 
     if (loadedMovementId !== movement.movementId) {
@@ -171,6 +173,17 @@ export const useMigrationActMovement = () => {
       movementSourceDurationMs.value,
     );
     tick(phaseElapsedMs);
+    return true;
+  };
+
+  const start = async (
+    movement: ResolvedMigrationMovement,
+    phaseElapsedMs = 0,
+  ) => {
+    const revision = activeLoadRevision;
+    const loaded = await preload(movement);
+    if (!loaded || revision !== activeLoadRevision) return false;
+    return activate(movement, phaseElapsedMs);
   };
 
   const pause = () => {
@@ -197,6 +210,7 @@ export const useMigrationActMovement = () => {
     movementLoopStartMs.value = 0;
     movementLoopEndMs.value = 0;
     movementSourceTimeMs.value = 0;
+    movementLoadError.value = null;
     playback.stop();
   };
 
@@ -227,8 +241,11 @@ export const useMigrationActMovement = () => {
     movementLoopStartMs,
     movementLoopEndMs,
     movementSourceTimeMs,
+    movementLoadError,
     recognitionEnabled,
     select,
+    preload,
+    activate,
     start,
     tick,
     pause,

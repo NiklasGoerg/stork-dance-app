@@ -28,6 +28,27 @@
         <strong v-if="model.feedbackTitle">{{ model.feedbackTitle }}</strong>
         <span v-if="model.feedbackText">{{ model.feedbackText }}</span>
       </div>
+
+      <div
+        v-if="model.progress"
+        class="migration-info-panel__progress"
+        role="status"
+        :aria-label="model.progress.label"
+      >
+        <span
+          v-for="index in model.progress.total"
+          :key="index"
+          class="migration-info-panel__progress-dot"
+          :class="{
+            'migration-info-panel__progress-dot--complete':
+              index <= model.progress.current,
+          }"
+          aria-hidden="true"
+        />
+        <span class="migration-info-panel__progress-label">
+          {{ model.progress.label }}
+        </span>
+      </div>
     </div>
 
     <ol
@@ -50,7 +71,10 @@
       </li>
     </ol>
 
-    <div v-if="model.actions.length" class="migration-info-panel__actions">
+    <div
+      v-if="showActions && model.actions.length"
+      class="migration-info-panel__actions"
+    >
       <button
         v-for="action in model.actions"
         :key="action.id"
@@ -73,7 +97,13 @@ import type {
   MigrationMovementListItem,
 } from "~/types/migrationAct";
 
-defineProps<{ model: MigrationActInfoPanelModel }>();
+withDefaults(
+  defineProps<{
+    model: MigrationActInfoPanelModel;
+    showActions?: boolean;
+  }>(),
+  { showActions: true },
+);
 defineEmits<{ action: [actionId: MigrationInfoPanelActionId] }>();
 const { t } = useI18n();
 
@@ -159,6 +189,31 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
   font-size: clamp(0.92rem, 1.05vw, 1.2rem);
   font-weight: 700;
   line-height: 1.25;
+}
+
+.migration-info-panel__progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.migration-info-panel__progress-dot {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--act5-color-text-muted);
+  border-radius: 50%;
+}
+
+.migration-info-panel__progress-dot--complete {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.migration-info-panel__progress-label {
+  flex-basis: 100%;
+  color: var(--act5-color-text-soft);
+  font-weight: 750;
 }
 
 .migration-info-panel--success .migration-info-panel__feedback {

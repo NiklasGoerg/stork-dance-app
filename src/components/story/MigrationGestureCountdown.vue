@@ -17,10 +17,13 @@ const props = defineProps<{
   gestureId?: StoryGestureId;
   count: number;
   initial?: boolean;
+  movement?: boolean;
 }>();
 const { t } = useI18n();
 const heading = computed(() => {
-  if (props.initial) return t("story.migrationPanel.gestures.startCountdown");
+  if (props.initial || props.movement) {
+    return t("story.migrationPanel.gestures.startCountdown");
+  }
   return t("story.migrationPanel.gestures.countdownHeading", {
     gesture: t(`story.migrationPanel.movements.${props.gestureId}`),
   });

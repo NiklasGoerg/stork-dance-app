@@ -8,7 +8,9 @@ import {
   type TimedMigrationPoseSample,
 } from "~/utils/migrationActs/migrationMovementEvaluation";
 import {
+  getMigrationGestureBeatForCheckpoint,
   migrationGestureMovementDefinitions,
+  resolveGestureCountdownSourceTime,
   type MigrationMovementCheckpointDefinition,
 } from "~/utils/migrationActs/migrationMovementDefinitions";
 import { POSE_LANDMARK } from "~/utils/pose/poseLandmarks";
@@ -160,8 +162,40 @@ describe("migration movement evaluation", () => {
     expect(
       migrationGestureMovementDefinitions.arrival.checkpoints[1],
     ).toMatchObject({
+      criteria: ["arms_lowered_or_closer"],
+      required: false,
+    });
+    expect(
+      migrationGestureMovementDefinitions.arrival.checkpoints[2],
+    ).toMatchObject({
       criteria: ["moderate_crouch", "arms_lowered_or_closer"],
       required: true,
     });
+  });
+
+  it("maps gesture countdown playback and local feedback beats", () => {
+    const definition = migrationGestureMovementDefinitions.departure;
+    expect(
+      resolveGestureCountdownSourceTime({
+        definition,
+        elapsedMs: 0,
+        durationMs: 4_000,
+      }),
+    ).toBe(1_000);
+    expect(
+      resolveGestureCountdownSourceTime({
+        definition,
+        elapsedMs: 4_000,
+        durationMs: 4_000,
+      }),
+    ).toBe(4_400);
+    expect(getMigrationGestureBeatForCheckpoint("departure-crouch")).toBe(1);
+    expect(getMigrationGestureBeatForCheckpoint("departure-rise-hands")).toBe(
+      2,
+    );
+    expect(getMigrationGestureBeatForCheckpoint("departure-arms-out")).toBe(3);
+    expect(getMigrationGestureBeatForCheckpoint("arrival-arms-out")).toBe(1);
+    expect(getMigrationGestureBeatForCheckpoint("arrival-descent")).toBe(2);
+    expect(getMigrationGestureBeatForCheckpoint("arrival-landing")).toBe(3);
   });
 });

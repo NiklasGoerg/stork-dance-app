@@ -79,9 +79,11 @@ export const useMigrationActSeasonAudio = ({
     }
   };
 
-  const fadeOutForCycle = () => {
+  const fadeOutForCycle = (
+    durationSeconds = SEASON_THEME_BEAT_DURATION_SECONDS,
+  ) => {
     started = false;
-    transport.stop(SEASON_THEME_BEAT_DURATION_SECONDS);
+    transport.stop(durationSeconds);
   };
 
   const reset = () => {

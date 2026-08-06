@@ -1,4 +1,4 @@
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import {
   useMigrationActSeasonAudio,
   type MigrationActSeasonAudioService,
@@ -11,12 +11,17 @@ import { useAudioStore } from "~/store/audioStore";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
 import type { StoryAct } from "~/story/types";
+import type { StoryGestureId } from "~/story/gestures";
+import type { StoryGestureResult } from "~/store/storyGestureStore";
 import type {
+  AvatarPlaybackOwner,
+  GuidedOwnerSwitchTrace,
   MigrationActCycleRun,
   MigrationActEvent,
   MigrationActMapFrame,
   MigrationActPauseReason,
   MigrationActSurfaceId,
+  ResolvedMigrationMovement,
 } from "~/types/migrationAct";
 import type { PoseLandmarkLike } from "~/types/pose";
 import {
@@ -24,6 +29,7 @@ import {
   reconcileMigrationActEventsForSeek,
 } from "~/utils/migrationActs/events";
 import { resolveMigrationActCycleRuns } from "~/utils/migrationActs/config";
+import { MIGRATION_RECOGNITION_THRESHOLDS } from "~/utils/migrationActs/migrationMovementConfig";
 import { getMigrationMapFrame } from "~/utils/migrationActs/timeline";
 import { getMigrationPlaybackAdvance } from "~/utils/migrationActs/transitions";
 import {
@@ -31,6 +37,11 @@ import {
   getMigrationMovementPhaseTiming,
   resolveMigrationMovement,
 } from "~/utils/migrationActs/migrationMovementSelection";
+import {
+  resolveGuidedMovementSourceTime,
+  resolveGuidedTransportPosition,
+  resolveNextGuidedBarBoundary,
+} from "~/utils/act2/guidedTiming";
 import { getMigrationGestureMovementDefinition } from "~/utils/migrationActs/migrationMovementDefinitions";
 import {
   buildPreparedStoryTimeline,
@@ -54,6 +65,20 @@ type MigrationActRuntimeOptions = {
   movementRecognitionService?: MigrationActMovementRecognitionService;
   seasonAudioService?: MigrationActSeasonAudioService;
 };
+
+type GuidedGesturePreparationOptions = {
+  gestureId: StoryGestureId;
+  demonstrationBars: number;
+  handoverStartBarOffsetMs?: number;
+  onPreparationBar?: (barIndex: number) => void;
+  onHandoverStart?: () => void;
+  onAttemptStart?: () => void;
+};
+
+type GuidedGesturePracticeOptions = Omit<
+  GuidedGesturePreparationOptions,
+  "gestureId" | "demonstrationBars" | "onPreparationBar"
+>;
 
 export type MigrationActRuntimeDriver = {
   requestFrame: (callback: FrameRequestCallback) => number;
@@ -155,6 +180,33 @@ export const useMigrationActRuntime = ({
     null;
   let pausedFromState: "initial_countdown" | "playing" | null = null;
   let phaseMovementScheduledStartTransportMs: number | null = null;
+  const guidedInterludeActive = ref(false);
+  const tutorialPlaybackMode = ref<
+    "demonstration" | "practice" | "story" | null
+  >(null);
+  const tutorialRepetitionIndex = ref(0);
+  const guidedStoryTransitionActive = ref(false);
+  let tutorialMovement: ResolvedMigrationMovement | null = null;
+  let tutorialPlaybackStartTransportMs: number | null = null;
+  let tutorialDemonstrationDurationMs = 0;
+  let tutorialDemonstrationRepetitions = 0;
+  let tutorialDemonstrationResolver: (() => void) | null = null;
+  let tutorialDemonstrationHandsOffToPractice = false;
+  let onTutorialRepetition: ((index: number) => void) | null = null;
+  let guidedInterludeRevision = 0;
+  let guidedTransitionStartElapsedMs = 0;
+  let guidedTransitionTargetElapsedMs = 0;
+  let guidedTransitionStartTransportMs = 0;
+  let guidedTransitionDurationMs = 0;
+  let guidedTransitionResolver: (() => void) | null = null;
+  let guidedTransitionBarIndex = -1;
+  let onGuidedTransitionBar: ((index: number) => void) | null = null;
+  const avatarPlaybackOwner = ref<AvatarPlaybackOwner>("idle");
+  const scheduledNextOwner = ref<AvatarPlaybackOwner | null>(null);
+  const scheduledOwnerSwitchMs = ref<number | null>(null);
+  const lastOwnerSwitchReason = ref<string | null>(null);
+  const ownerSwitchTrace = ref<GuidedOwnerSwitchTrace[]>([]);
+  let scheduledOwnerResolver: ((switched: boolean) => void) | null = null;
 
   const activeEvent = computed(
     () =>
@@ -166,6 +218,138 @@ export const useMigrationActRuntime = ({
   const migrationPhaseDurationSeconds = computed(
     () => (movementPhaseTiming.value?.durationMs ?? 0) / 1_000,
   );
+  const usesGestureOwner = computed(
+    () =>
+      avatarPlaybackOwner.value === "departure" ||
+      avatarPlaybackOwner.value === "arrival",
+  );
+  const instructorFrame = computed(() =>
+    usesGestureOwner.value
+      ? gestures.instructorFrame.value
+      : movement.instructorFrame.value,
+  );
+  const instructorSourceAspect = computed(() =>
+    usesGestureOwner.value
+      ? gestures.instructorSourceAspect.value
+      : movement.sourceAspect.value,
+  );
+  const guidedTrace = computed(() => {
+    const masterTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const position = resolveGuidedTransportPosition(
+      masterTransportMs,
+      audioStore.getBeatDurationMs(),
+    );
+    const lastBeat = movementRecognition.lastBeatEvaluation.value;
+    const lastBar = movementRecognition.lastBarEvaluation.value;
+    const renderedMovementId = usesGestureOwner.value
+      ? gestures.store.activeGestureId
+      : (movement.resolvedMovement.value?.movementId ?? null);
+
+    return {
+      runtimeRunId: runId,
+      guidedInterludeRevision,
+      playbackState: store.playbackState,
+      pauseReasons: [...store.pauseReasons],
+      masterTransportMs,
+      masterBarIndex: position.barIndex,
+      masterBeatIndex: position.beatIndex,
+      musicSourceTimeMs: masterTransportMs,
+      storyTimeMs: store.currentElapsedMs,
+      seasonalThemeId: store.seasonAudio.currentSeason,
+      seasonalThemeSourceTimeMs: null,
+      guidedPhase: store.guided.phase,
+      tutorialPlaybackMode: tutorialPlaybackMode.value,
+      gestureState: gestures.store.state,
+      gestureId: gestures.store.activeGestureId,
+      gestureCompletionStatus:
+        gestures.store.latestEvaluationResult?.status ?? null,
+      avatarPlaybackOwner: avatarPlaybackOwner.value,
+      renderedMovementId,
+      avatarSourceTimeMs: usesGestureOwner.value
+        ? gestures.store.currentSourceTimeMs
+        : movement.movementSourceTimeMs.value,
+      recognitionSessionId: lastBeat?.sessionId ?? lastBar?.sessionId ?? null,
+      recognitionProfile: movementRecognition.recognitionProfile.value,
+      recognitionMovementId:
+        movementRecognition.diagnostics.value.currentMovementId,
+      recognitionBarIndex:
+        movementRecognition.diagnostics.value.currentBarIndex,
+      recognitionBeatIndex:
+        movementRecognition.diagnostics.value.currentBeat ?? null,
+      recognitionSourceTimeMs: movementRecognition.recognitionActive.value
+        ? position.barLocalMs
+        : null,
+      scheduledNextOwner: scheduledNextOwner.value,
+      scheduledOwnerSwitchMs: scheduledOwnerSwitchMs.value,
+      lastOwnerSwitchReason: lastOwnerSwitchReason.value,
+      ownerSwitchPromisePending: scheduledOwnerResolver !== null,
+      demonstrationPromisePending: tutorialDemonstrationResolver !== null,
+      storyTransitionPromisePending: guidedTransitionResolver !== null,
+      movementLoaded: usesGestureOwner.value
+        ? gestures.store.movementLoaded
+        : movement.movementLoaded.value,
+      movementLoadError: usesGestureOwner.value
+        ? gestures.store.movementLoadError
+        : movement.movementLoadError.value,
+    } satisfies import("~/types/migrationAct").GuidedAct2Trace;
+  });
+
+  const getMovementOwner = (
+    resolved: ResolvedMigrationMovement,
+  ): AvatarPlaybackOwner => {
+    if (resolved.movementId === "summer-step") return "summer";
+    if (resolved.movementId === "winter-step") return "winter";
+    return resolved.direction === "return"
+      ? "spring-migration"
+      : "autumn-migration";
+  };
+
+  const commitOwnerSwitch = (
+    toOwner: AvatarPlaybackOwner,
+    scheduledTransportMs: number,
+    reason: string,
+  ) => {
+    const actualTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const fromOwner = avatarPlaybackOwner.value;
+    avatarPlaybackOwner.value = toOwner;
+    scheduledNextOwner.value = null;
+    scheduledOwnerSwitchMs.value = null;
+    lastOwnerSwitchReason.value = reason;
+    ownerSwitchTrace.value.push({
+      fromOwner,
+      toOwner,
+      scheduledTransportMs,
+      actualTransportMs,
+      reason,
+    });
+    scheduledOwnerResolver?.(true);
+    scheduledOwnerResolver = null;
+  };
+
+  const scheduleOwnerSwitch = (
+    owner: AvatarPlaybackOwner,
+    scheduledTransportMs: number,
+    reason: string,
+  ) => {
+    scheduledOwnerResolver?.(false);
+    if (audioStore.getBaseRhythmTransportTimeMs() >= scheduledTransportMs) {
+      commitOwnerSwitch(owner, scheduledTransportMs, reason);
+      return Promise.resolve(true);
+    }
+    scheduledNextOwner.value = owner;
+    scheduledOwnerSwitchMs.value = scheduledTransportMs;
+    lastOwnerSwitchReason.value = reason;
+    return new Promise<boolean>((resolve) => {
+      scheduledOwnerResolver = resolve;
+    });
+  };
+
+  const cancelScheduledOwnerSwitch = () => {
+    scheduledNextOwner.value = null;
+    scheduledOwnerSwitchMs.value = null;
+    scheduledOwnerResolver?.(false);
+    scheduledOwnerResolver = null;
+  };
 
   const nextRunId = () => {
     runId++;
@@ -276,6 +460,7 @@ export const useMigrationActRuntime = ({
       transportTimeMs: audioStore.getBaseRhythmTransportTimeMs(),
       movementElapsedMs: phaseElapsedMs,
       prerollMs: resolved.playbackTiming.prerollMs,
+      movementId: resolved.movementId,
     });
     await movement.start(resolved, phaseElapsedMs);
 
@@ -332,6 +517,380 @@ export const useMigrationActRuntime = ({
       await audioStore.resumeBaseRhythmLoop();
       await seasonAudio.resume();
     }
+  };
+
+  const stopTutorialMovement = () => {
+    movement.pause();
+    movementRecognition.pause();
+    tutorialPlaybackMode.value = null;
+    tutorialRepetitionIndex.value = 0;
+    tutorialMovement = null;
+    tutorialPlaybackStartTransportMs = null;
+    tutorialDemonstrationDurationMs = 0;
+    tutorialDemonstrationRepetitions = 0;
+    tutorialDemonstrationHandsOffToPractice = false;
+    onTutorialRepetition = null;
+    const resolveDemonstration = tutorialDemonstrationResolver;
+    tutorialDemonstrationResolver = null;
+    resolveDemonstration?.();
+  };
+
+  const cancelGuidedStoryTransition = () => {
+    guidedStoryTransitionActive.value = false;
+    guidedTransitionStartElapsedMs = 0;
+    guidedTransitionTargetElapsedMs = 0;
+    guidedTransitionStartTransportMs = 0;
+    guidedTransitionDurationMs = 0;
+    guidedTransitionBarIndex = -1;
+    onGuidedTransitionBar = null;
+    const resolve = guidedTransitionResolver;
+    guidedTransitionResolver = null;
+    resolve?.();
+  };
+
+  const enterGuidedInterlude = async (
+    initialMovementOrPreroll: ResolvedMigrationMovement | number | null = null,
+  ) => {
+    if (guidedInterludeActive.value) return;
+    gestures.setNarrationEnabled?.(false);
+    const initialMovement =
+      initialMovementOrPreroll && typeof initialMovementOrPreroll !== "number"
+        ? initialMovementOrPreroll
+        : null;
+
+    if (initialMovement && !(await movement.preload(initialMovement))) {
+      avatarPlaybackOwner.value = "idle";
+      store.setError(
+        movement.movementLoadError.value ??
+          `Unable to preload ${initialMovement.movementId}.`,
+      );
+      return;
+    }
+
+    movement.pause();
+    movementRecognition.pause();
+    clearMovementFeedback();
+    guidedInterludeRevision++;
+    guidedInterludeActive.value = true;
+    store.addPauseReason("tutorial");
+
+    if (store.playbackState === "idle") {
+      ownerSwitchTrace.value = [];
+      lastOwnerSwitchReason.value = null;
+      if (act) storyEngine.startAct(act.id);
+      seasonAudio.reset();
+      audioStore.resetBaseRhythmLoop();
+      if (
+        initialMovement &&
+        !movement.activate(
+          initialMovement,
+          initialMovement.playbackTiming.prerollMs,
+        )
+      ) {
+        avatarPlaybackOwner.value = "idle";
+        store.setError(
+          movement.movementLoadError.value ??
+            `Unable to start ${initialMovement.movementId}.`,
+        );
+        return;
+      }
+      if (initialMovement) {
+        tutorialMovement = initialMovement;
+        tutorialPlaybackMode.value = "demonstration";
+        tutorialPlaybackStartTransportMs =
+          -initialMovement.playbackTiming.prerollMs;
+        commitOwnerSwitch(getMovementOwner(initialMovement), 0, "guided-start");
+      }
+      await audioStore.startBaseRhythmLoop(0);
+      await seasonAudio.start(store.currentDate);
+      store.setPlaybackState("playing");
+    }
+
+    lastFrameAtMs = null;
+    scheduleFrame();
+  };
+
+  const startTutorialPlayback = async (
+    resolved: ResolvedMigrationMovement,
+    mode: "demonstration" | "practice" | "story",
+    prepareBeforeOwnerSwitch?: () => void,
+  ) => {
+    if (!guidedInterludeActive.value) {
+      await enterGuidedInterlude();
+    }
+    const revision = guidedInterludeRevision;
+    const continuesCurrentMovement =
+      tutorialMovement?.movementId === resolved.movementId &&
+      movement.movementPlaying.value;
+
+    if (!continuesCurrentMovement) {
+      stopTutorialMovement();
+      const loaded = await movement.preload(resolved);
+      if (!loaded) return false;
+    }
+    tutorialMovement = resolved;
+    tutorialPlaybackMode.value = mode;
+    tutorialRepetitionIndex.value = mode === "demonstration" ? 1 : 0;
+    const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const movementStartTransportMs = continuesCurrentMovement
+      ? Math.max(
+          0,
+          (tutorialPlaybackStartTransportMs ??
+            -resolved.playbackTiming.prerollMs) +
+            resolved.playbackTiming.prerollMs,
+        )
+      : resolveNextGuidedBarBoundary(
+          currentTransportMs,
+          audioStore.getBeatDurationMs(),
+        );
+    let ownerSwitch: Promise<boolean> | null = null;
+    if (!continuesCurrentMovement) {
+      if (!movement.activate(resolved, 0)) return false;
+      prepareBeforeOwnerSwitch?.();
+      ownerSwitch = scheduleOwnerSwitch(
+        getMovementOwner(resolved),
+        movementStartTransportMs,
+        `${mode}:${resolved.movementId}`,
+      );
+      tutorialPlaybackStartTransportMs =
+        movementStartTransportMs - resolved.playbackTiming.prerollMs;
+    } else {
+      prepareBeforeOwnerSwitch?.();
+    }
+    if (!guidedInterludeActive.value || revision !== guidedInterludeRevision) {
+      movement.pause();
+      return false;
+    }
+    if (ownerSwitch && !(await ownerSwitch)) return false;
+    const playbackOriginMs = tutorialPlaybackStartTransportMs;
+    if (playbackOriginMs === null) return false;
+    const movementElapsedMs = Math.max(
+      0,
+      audioStore.getBaseRhythmTransportTimeMs() - playbackOriginMs,
+    );
+    movement.tick(movementElapsedMs);
+
+    if (mode === "practice") {
+      movementRecognition.start(resolved.recognitionProfile, {
+        transportTimeMs: currentTransportMs,
+        movementElapsedMs,
+        prerollMs: resolved.playbackTiming.prerollMs,
+        movementId: resolved.movementId,
+      });
+    }
+
+    lastFrameAtMs = null;
+    scheduleFrame();
+    return true;
+  };
+
+  const preloadTutorialMovement = (resolved: ResolvedMigrationMovement) =>
+    movement.preload(resolved);
+
+  const continueTutorialMovement = () => {
+    if (!tutorialMovement || !movement.movementPlaying.value) return false;
+    tutorialPlaybackMode.value = "story";
+    movementRecognition.pause();
+    return true;
+  };
+
+  const startTutorialStoryMovement = async (
+    resolved: ResolvedMigrationMovement,
+  ) => {
+    return await startTutorialPlayback(resolved, "story");
+  };
+
+  const playTutorialDemonstration = async (
+    resolved: ResolvedMigrationMovement,
+    repetitions: number,
+    onRepetition?: (index: number) => void,
+    options: { handoverToPractice?: boolean } = {},
+  ) => {
+    const prepareDemonstration = () => {
+      tutorialDemonstrationRepetitions = Math.max(1, Math.round(repetitions));
+      tutorialDemonstrationDurationMs =
+        resolved.playbackTiming.prerollMs +
+        tutorialDemonstrationRepetitions *
+          audioStore.getBeatDurationMs() *
+          MIGRATION_RECOGNITION_THRESHOLDS.beatsPerBar;
+      onTutorialRepetition = onRepetition ?? null;
+      tutorialDemonstrationHandsOffToPractice =
+        options.handoverToPractice === true;
+    };
+    const started = await startTutorialPlayback(
+      resolved,
+      "demonstration",
+      prepareDemonstration,
+    );
+    if (!started) {
+      const message =
+        movement.movementLoadError.value ??
+        `Unable to start guided movement "${resolved.movementId}".`;
+      store.setError(message);
+      throw new Error(message);
+    }
+    onTutorialRepetition?.(1);
+
+    return new Promise<void>((resolve) => {
+      tutorialDemonstrationResolver = resolve;
+    });
+  };
+
+  const playGuidedGesturePreparation = async ({
+    gestureId,
+    demonstrationBars,
+    handoverStartBarOffsetMs,
+    onPreparationBar,
+    onHandoverStart,
+    onAttemptStart,
+  }: GuidedGesturePreparationOptions): Promise<StoryGestureResult> => {
+    movementRecognition.pause();
+    const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const countdownStartTransportMs = resolveNextGuidedBarBoundary(
+      currentTransportMs,
+      audioStore.getBeatDurationMs(),
+      true,
+    );
+    void scheduleOwnerSwitch(
+      gestureId,
+      countdownStartTransportMs,
+      `gesture-preparation:${gestureId}`,
+    );
+    const practice = gestures.start(gestureId, {
+      countdownStartTransportMs,
+      preparationBars: Math.max(0, Math.round(demonstrationBars)),
+      handoverStartBarOffsetMs,
+      onPreparationBar,
+      onHandoverStart,
+      onAttemptStart,
+    });
+    scheduleFrame();
+    return await practice;
+  };
+
+  const startGuidedGesturePractice = async (
+    gestureId: StoryGestureId,
+    options: GuidedGesturePracticeOptions = {},
+  ): Promise<StoryGestureResult> => {
+    movementRecognition.pause();
+    const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const countdownStartTransportMs = resolveNextGuidedBarBoundary(
+      currentTransportMs,
+      audioStore.getBeatDurationMs(),
+      true,
+    );
+    void scheduleOwnerSwitch(
+      gestureId,
+      countdownStartTransportMs,
+      `gesture-countdown:${gestureId}`,
+    );
+    const practice = gestures.start(gestureId, {
+      countdownStartTransportMs,
+      preparationBars: 0,
+      ...options,
+    });
+    scheduleFrame();
+    return await practice;
+  };
+
+  const playGuidedStoryTransition = async ({
+    targetElapsedMs,
+    durationMs,
+    movement: transitionMovement,
+    onBar,
+  }: {
+    targetElapsedMs: number;
+    durationMs: number;
+    movement?: ResolvedMigrationMovement | null;
+    onBar?: (index: number) => void;
+  }) => {
+    cancelGuidedStoryTransition();
+    if (
+      transitionMovement &&
+      tutorialMovement?.movementId !== transitionMovement.movementId
+    ) {
+      await startTutorialPlayback(transitionMovement, "story");
+    } else if (transitionMovement) {
+      continueTutorialMovement();
+    } else {
+      stopTutorialMovement();
+    }
+    if (!guidedInterludeActive.value) return;
+
+    guidedTransitionStartElapsedMs = store.currentElapsedMs;
+    guidedTransitionTargetElapsedMs = Math.max(
+      guidedTransitionStartElapsedMs,
+      targetElapsedMs,
+    );
+    guidedTransitionStartTransportMs =
+      audioStore.getBaseRhythmTransportTimeMs();
+    const transitionBoundaryMs = resolveNextGuidedBarBoundary(
+      guidedTransitionStartTransportMs + Math.max(1, durationMs),
+      audioStore.getBeatDurationMs(),
+      true,
+    );
+    guidedTransitionDurationMs = Math.max(
+      1,
+      transitionBoundaryMs - guidedTransitionStartTransportMs,
+    );
+    guidedTransitionBarIndex = 0;
+    onGuidedTransitionBar = onBar ?? null;
+    onGuidedTransitionBar?.(0);
+    guidedStoryTransitionActive.value = true;
+    scheduleFrame();
+
+    return new Promise<void>((resolve) => {
+      guidedTransitionResolver = resolve;
+    });
+  };
+
+  const leaveGuidedInterlude = async () => {
+    if (!guidedInterludeActive.value) return;
+
+    guidedInterludeRevision++;
+    cancelGuidedStoryTransition();
+    gestures.cancel();
+    stopTutorialMovement();
+    guidedInterludeActive.value = false;
+    gestures.setNarrationEnabled?.(true);
+    store.removePauseReason("tutorial");
+
+    if (hasBlockingPause(store.pauseReasons)) {
+      store.setPlaybackState("paused");
+      return;
+    }
+
+    store.setPlaybackState("playing");
+    await startMovementForCurrentPhase();
+    await synchronizeAudioForPauseReasons();
+    lastFrameAtMs = null;
+    scheduleFrame();
+  };
+
+  const cancelGuidedInterlude = () => {
+    guidedInterludeRevision++;
+    cancelScheduledOwnerSwitch();
+    cancelGuidedStoryTransition();
+    gestures.cancel();
+    stopTutorialMovement();
+    guidedInterludeActive.value = false;
+    gestures.setNarrationEnabled?.(true);
+    avatarPlaybackOwner.value = "idle";
+    store.removePauseReason("tutorial");
+  };
+
+  const completeGuidedInterlude = () => {
+    cancelGuidedStoryTransition();
+    movement.tick(0);
+    movement.pause();
+    movementRecognition.pause();
+    audioStore.stopBaseRhythmLoop();
+    seasonAudio.fadeOutForCycle(2);
+    tutorialPlaybackMode.value = null;
+    tutorialMovement = null;
+    tutorialPlaybackStartTransportMs = null;
+    avatarPlaybackOwner.value = "idle";
+    store.setPlaybackState("completed");
   };
 
   const warnEventMismatch = (event: MigrationActEvent) => {
@@ -531,6 +1090,122 @@ export const useMigrationActRuntime = ({
       clearMovementFeedback();
     }
 
+    if (guidedInterludeActive.value) {
+      const transportTimeMs = audioStore.getBaseRhythmTransportTimeMs();
+      if (
+        scheduledNextOwner.value &&
+        scheduledOwnerSwitchMs.value !== null &&
+        transportTimeMs >= scheduledOwnerSwitchMs.value
+      ) {
+        commitOwnerSwitch(
+          scheduledNextOwner.value,
+          scheduledOwnerSwitchMs.value,
+          lastOwnerSwitchReason.value ?? "scheduled-owner-switch",
+        );
+      }
+      if (gestures.store.isActive || gestures.demonstrationActive.value) {
+        gestures.tick();
+      }
+
+      if (
+        guidedStoryTransitionActive.value &&
+        store.playbackState === "playing" &&
+        !hasBlockingPause(store.pauseReasons)
+      ) {
+        const previousDate = store.currentDate;
+        const transitionElapsedMs = Math.max(
+          0,
+          audioStore.getBaseRhythmTransportTimeMs() -
+            guidedTransitionStartTransportMs,
+        );
+        const progress = Math.min(
+          transitionElapsedMs / guidedTransitionDurationMs,
+          1,
+        );
+        const barDurationMs = audioStore.getBeatDurationMs() * 4;
+        const nextBarIndex = Math.floor(transitionElapsedMs / barDurationMs);
+        while (guidedTransitionBarIndex < nextBarIndex) {
+          guidedTransitionBarIndex++;
+          onGuidedTransitionBar?.(guidedTransitionBarIndex);
+        }
+        store.setElapsedMs(
+          guidedTransitionStartElapsedMs +
+            (guidedTransitionTargetElapsedMs - guidedTransitionStartElapsedMs) *
+              progress,
+        );
+        if (store.currentDate !== previousDate)
+          synchronizeSeasonForCurrentDate();
+        if (progress >= 1) {
+          store.setElapsedMs(guidedTransitionTargetElapsedMs);
+          guidedStoryTransitionActive.value = false;
+          onGuidedTransitionBar = null;
+          const resolve = guidedTransitionResolver;
+          guidedTransitionResolver = null;
+          resolve?.();
+        }
+      }
+
+      if (
+        store.playbackState === "playing" &&
+        !hasBlockingPause(store.pauseReasons) &&
+        tutorialMovement &&
+        tutorialPlaybackStartTransportMs !== null
+      ) {
+        const tutorialElapsedMs = Math.max(
+          0,
+          resolveGuidedMovementSourceTime({
+            transportMs: audioStore.getBaseRhythmTransportTimeMs(),
+            ownerStartedAtMs:
+              tutorialPlaybackStartTransportMs +
+              tutorialMovement.playbackTiming.prerollMs,
+            prerollMs: tutorialMovement.playbackTiming.prerollMs,
+          }),
+        );
+        movement.tick(tutorialElapsedMs);
+
+        if (tutorialPlaybackMode.value === "demonstration") {
+          const movementElapsedMs = Math.max(
+            0,
+            tutorialElapsedMs - tutorialMovement.playbackTiming.prerollMs,
+          );
+          const barDurationMs =
+            audioStore.getBeatDurationMs() *
+            MIGRATION_RECOGNITION_THRESHOLDS.beatsPerBar;
+          const repetitionIndex = Math.min(
+            Math.floor(movementElapsedMs / barDurationMs) + 1,
+            tutorialDemonstrationRepetitions,
+          );
+          if (repetitionIndex !== tutorialRepetitionIndex.value) {
+            tutorialRepetitionIndex.value = repetitionIndex;
+            onTutorialRepetition?.(repetitionIndex);
+          }
+
+          if (tutorialElapsedMs >= tutorialDemonstrationDurationMs) {
+            if (tutorialDemonstrationHandsOffToPractice) {
+              tutorialPlaybackMode.value = "practice";
+              movementRecognition.start(tutorialMovement.recognitionProfile, {
+                transportTimeMs: audioStore.getBaseRhythmTransportTimeMs(),
+                movementElapsedMs: tutorialElapsedMs,
+                prerollMs: tutorialMovement.playbackTiming.prerollMs,
+                movementId: tutorialMovement.movementId,
+              });
+            } else {
+              movement.pause();
+              tutorialPlaybackMode.value = null;
+              tutorialPlaybackStartTransportMs = null;
+            }
+            tutorialDemonstrationHandsOffToPractice = false;
+            const resolveDemonstration = tutorialDemonstrationResolver;
+            tutorialDemonstrationResolver = null;
+            resolveDemonstration?.();
+          }
+        }
+      }
+
+      if (store.playbackState === "playing") scheduleFrame();
+      return;
+    }
+
     if (store.playbackState === "initial_countdown") {
       const transportTimeMs = audioStore.getBaseRhythmTransportTimeMs();
       const beatDurationMs = audioStore.getBeatDurationMs();
@@ -668,6 +1343,7 @@ export const useMigrationActRuntime = ({
   const resetForMode = (mode: "story" | "single_cycle", index: number) => {
     nextRunId();
     cancelFrame();
+    cancelGuidedInterlude();
     gestures.cancel();
     previewEventId = null;
     previewResult = null;
@@ -738,6 +1414,33 @@ export const useMigrationActRuntime = ({
 
   const resume = async () => {
     store.removePauseReason("user");
+    if (guidedInterludeActive.value) {
+      if (hasBlockingPause(store.pauseReasons)) return;
+
+      store.setPlaybackState("playing");
+      await synchronizeAudioForPauseReasons();
+      movement.resume(movement.movementSourceTimeMs.value);
+      if (
+        tutorialPlaybackMode.value === "practice" &&
+        tutorialMovement &&
+        tutorialPlaybackStartTransportMs !== null
+      ) {
+        const transportTimeMs = audioStore.getBaseRhythmTransportTimeMs();
+        movementRecognition.start(tutorialMovement.recognitionProfile, {
+          transportTimeMs,
+          movementElapsedMs: Math.max(
+            0,
+            transportTimeMs - tutorialPlaybackStartTransportMs,
+          ),
+          prerollMs: tutorialMovement.playbackTiming.prerollMs,
+          movementId: tutorialMovement.movementId,
+        });
+      }
+      lastFrameAtMs = null;
+      scheduleFrame();
+      pausedFromState = null;
+      return;
+    }
     if (store.isGestureActive) {
       await synchronizeAudioForPauseReasons();
       return;
@@ -788,6 +1491,7 @@ export const useMigrationActRuntime = ({
   const reset = async () => {
     nextRunId();
     cancelFrame();
+    cancelGuidedInterlude();
     gestures.cancel();
     previewEventId = null;
     previewResult = null;
@@ -879,6 +1583,12 @@ export const useMigrationActRuntime = ({
     }
   };
 
+  const forceCompleteGuidedRecognition = () => {
+    clearMovementFeedback();
+    movementRecognition.reset();
+    return gestures.forceComplete();
+  };
+
   const reportMapFrame = (frame: MigrationActMapFrame) => {
     store.reportMapFrame(frame);
     const event = activeEvent.value;
@@ -927,6 +1637,7 @@ export const useMigrationActRuntime = ({
     disposed = true;
     nextRunId();
     cancelFrame();
+    cancelGuidedInterlude();
     gestures.cleanup();
     previewEventId = null;
     previewResult = null;
@@ -950,6 +1661,18 @@ export const useMigrationActRuntime = ({
     movement,
     movementRecognition,
     seasonAudio,
+    guidedInterludeActive,
+    guidedStoryTransitionActive,
+    tutorialPlaybackMode,
+    tutorialRepetitionIndex,
+    avatarPlaybackOwner,
+    scheduledNextOwner,
+    scheduledOwnerSwitchMs,
+    lastOwnerSwitchReason,
+    ownerSwitchTrace,
+    instructorFrame,
+    instructorSourceAspect,
+    guidedTrace,
     activeEvent,
     movementPhaseTiming,
     migrationPhaseDurationSeconds,
@@ -962,9 +1685,28 @@ export const useMigrationActRuntime = ({
     seekToElapsedMs,
     selectCycle,
     startManualGesture,
+    enterGuidedInterlude,
+    leaveGuidedInterlude,
+    cancelGuidedInterlude,
+    playTutorialDemonstration,
+    preloadTutorialMovement,
+    continueTutorialMovement,
+    startTutorialStoryMovement,
+    playGuidedGesturePreparation,
+    startGuidedGesturePractice,
+    playGuidedStoryTransition,
+    completeGuidedInterlude,
+    getGuidedTransportMs: () => audioStore.getBaseRhythmTransportTimeMs(),
+    stopTutorialMovement,
+    resolveCurrentPhaseMovement,
     handlePoseFrame,
+    forceCompleteGuidedRecognition,
     reportMapFrame,
     getCurrentMapFrame,
     dispose,
   };
 };
+
+export type MigrationActRuntimeService = ReturnType<
+  typeof useMigrationActRuntime
+>;

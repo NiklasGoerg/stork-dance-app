@@ -1,0 +1,901 @@
+import { computed, watch, type WatchStopHandle } from "vue";
+import { useGuidedAct2Narration } from "~/composables/act2/useGuidedAct2Narration";
+import type { MigrationActRuntimeService } from "~/composables/migrationActs/useMigrationActRuntime";
+import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
+import type { StoryGestureId } from "~/story/gestures";
+import type {
+  GuidedMigrationPhase,
+  MigrationActInfoPanelModel,
+  MigrationInfoPanelActionId,
+  ResolvedMigrationMovement,
+} from "~/types/migrationAct";
+import {
+  GUIDED_GESTURE_DEMONSTRATIONS,
+  GUIDED_MOVEMENT_DEMONSTRATIONS,
+  GUIDED_REQUIRED_SUCCESSFUL_BARS,
+  GUIDED_SUMMER_DEMONSTRATIONS,
+  guidedAct2Timing,
+  type GuidedAct2TimingConfig,
+} from "~/utils/act2/guidedConfig";
+import type { GuidedNarrationId } from "~/utils/act2/guidedNarrationCatalog";
+import { resolveGuidedNarrationTokens } from "~/utils/act2/guidedNarrationTokens";
+import { resolveMigrationMovement } from "~/utils/migrationActs/migrationMovementSelection";
+import type { StorkMigrationEvent } from "~/types/stork";
+import type { NarrationResult, NarrationSpeakOptions } from "~/types/narration";
+import { migrationStoryCycleDefinitions } from "~/utils/migrationStoryData";
+import { getMigrationGestureFeedbackCatalogEntry } from "~/utils/migrationActs/gestureFeedback";
+
+type ContinuousTutorialPhases = {
+  context: GuidedMigrationPhase;
+  demonstration: GuidedMigrationPhase;
+  prompt: GuidedMigrationPhase;
+  practice: GuidedMigrationPhase;
+  success: GuidedMigrationPhase;
+};
+
+type GestureTutorialPhases = {
+  context: GuidedMigrationPhase;
+  demonstration?: GuidedMigrationPhase;
+  prompt: GuidedMigrationPhase;
+  practice: GuidedMigrationPhase;
+  success: GuidedMigrationPhase;
+};
+
+type ContinuousPractice = {
+  runId: number;
+  movementId: string;
+  resolve: (completed: boolean) => void;
+};
+
+export type GuidedMigrationController = ReturnType<
+  typeof useGuidedMigrationController
+>;
+
+export const useGuidedMigrationController = ({
+  runtime,
+  enabled,
+  timing = guidedAct2Timing,
+  onGuidedCycleCompleted,
+  instructionNarration,
+  translate,
+}: {
+  runtime: MigrationActRuntimeService;
+  enabled: boolean;
+  timing?: GuidedAct2TimingConfig;
+  onGuidedCycleCompleted?: () => void;
+  translate?: (key: string) => string;
+  instructionNarration?: {
+    play: (
+      cueKey: string,
+      options?: { behavior?: "replace" },
+    ) => Promise<NarrationResult> | NarrationResult;
+    speakText?: (
+      text: string,
+      options?: Pick<
+        NarrationSpeakOptions,
+        "behavior" | "rate" | "onStart" | "onEnd"
+      >,
+    ) => Promise<NarrationResult> | NarrationResult;
+    stop: () => void;
+  };
+}) => {
+  const store = useMigrationActStore();
+  const translateText = translate ?? ((key: string) => key);
+  const processedEvaluationIds = new Set<string>();
+  let activePractice: ContinuousPractice | null = null;
+  let runId = 0;
+  let disposed = false;
+  let flowStarted = false;
+
+  const narration = useGuidedAct2Narration({
+    narration: instructionNarration
+      ? {
+          speakText: async (text, options) => {
+            if (instructionNarration.speakText) {
+              return await instructionNarration.speakText(text, options);
+            }
+            return await instructionNarration.play(text, {
+              behavior: "replace",
+            });
+          },
+          stop: instructionNarration.stop,
+        }
+      : undefined,
+    getTransportMs: () => runtime.getGuidedTransportMs?.() ?? 0,
+    getTokens: () =>
+      resolveGuidedNarrationTokens(
+        migrationStoryCycleDefinitions.find(
+          (cycle) => cycle.label === store.activeCycleId,
+        ),
+      ),
+  });
+
+  const summerMovement = resolveMigrationMovement({
+    phase: "summer_rest",
+    phaseDurationMs: 0,
+  });
+
+  const isCurrentRun = (candidate: number) => !disposed && candidate === runId;
+
+  const cancelPractice = () => {
+    activePractice?.resolve(false);
+    activePractice = null;
+    processedEvaluationIds.clear();
+  };
+
+  const invalidateRun = () => {
+    runId++;
+    cancelPractice();
+    return runId;
+  };
+
+  const setPhase = (
+    phase: GuidedMigrationPhase,
+    status: typeof store.guided.status,
+    patch: Partial<typeof store.guided> = {},
+  ) => {
+    narration.enterPhase(phase);
+    store.setGuidedState({ phase, status, ...patch });
+  };
+
+  const cue = (id: GuidedNarrationId, eventId?: string) =>
+    narration.present(id, eventId);
+
+  const getContinuousCuePrefix = (phase: GuidedMigrationPhase) =>
+    phase.startsWith("summer-")
+      ? "summer"
+      : phase.startsWith("autumn-migration-")
+        ? "autumnMigration"
+        : phase.startsWith("winter-")
+          ? "winter"
+          : "springMigration";
+
+  const waitForContinuousPractice = (
+    movementId: string,
+    currentRunId: number,
+  ) =>
+    new Promise<boolean>((resolve) => {
+      activePractice = { movementId, runId: currentRunId, resolve };
+    });
+
+  const useGuidedRecognitionProfile = (
+    movement: ResolvedMigrationMovement,
+  ): ResolvedMigrationMovement =>
+    movement.movementType === "migration"
+      ? { ...movement, recognitionProfile: "migration-guided" }
+      : movement;
+
+  const runContinuousMovementTutorial = async ({
+    movement,
+    phases,
+    currentRunId,
+    initialPhase,
+  }: {
+    movement: ResolvedMigrationMovement;
+    phases: ContinuousTutorialPhases;
+    currentRunId: number;
+    initialPhase?: GuidedMigrationPhase;
+  }) => {
+    const guidedMovement = useGuidedRecognitionProfile(movement);
+    const cuePrefix = getContinuousCuePrefix(phases.context);
+    const demonstrationCount =
+      cuePrefix === "summer"
+        ? GUIDED_SUMMER_DEMONSTRATIONS
+        : GUIDED_MOVEMENT_DEMONSTRATIONS;
+    const initialState = {
+      activeMovementId: guidedMovement.movementId,
+      activeGestureId: null,
+      successfulBars: 0,
+      requiredSuccessfulBars: GUIDED_REQUIRED_SUCCESSFUL_BARS,
+      demonstrationIndex: 0,
+      demonstrationCount,
+    };
+    if (initialPhase) setPhase(initialPhase, "context", initialState);
+    processedEvaluationIds.clear();
+    const practiceCompleted = waitForContinuousPractice(
+      guidedMovement.movementId,
+      currentRunId,
+    );
+    await runtime.playTutorialDemonstration(
+      guidedMovement,
+      demonstrationCount,
+      (index) => {
+        if (isCurrentRun(currentRunId)) {
+          if (index === demonstrationCount) {
+            setPhase(phases.prompt, "prompt", {
+              demonstrationIndex: index,
+            });
+            cue(
+              `act2.${cuePrefix}.handover` as GuidedNarrationId,
+              `${currentRunId}:${cuePrefix}:handover`,
+            );
+          } else if (cuePrefix === "summer") {
+            if (index === 1) {
+              setPhase("journey-introduction", "context", {
+                ...initialState,
+                demonstrationIndex: index,
+              });
+              cue(
+                "act2.introduction.annualJourney",
+                `${currentRunId}:summer:introduction`,
+              );
+            } else {
+              setPhase(phases.demonstration, "demonstrating", {
+                demonstrationIndex: index,
+              });
+              cue(
+                index === 2
+                  ? "act2.introduction.summerBreeding"
+                  : "act2.summer.instruction",
+                `${currentRunId}:summer:${index === 2 ? "breeding" : "instruction"}`,
+              );
+            }
+          } else if (index === 2) {
+            setPhase(phases.demonstration, "demonstrating", {
+              demonstrationIndex: index,
+            });
+            cue(
+              `act2.${cuePrefix}.instruction` as GuidedNarrationId,
+              `${currentRunId}:${cuePrefix}:instruction`,
+            );
+          } else {
+            setPhase(phases.context, "context", {
+              ...initialState,
+              demonstrationIndex: index,
+            });
+            cue(
+              `act2.${cuePrefix}.context` as GuidedNarrationId,
+              `${currentRunId}:${cuePrefix}:context`,
+            );
+          }
+        }
+      },
+      { handoverToPractice: true },
+    );
+    if (!isCurrentRun(currentRunId)) return false;
+    setPhase(phases.practice, "practicing", {
+      successfulBars: 0,
+      demonstrationIndex: demonstrationCount,
+    });
+    cue(
+      `act2.${cuePrefix}.progress` as GuidedNarrationId,
+      `${currentRunId}:${cuePrefix}:progress`,
+    );
+    if (!(await practiceCompleted) || !isCurrentRun(currentRunId)) return false;
+
+    runtime.continueTutorialMovement();
+    store.markGuidedMovementLearned(movement.movementId);
+    setPhase(phases.success, "success");
+    cue(
+      `act2.${cuePrefix}.success` as GuidedNarrationId,
+      `${currentRunId}:${cuePrefix}:success`,
+    );
+    return isCurrentRun(currentRunId);
+  };
+
+  const markGuidedEventCompleted = (eventType: StorkMigrationEvent) => {
+    const event = store.events.find((item) => item.eventType === eventType);
+    if (event) store.setEventStatus(event.id, "completed");
+  };
+
+  const forceCompleteGuidedStep = () => {
+    store.markGuidedPhaseFacilitatorCompleted(store.guided.phase);
+
+    if (activePractice) {
+      const practice = activePractice;
+      activePractice = null;
+      store.setGuidedState({
+        successfulBars: store.guided.requiredSuccessfulBars,
+      });
+      runtime.forceCompleteGuidedRecognition();
+      practice.resolve(true);
+      console.info("[GuidedAct2] Facilitator completed movement practice.", {
+        phase: store.guided.phase,
+        movementId: practice.movementId,
+      });
+      return;
+    }
+
+    if (runtime.gestures.store.isActive) {
+      runtime.forceCompleteGuidedRecognition();
+      console.info("[GuidedAct2] Facilitator completed gesture practice.", {
+        phase: store.guided.phase,
+        gestureId: runtime.gestures.store.activeGestureId,
+      });
+    }
+  };
+
+  const runGestureTutorial = async ({
+    gestureId,
+    eventType,
+    phases,
+    demonstrate,
+    leadInMovement,
+    currentRunId,
+  }: {
+    gestureId: StoryGestureId;
+    eventType: StorkMigrationEvent;
+    phases: GestureTutorialPhases;
+    demonstrate: boolean;
+    leadInMovement: ResolvedMigrationMovement;
+    currentRunId: number;
+  }) => {
+    const isSpring = phases.context.startsWith("spring-");
+    const gesturePrefix = isSpring
+      ? gestureId === "departure"
+        ? "springDeparture"
+        : "springArrival"
+      : gestureId;
+    setPhase(phases.context, "context", {
+      activeMovementId: leadInMovement.movementId,
+      activeGestureId: gestureId,
+      successfulBars: 0,
+      demonstrationIndex: 0,
+      demonstrationCount: demonstrate ? GUIDED_GESTURE_DEMONSTRATIONS : 1,
+    });
+
+    if (demonstrate && phases.demonstration) {
+      setPhase(phases.demonstration, "demonstrating", {
+        demonstrationIndex: 1,
+      });
+      const result = await runtime.playGuidedGesturePreparation({
+        gestureId,
+        demonstrationBars: GUIDED_GESTURE_DEMONSTRATIONS,
+        handoverStartBarOffsetMs: timing.gestureHandoverStartBarOffsetMs,
+        onPreparationBar: (index) => {
+          if (isCurrentRun(currentRunId)) {
+            store.setGuidedState({ demonstrationIndex: index });
+            cue(
+              `act2.${gesturePrefix}.${index === 1 ? "context" : "instruction"}` as GuidedNarrationId,
+              `${currentRunId}:${gesturePrefix}:preparation:${index}`,
+            );
+          }
+        },
+        onHandoverStart: () => {
+          if (!isCurrentRun(currentRunId)) return;
+          setPhase(phases.prompt, "prompt", {
+            demonstrationIndex: GUIDED_GESTURE_DEMONSTRATIONS + 1,
+          });
+          cue(
+            `act2.${gesturePrefix}.handover` as GuidedNarrationId,
+            `${currentRunId}:${gesturePrefix}:handover`,
+          );
+        },
+        onAttemptStart: () => {
+          if (isCurrentRun(currentRunId)) {
+            setPhase(phases.practice, "practicing", {
+              demonstrationIndex: GUIDED_GESTURE_DEMONSTRATIONS + 1,
+            });
+          }
+        },
+      });
+      if (result !== "completed" || !isCurrentRun(currentRunId)) return false;
+      markGuidedEventCompleted(eventType);
+      store.markGuidedMovementLearned(`${gestureId}-gesture`);
+      setPhase(phases.success, "success");
+      cue(
+        `act2.${gesturePrefix}.success` as GuidedNarrationId,
+        `${currentRunId}:${gesturePrefix}:success`,
+      );
+      return isCurrentRun(currentRunId);
+    }
+
+    const result = await runtime.startGuidedGesturePractice(gestureId, {
+      handoverStartBarOffsetMs: timing.gestureHandoverStartBarOffsetMs,
+      onHandoverStart: () => {
+        if (!isCurrentRun(currentRunId)) return;
+        setPhase(phases.prompt, "prompt");
+        cue(
+          `act2.${gesturePrefix}.handover` as GuidedNarrationId,
+          `${currentRunId}:${gesturePrefix}:handover`,
+        );
+      },
+      onAttemptStart: () => {
+        if (isCurrentRun(currentRunId)) {
+          setPhase(phases.practice, "practicing");
+        }
+      },
+    });
+    if (result !== "completed" || !isCurrentRun(currentRunId)) return false;
+
+    markGuidedEventCompleted(eventType);
+    store.markGuidedMovementLearned(`${gestureId}-gesture`);
+    setPhase(phases.success, "success");
+    cue(
+      `act2.${gesturePrefix}.success` as GuidedNarrationId,
+      `${currentRunId}:${gesturePrefix}:success`,
+    );
+    return isCurrentRun(currentRunId);
+  };
+
+  const getEventElapsedMs = (eventType: StorkMigrationEvent) => {
+    const event = store.events.find((item) => item.eventType === eventType);
+    if (!event) throw new Error(`Missing guided event ${eventType}.`);
+    return event.boundaryTimeMs;
+  };
+
+  const runStoryTransition = async ({
+    phase,
+    eventType,
+    durationMs,
+    movement,
+    cues,
+    currentRunId,
+  }: {
+    phase: GuidedMigrationPhase;
+    eventType: StorkMigrationEvent;
+    durationMs: number;
+    movement: ResolvedMigrationMovement;
+    cues: readonly GuidedNarrationId[];
+    currentRunId: number;
+  }) => {
+    setPhase(phase, "transition", {
+      activeMovementId: movement.movementId,
+      activeGestureId: null,
+    });
+    await runtime.playGuidedStoryTransition({
+      targetElapsedMs: getEventElapsedMs(eventType),
+      durationMs,
+      movement,
+      onBar: (index) => {
+        const narrationId = cues[index];
+        if (narrationId && isCurrentRun(currentRunId)) {
+          cue(narrationId, `${currentRunId}:${phase}:bar:${index}`);
+        }
+      },
+    });
+    return isCurrentRun(currentRunId);
+  };
+
+  const requireCurrentPhaseMovement = () => {
+    const movement = runtime.resolveCurrentPhaseMovement();
+    if (!movement) throw new Error("Guided phase has no resolved movement.");
+    return movement;
+  };
+
+  const runGuidedFlow = async (currentRunId: number) => {
+    try {
+      await runtime.enterGuidedInterlude(summerMovement);
+      if (!isCurrentRun(currentRunId)) return;
+
+      if (
+        !(await runContinuousMovementTutorial({
+          movement: summerMovement,
+          phases: {
+            context: "summer-context",
+            demonstration: "summer-demonstration",
+            prompt: "summer-practice-prompt",
+            practice: "summer-practice",
+            success: "summer-success",
+          },
+          currentRunId,
+          initialPhase: "journey-introduction",
+        }))
+      )
+        return;
+
+      if (
+        !(await runStoryTransition({
+          phase: "summer-story-transition",
+          eventType: "autumn_departure",
+          durationMs: timing.storyTransitionMs.summerToDeparture,
+          movement: summerMovement,
+          cues: [
+            "act2.summer.story.breeding",
+            "act2.summer.story.embodiedMeaning",
+            "act2.summer.story.departureApproaches",
+          ],
+          currentRunId,
+        }))
+      )
+        return;
+
+      const autumnMovement = requireCurrentPhaseMovement();
+      const autumnPreload = runtime.preloadTutorialMovement(
+        useGuidedRecognitionProfile(autumnMovement),
+      );
+
+      if (
+        !(await runGestureTutorial({
+          gestureId: "departure",
+          eventType: "autumn_departure",
+          demonstrate: true,
+          leadInMovement: summerMovement,
+          phases: {
+            context: "autumn-departure-context",
+            demonstration: "autumn-departure-demonstration",
+            prompt: "autumn-departure-practice-prompt",
+            practice: "autumn-departure-practice",
+            success: "autumn-departure-success",
+          },
+          currentRunId,
+        }))
+      )
+        return;
+      if (!(await autumnPreload) || !isCurrentRun(currentRunId)) return;
+
+      if (
+        !(await runContinuousMovementTutorial({
+          movement: autumnMovement,
+          phases: {
+            context: "autumn-migration-context",
+            demonstration: "autumn-migration-demonstration",
+            prompt: "autumn-migration-practice-prompt",
+            practice: "autumn-migration-practice",
+            success: "autumn-migration-success",
+          },
+          currentRunId,
+        }))
+      )
+        return;
+
+      if (
+        !(await runStoryTransition({
+          phase: "autumn-migration-story",
+          eventType: "autumn_arrival",
+          durationMs: timing.storyTransitionMs.autumnMigration,
+          movement: autumnMovement,
+          cues: [
+            "act2.autumnMigration.story.mapAndBody",
+            "act2.autumnMigration.story.route",
+            "act2.autumnMigration.story.arrivalApproaches",
+          ],
+          currentRunId,
+        }))
+      )
+        return;
+
+      const winterMovement = requireCurrentPhaseMovement();
+      const winterPreload = runtime.preloadTutorialMovement(winterMovement);
+
+      if (
+        !(await runGestureTutorial({
+          gestureId: "arrival",
+          eventType: "autumn_arrival",
+          demonstrate: true,
+          leadInMovement: autumnMovement,
+          phases: {
+            context: "autumn-arrival-context",
+            demonstration: "autumn-arrival-demonstration",
+            prompt: "autumn-arrival-practice-prompt",
+            practice: "autumn-arrival-practice",
+            success: "autumn-arrival-success",
+          },
+          currentRunId,
+        }))
+      )
+        return;
+      if (!(await winterPreload) || !isCurrentRun(currentRunId)) return;
+
+      if (
+        !(await runContinuousMovementTutorial({
+          movement: winterMovement,
+          phases: {
+            context: "winter-context",
+            demonstration: "winter-demonstration",
+            prompt: "winter-practice-prompt",
+            practice: "winter-practice",
+            success: "winter-success",
+          },
+          currentRunId,
+        }))
+      )
+        return;
+
+      if (
+        !(await runStoryTransition({
+          phase: "winter-story-transition",
+          eventType: "spring_departure",
+          durationMs: timing.storyTransitionMs.winterToDeparture,
+          movement: winterMovement,
+          cues: [
+            "act2.winter.story.behavior",
+            "act2.winter.story.conditions",
+            "act2.winter.story.returnApproaches",
+          ],
+          currentRunId,
+        }))
+      )
+        return;
+
+      const springMovement = requireCurrentPhaseMovement();
+      const springPreload = runtime.preloadTutorialMovement(
+        useGuidedRecognitionProfile(springMovement),
+      );
+
+      if (
+        !(await runGestureTutorial({
+          gestureId: "departure",
+          eventType: "spring_departure",
+          demonstrate: false,
+          leadInMovement: winterMovement,
+          phases: {
+            context: "spring-departure-context",
+            prompt: "spring-departure-practice-prompt",
+            practice: "spring-departure-practice",
+            success: "spring-departure-success",
+          },
+          currentRunId,
+        }))
+      )
+        return;
+      if (!(await springPreload) || !isCurrentRun(currentRunId)) return;
+
+      if (
+        !(await runContinuousMovementTutorial({
+          movement: springMovement,
+          phases: {
+            context: "spring-migration-context",
+            demonstration: "spring-migration-demonstration",
+            prompt: "spring-migration-practice-prompt",
+            practice: "spring-migration-practice",
+            success: "spring-migration-success",
+          },
+          currentRunId,
+        }))
+      )
+        return;
+
+      await runtime.preloadTutorialMovement(summerMovement);
+      if (!isCurrentRun(currentRunId)) return;
+
+      if (
+        !(await runStoryTransition({
+          phase: "spring-migration-story",
+          eventType: "spring_arrival",
+          durationMs: timing.storyTransitionMs.springMigration,
+          movement: springMovement,
+          cues: [
+            "act2.springMigration.story.route",
+            "act2.springMigration.story.embodiedMeaning",
+            "act2.springMigration.story.arrivalApproaches",
+          ],
+          currentRunId,
+        }))
+      )
+        return;
+
+      if (
+        !(await runGestureTutorial({
+          gestureId: "arrival",
+          eventType: "spring_arrival",
+          demonstrate: false,
+          leadInMovement: springMovement,
+          phases: {
+            context: "spring-arrival-context",
+            prompt: "spring-arrival-practice-prompt",
+            practice: "spring-arrival-practice",
+            success: "spring-arrival-success",
+          },
+          currentRunId,
+        }))
+      )
+        return;
+
+      if (!(await runtime.startTutorialStoryMovement(summerMovement))) return;
+      if (!isCurrentRun(currentRunId)) return;
+      setPhase("cycle-complete", "completed", {
+        activeMovementId: summerMovement.movementId,
+        activeGestureId: null,
+      });
+      await runtime.playGuidedStoryTransition({
+        targetElapsedMs: store.currentElapsedMs,
+        durationMs: 8_000,
+        movement: summerMovement,
+        onBar: (index) => {
+          const id = [
+            "act2.completion.journeyComplete",
+            "act2.completion.movementSummary",
+          ][index] as GuidedNarrationId | undefined;
+          if (id && isCurrentRun(currentRunId)) {
+            cue(id, `${currentRunId}:completion:bar:${index}`);
+          }
+        },
+      });
+      if (!isCurrentRun(currentRunId)) return;
+      runtime.completeGuidedInterlude?.();
+      cue("act2.completion.title", `${currentRunId}:completion:title`);
+      store.markCycleCompleted(store.activeCycleRun?.id ?? "guided-cycle");
+      store.setGuidedState({
+        completionCount: store.guided.completionCount + 1,
+      });
+      onGuidedCycleCompleted?.();
+    } catch (error) {
+      if (!isCurrentRun(currentRunId)) return;
+      store.setError(
+        error instanceof Error ? error.message : "Guided migration failed.",
+      );
+    }
+  };
+
+  const startGuidedJourney = () => {
+    if (!enabled || disposed || flowStarted || store.guided.phase !== "idle") {
+      return;
+    }
+    flowStarted = true;
+    const currentRunId = invalidateRun();
+    void runGuidedFlow(currentRunId);
+  };
+
+  const initialize = () => {
+    if (!enabled) return;
+    disposed = false;
+    flowStarted = false;
+    invalidateRun();
+    narration.reset("initialize");
+    store.resetGuidedState();
+  };
+
+  const resetAct = async () => {
+    invalidateRun();
+    narration.reset("act-reset");
+    flowStarted = false;
+    runtime.cancelGuidedInterlude();
+    await runtime.reset();
+    if (!disposed) store.resetGuidedState();
+  };
+
+  const handleAction = (actionId: MigrationInfoPanelActionId) => {
+    if (actionId === "startGuidedJourney") startGuidedJourney();
+    if (actionId === "forceCompleteGuidedStep") forceCompleteGuidedStep();
+  };
+
+  const stopEvaluationWatch: WatchStopHandle = watch(
+    runtime.movementRecognition.lastBarEvaluation,
+    (evaluation) => {
+      const practice = activePractice;
+      if (
+        !enabled ||
+        disposed ||
+        !practice ||
+        !isCurrentRun(practice.runId) ||
+        !evaluation ||
+        evaluation.movementId !== practice.movementId ||
+        processedEvaluationIds.has(evaluation.evaluationId)
+      ) {
+        return;
+      }
+
+      processedEvaluationIds.add(evaluation.evaluationId);
+      if (evaluation.status !== "success") {
+        const prefix = getContinuousCuePrefix(store.guided.phase);
+        if (evaluation.status === "not_evaluable") {
+          cue(
+            "act2.feedback.bodyNotVisible",
+            `${evaluation.evaluationId}:tracking`,
+          );
+        } else {
+          const noMovement = evaluation.beatResults.every(
+            (beat) =>
+              beat.detectedSide === null &&
+              (beat.metrics.activeFootDelta === null ||
+                Math.abs(beat.metrics.activeFootDelta) < 0.01),
+          );
+          cue(
+            `act2.${prefix}.failure.${noMovement ? "noMovement" : "incomplete"}` as GuidedNarrationId,
+            `${evaluation.evaluationId}:movement-failure`,
+          );
+        }
+        return;
+      }
+
+      const successfulBars = Math.min(
+        store.guided.successfulBars + 1,
+        store.guided.requiredSuccessfulBars,
+      );
+      store.setGuidedState({ successfulBars });
+      if (successfulBars < store.guided.requiredSuccessfulBars) return;
+
+      activePractice = null;
+      practice.resolve(true);
+    },
+  );
+
+  const stopGestureEvaluationWatch: WatchStopHandle = watch(
+    () => runtime.gestures.store.latestEvaluationResult,
+    (result) => {
+      if (!enabled || disposed || !result || result.status === "success")
+        return;
+      const feedback = getMigrationGestureFeedbackCatalogEntry(
+        result.primaryFeedbackCode,
+      );
+      if (!feedback) return;
+      narration.presentExternal({
+        id: `act2.gestureFeedback.${result.primaryFeedbackCode}`,
+        title: translateText(feedback.titleKey),
+        text: translateText(feedback.textKey),
+        priority:
+          result.primaryFeedbackCode === "CHECKPOINT_NOT_EVALUABLE" ? 100 : 70,
+        eventId: result.id,
+      });
+    },
+  );
+
+  const panelModel = computed<MigrationActInfoPanelModel>(() => {
+    const state = store.guided;
+    const content = narration.panelContent.value;
+    const isPractice = state.phase.endsWith("-practice");
+    const isContinuousPractice =
+      isPractice && Boolean(state.activeMovementId) && !state.activeGestureId;
+    const isDemonstration = state.phase.endsWith("-demonstration");
+    const isSuccess = state.phase.endsWith("-success");
+    const isTransition =
+      state.phase.includes("story-transition") ||
+      state.phase.endsWith("-story");
+    const isCompleted = state.phase === "cycle-complete";
+
+    const actions: MigrationActInfoPanelModel["actions"] =
+      state.phase === "idle"
+        ? [
+            {
+              id: "startGuidedJourney",
+              label: "Start guided journey",
+              primary: true,
+            },
+          ]
+        : import.meta.dev &&
+            state.phase !== "cycle-complete" &&
+            state.phase !== "journey-introduction"
+          ? [
+              {
+                id: "forceCompleteGuidedStep",
+                label: "Force complete current guided step",
+              },
+            ]
+          : [];
+
+    return {
+      mode: isCompleted
+        ? "completed"
+        : isTransition
+          ? "cycleTransition"
+          : isSuccess
+            ? "movementFeedback"
+            : state.activeGestureId
+              ? "gestureInstruction"
+              : "phaseInstruction",
+      title: content.title,
+      instruction: content.text,
+      status: isDemonstration
+        ? `Demonstration ${state.demonstrationIndex} of ${state.demonstrationCount}`
+        : isContinuousPractice
+          ? `${state.successfulBars} of ${state.requiredSuccessfulBars}`
+          : undefined,
+      feedbackText: undefined,
+      tone: isSuccess || isCompleted ? "success" : "neutral",
+      progress: isContinuousPractice
+        ? {
+            current: state.successfulBars,
+            total: state.requiredSuccessfulBars,
+            label: `${state.successfulBars} of ${state.requiredSuccessfulBars} successful movements`,
+          }
+        : undefined,
+      movements: [],
+      actions,
+    };
+  });
+
+  const dispose = () => {
+    disposed = true;
+    invalidateRun();
+    narration.cancel("dispose");
+    stopEvaluationWatch();
+    stopGestureEvaluationWatch();
+    runtime.cancelGuidedInterlude();
+  };
+
+  return {
+    enabled,
+    state: computed(() => store.guided),
+    panelModel,
+    narrationDiagnostics: narration.diagnostics,
+    isGuidedUiActive: computed(() => enabled),
+    startGuidedJourney,
+    resetAct,
+    handleAction,
+    pause: runtime.pause,
+    resume: runtime.resume,
+    initialize,
+    dispose,
+  };
+};

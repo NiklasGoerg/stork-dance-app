@@ -4,6 +4,7 @@ import { useNarrator } from "~/composables/narration/useNarrator.client";
 import type {
   NarrationResult,
   NarrationSpeakBehavior,
+  NarrationSpeakOptions,
 } from "~/types/narration";
 
 export type NarrationCueKey = string;
@@ -30,8 +31,23 @@ export const useNarration = () => {
     });
   };
 
+  const speakText = async (
+    text: string,
+    options: Pick<
+      NarrationSpeakOptions,
+      "behavior" | "rate" | "onStart" | "onEnd"
+    > = {},
+  ): Promise<NarrationResult> =>
+    await narrator.speakText(text, {
+      behavior: options.behavior,
+      rate: options.rate,
+      onStart: options.onStart,
+      onEnd: options.onEnd,
+    });
+
   return {
     play,
+    speakText,
     stop: narrator.stop,
     pause: narrator.pause,
     resume: narrator.resume,

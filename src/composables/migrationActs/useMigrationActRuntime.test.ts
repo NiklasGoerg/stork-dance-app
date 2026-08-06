@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from "pinia";
-import { beforeEach, describe, expect, it } from "vitest";
+import { ref } from "vue";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   useMigrationActRuntime,
   type MigrationActAudioService,
@@ -11,6 +12,7 @@ import type { StoryGestureResult } from "~/store/storyGestureStore";
 import type { MigrationActCycleRun } from "~/types/migrationAct";
 import { migrationStoryCycleDefinitions } from "~/utils/migrationStoryData";
 import { getSeasonForDate, type StorySeasonId } from "~/utils/storyCycle";
+import { resolveMigrationMovement } from "~/utils/migrationActs/migrationMovementSelection";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -99,7 +101,21 @@ const createFakeAudio = () => {
     },
     getBaseRhythmTransportTimeMs: () => state.currentOffsetSeconds * 1_000,
     getBeatDurationMs: () => 1_000,
-    getMsUntilNextBaseRhythmBeat: () => 0,
+    getMsUntilNextBaseRhythmBeat: (targetBeat: number) => {
+      const beatDurationMs = 1_000;
+      const beatsPerBar = 4;
+      const transportTimeMs = state.currentOffsetSeconds * 1_000;
+      const currentBeatIndex = Math.floor(transportTimeMs / beatDurationMs);
+      const barStartBeatIndex =
+        Math.floor(currentBeatIndex / beatsPerBar) * beatsPerBar;
+      const targetBeatIndex = targetBeat - 1;
+      let targetTransportTimeMs =
+        (barStartBeatIndex + targetBeatIndex) * beatDurationMs;
+      if (targetTransportTimeMs <= transportTimeMs + 40) {
+        targetTransportTimeMs += beatsPerBar * beatDurationMs;
+      }
+      return targetTransportTimeMs - transportTimeMs;
+    },
   } as unknown as MigrationActAudioService;
 
   return { service, state };
@@ -188,10 +204,13 @@ const createFakeGestures = (
     starts: [] as Array<{
       id: "departure" | "arrival";
       countdownStartTransportMs?: number;
+      preparationBars?: number;
     }>,
   };
   const service = {
     store: state,
+    demonstrationActive: ref(false),
+    demonstrationSourceTimeMs: ref(0),
     loadTimings: new Map(),
     preload: async () => {
       calls.preload++;
@@ -206,6 +225,7 @@ const createFakeGestures = (
       state.isActive = false;
       return result;
     },
+    demonstrate: async () => undefined,
     tick: () => {
       calls.tick++;
       state.state = "attempt-playing";
@@ -274,6 +294,64 @@ const finishInitialCountdown = async (
 
 describe("migration act runtime", () => {
   beforeEach(() => setActivePinia(createPinia()));
+
+  it("uses the same zero transport origin for three guided start-reset cycles", async () => {
+    const { controller, audio } = createHarness();
+    const movement = resolveMigrationMovement({
+      phase: "summer_rest",
+      phaseDurationMs: 0,
+    });
+
+    await controller.initialize();
+    for (let run = 0; run < 3; run++) {
+      if (run > 0) await controller.reset();
+      await controller.enterGuidedInterlude(movement);
+
+      expect(audio.state.currentOffsetSeconds).toBe(0);
+      expect(controller.avatarPlaybackOwner.value).toBe("summer");
+      expect(controller.movement.movementSourceTimeMs.value).toBe(1_000);
+      expect(controller.ownerSwitchTrace.value).toEqual([
+        expect.objectContaining({
+          fromOwner: "idle",
+          toOwner: "summer",
+          scheduledTransportMs: 0,
+          actualTransportMs: 0,
+          reason: "guided-start",
+        }),
+      ]);
+    }
+  });
+
+  it("switches the visible owner atomically on the scheduled boundary", async () => {
+    const gesture = createDeferred<StoryGestureResult>();
+    const { controller, raf } = createHarness({
+      gestureStart: () => gesture.promise,
+    });
+    const movement = resolveMigrationMovement({
+      phase: "summer_rest",
+      phaseDurationMs: 0,
+    });
+
+    await controller.initialize();
+    await controller.enterGuidedInterlude(movement);
+    const preparation = controller.playGuidedGesturePreparation({
+      gestureId: "departure",
+      demonstrationBars: 2,
+    });
+    raf.step(0);
+
+    expect(controller.avatarPlaybackOwner.value).toBe("departure");
+    expect(controller.ownerSwitchTrace.value.at(-1)).toEqual({
+      fromOwner: "summer",
+      toOwner: "departure",
+      scheduledTransportMs: 0,
+      actualTransportMs: 0,
+      reason: "gesture-preparation:departure",
+    });
+
+    gesture.resolve("completed");
+    await preparation;
+  });
 
   it("uses the final countdown beat as preroll before story recognition starts", async () => {
     const { controller, raf } = createHarness();
@@ -556,5 +634,213 @@ describe("migration act runtime", () => {
     expect(seasonAudio.state.isPlaying).toBe(false);
     expect(seasonAudio.calls.pauses).toBe(1);
     expect(raf.pendingCount()).toBe(0);
+  });
+
+  it("freezes story time in a guided interlude while the beat transport continues", async () => {
+    const { controller, raf, audio } = createHarness();
+
+    await controller.initialize();
+    await controller.enterGuidedInterlude();
+    expect(controller.guidedInterludeActive.value).toBe(true);
+    expect(controller.store.pauseReasons).toContain("tutorial");
+    expect(audio.state.isPlaying).toBe(true);
+
+    raf.step(0);
+    raf.step(5_000);
+    expect(controller.store.currentElapsedMs).toBe(0);
+    expect(audio.state.currentOffsetSeconds).toBe(5);
+
+    await controller.leaveGuidedInterlude();
+    raf.step(0);
+    raf.step(500);
+    expect(controller.guidedInterludeActive.value).toBe(false);
+    expect(controller.store.pauseReasons).not.toContain("tutorial");
+    expect(controller.store.currentElapsedMs).toBe(500);
+  });
+
+  it("advances a guided story transition monotonically to the exact event boundary", async () => {
+    const { controller, raf } = createHarness();
+
+    await controller.initialize();
+    await controller.enterGuidedInterlude();
+    const targetElapsedMs = controller.store.events[0]!.boundaryTimeMs;
+    const transition = controller.playGuidedStoryTransition({
+      targetElapsedMs,
+      durationMs: 4_000,
+    });
+
+    raf.step(0);
+    expect(controller.store.currentElapsedMs).toBe(0);
+    raf.step(1_000);
+    const firstElapsedMs = controller.store.currentElapsedMs;
+    raf.step(1_000);
+    const secondElapsedMs = controller.store.currentElapsedMs;
+
+    expect(firstElapsedMs).toBeCloseTo(targetElapsedMs * 0.25);
+    expect(secondElapsedMs).toBeCloseTo(targetElapsedMs * 0.5);
+    expect(secondElapsedMs).toBeGreaterThan(firstElapsedMs);
+    expect(controller.guidedStoryTransitionActive.value).toBe(true);
+
+    raf.step(2_000);
+    await transition;
+    expect(controller.store.currentElapsedMs).toBe(targetElapsedMs);
+    expect(controller.store.currentDate).toBe(
+      controller.store.events[0]!.boundaryDate,
+    );
+    expect(controller.store.events[0]!.status).toBe("pending");
+    expect(controller.guidedStoryTransitionActive.value).toBe(false);
+  });
+
+  it("ends tutorial preroll on beat one and plays two bars without recognition", async () => {
+    const { controller, raf, audio } = createHarness();
+    const repetitions: number[] = [];
+    const summerMovement = resolveMigrationMovement({
+      phase: "summer_rest",
+      phaseDurationMs: 0,
+    });
+
+    await controller.initialize();
+    await controller.enterGuidedInterlude(summerMovement);
+    expect(audio.state.currentOffsetSeconds).toBe(0);
+    const demonstration = controller.playTutorialDemonstration(
+      summerMovement,
+      2,
+      (index) => repetitions.push(index),
+    );
+    await vi.waitFor(() => {
+      expect(repetitions).toEqual([1]);
+    });
+
+    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+    expect(controller.movement.movementSourceTimeMs.value).toBe(1_000);
+    raf.step(0);
+    raf.step(1_000);
+    expect(controller.movement.movementSourceTimeMs.value).toBe(2_000);
+    raf.step(4_000);
+    raf.step(3_000);
+    await demonstration;
+
+    expect(repetitions).toEqual([1, 2]);
+    expect(controller.tutorialPlaybackMode.value).toBeNull();
+    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+  });
+
+  it("keeps four opening bars recognition-free and hands over without a restart", async () => {
+    const { controller, raf } = createHarness();
+    const repetitions: number[] = [];
+    const movement = resolveMigrationMovement({
+      phase: "summer_rest",
+      phaseDurationMs: 0,
+    });
+
+    await controller.initialize();
+    await controller.enterGuidedInterlude(movement);
+    const demonstration = controller.playTutorialDemonstration(
+      movement,
+      4,
+      (index) => repetitions.push(index),
+      { handoverToPractice: true },
+    );
+    await vi.waitFor(() => expect(repetitions).toEqual([1]));
+
+    raf.step(0);
+    raf.step(1_000);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+    raf.step(4_000);
+    raf.step(4_000);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+    raf.step(4_000);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+    raf.step(3_000);
+    await demonstration;
+
+    expect(repetitions).toEqual([1, 2, 3, 4]);
+    expect(controller.tutorialPlaybackMode.value).toBe("practice");
+    expect(controller.movement.movementPlaying.value).toBe(true);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(true);
+    expect(controller.movement.movementSourceTimeMs.value).toBe(1_000);
+  });
+
+  it.each([
+    ["autumn_migration", "autumn-migration"],
+    ["spring_migration", "spring-migration"],
+  ] as const)(
+    "keeps the %s demo alive while its owner switch is pending",
+    async (phase, expectedOwner) => {
+      const { controller, raf } = createHarness();
+      const summer = resolveMigrationMovement({
+        phase: "summer_rest",
+        phaseDurationMs: 0,
+      });
+      const migration = resolveMigrationMovement({
+        phase,
+        phaseDurationMs: 10_000,
+      });
+      const repetitions: number[] = [];
+
+      await controller.initialize();
+      await controller.enterGuidedInterlude(summer);
+      const demonstration = controller.playTutorialDemonstration(
+        migration,
+        3,
+        (index) => repetitions.push(index),
+        { handoverToPractice: true },
+      );
+      await vi.waitFor(() => {
+        expect(controller.tutorialPlaybackMode.value).toBe("demonstration");
+        expect(controller.guidedTrace.value.ownerSwitchPromisePending).toBe(
+          true,
+        );
+      });
+
+      raf.step(0);
+      expect(controller.tutorialPlaybackMode.value).toBe("demonstration");
+      expect(controller.avatarPlaybackOwner.value).toBe("summer");
+      expect(controller.guidedTrace.value).toMatchObject({
+        tutorialPlaybackMode: "demonstration",
+        avatarPlaybackOwner: "summer",
+        ownerSwitchPromisePending: true,
+        demonstrationPromisePending: false,
+        playbackState: "playing",
+        pauseReasons: ["tutorial"],
+      });
+
+      raf.step(4_000);
+      await flushPromises();
+      expect(controller.avatarPlaybackOwner.value).toBe(expectedOwner);
+      expect(repetitions).toEqual([1]);
+      expect(controller.guidedTrace.value).toMatchObject({
+        avatarPlaybackOwner: expectedOwner,
+        ownerSwitchPromisePending: false,
+        demonstrationPromisePending: true,
+      });
+
+      raf.step(4_000);
+      raf.step(4_000);
+      raf.step(4_000);
+      await demonstration;
+      expect(repetitions).toEqual([1, 2, 3]);
+      expect(controller.tutorialPlaybackMode.value).toBe("practice");
+      expect(controller.movementRecognition.recognitionActive.value).toBe(true);
+    },
+  );
+
+  it("surfaces a missing guided movement instead of waiting forever", async () => {
+    const { controller } = createHarness();
+    const summer = resolveMigrationMovement({
+      phase: "summer_rest",
+      phaseDurationMs: 0,
+    });
+    const missing = { ...summer, movementId: "missing-guided-movement" };
+
+    await controller.initialize();
+    await controller.enterGuidedInterlude(summer);
+
+    await expect(
+      controller.playTutorialDemonstration(missing, 3, undefined, {
+        handoverToPractice: true,
+      }),
+    ).rejects.toThrow('Movement "missing-guided-movement" is unavailable.');
+    expect(controller.store.error).toContain("missing-guided-movement");
   });
 });

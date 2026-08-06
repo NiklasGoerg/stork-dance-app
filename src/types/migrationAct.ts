@@ -20,7 +20,7 @@ export type MigrationActPlaybackState =
 export type MigrationActPlaybackMode = "story" | "single_cycle";
 
 export type MigrationActPauseReason =
-  "user" | "gesture" | "cycle_transition" | "system";
+  "user" | "gesture" | "tutorial" | "cycle_transition" | "system";
 
 export type MigrationActEventStatus =
   "pending" | "triggered" | "completed" | "skipped";
@@ -94,7 +94,60 @@ export type MigrationMovementDirection = "stationary" | "outbound" | "return";
 export type MigrationMovementType = "rest" | "migration";
 
 export type MigrationMovementRecognitionProfile =
-  "summer_rest" | "winter_rest" | "migration";
+  "summer_rest" | "winter_rest" | "migration" | "migration-guided";
+
+export type AvatarPlaybackOwner =
+  | "summer"
+  | "winter"
+  | "autumn-migration"
+  | "spring-migration"
+  | "departure"
+  | "arrival"
+  | "idle";
+
+export interface GuidedOwnerSwitchTrace {
+  fromOwner: AvatarPlaybackOwner;
+  toOwner: AvatarPlaybackOwner;
+  scheduledTransportMs: number;
+  actualTransportMs: number;
+  reason: string;
+}
+
+export interface GuidedAct2Trace {
+  runtimeRunId: number;
+  guidedInterludeRevision: number;
+  playbackState: string;
+  pauseReasons: MigrationActPauseReason[];
+  masterTransportMs: number;
+  masterBarIndex: number;
+  masterBeatIndex: number;
+  musicSourceTimeMs: number;
+  storyTimeMs: number;
+  seasonalThemeId: StorySeasonId | null;
+  seasonalThemeSourceTimeMs: number | null;
+  guidedPhase: GuidedMigrationPhase;
+  tutorialPlaybackMode: "demonstration" | "practice" | "story" | null;
+  gestureState: string;
+  gestureId: StoryGestureId | null;
+  gestureCompletionStatus: MigrationGestureEvaluationStatus | null;
+  avatarPlaybackOwner: AvatarPlaybackOwner;
+  renderedMovementId: string | null;
+  avatarSourceTimeMs: number;
+  recognitionSessionId: number | null;
+  recognitionProfile: MigrationMovementRecognitionProfile | null;
+  recognitionMovementId: string | null;
+  recognitionBarIndex: number | null;
+  recognitionBeatIndex: MigrationMovementBeatIndex | null;
+  recognitionSourceTimeMs: number | null;
+  scheduledNextOwner: AvatarPlaybackOwner | null;
+  scheduledOwnerSwitchMs: number | null;
+  lastOwnerSwitchReason: string | null;
+  ownerSwitchPromisePending: boolean;
+  demonstrationPromisePending: boolean;
+  storyTransitionPromisePending: boolean;
+  movementLoaded: boolean;
+  movementLoadError: string | null;
+}
 
 export type MigrationMovementCriterionKey =
   | "wingBeat"
@@ -107,6 +160,136 @@ export type MigrationMovementCriterionKey =
 
 export type MigrationMovementEvaluationStatus =
   "idle" | "success" | "failed" | "not_evaluable";
+
+export interface MigrationMovementBarEvaluation {
+  evaluationId: string;
+  sessionId: number;
+  profile: MigrationMovementRecognitionProfile;
+  movementId: string;
+  barIndex: number;
+  status: Exclude<MigrationMovementEvaluationStatus, "idle">;
+  beatResults: MigrationMovementBeatEvaluation[];
+  criteria: {
+    wingBeat: MigrationMovementCriterionStatus;
+    stepActivity: MigrationMovementCriterionStatus;
+    stanceWidthChange: MigrationMovementCriterionStatus;
+    verticalBounce: MigrationMovementCriterionStatus;
+  };
+  evaluatedAtMs: number;
+}
+
+export type MigrationMovementBeatIndex = 1 | 2 | 3 | 4;
+
+export interface MigrationMovementBeatEvaluation {
+  evaluationId: string;
+  sessionId: number;
+  profile: MigrationMovementRecognitionProfile;
+  movementId: string;
+  barIndex: number;
+  beatIndex: MigrationMovementBeatIndex;
+  status: MigrationMovementCriterionStatus;
+  detectedSide: "left" | "right" | null;
+  criteria: {
+    footActivity: MigrationMovementCriterionStatus;
+    returnToBaseline: MigrationMovementCriterionStatus;
+    stanceChange: MigrationMovementCriterionStatus;
+    armsUp: MigrationMovementCriterionStatus;
+    armsDown: MigrationMovementCriterionStatus;
+    direction: MigrationMovementCriterionStatus;
+  };
+  metrics: {
+    activeSide: "left" | "right" | null;
+    activeFootDelta: number | null;
+    baselineFootX: number | null;
+    actionFootX: number | null;
+    returnFootX: number | null;
+    returnDelta: number | null;
+    returnStartDistance: number | null;
+    returnFinalDistance: number | null;
+    returnMovement: number | null;
+    sampleWindowStartMs: number | null;
+    sampleWindowEndMs: number | null;
+    stanceChange: number | null;
+    actionStanceWidth: number | null;
+    returnStanceWidth: number | null;
+    validSampleCount: number;
+    actionSampleCount: number;
+    directionScore: number | null;
+    expectedDirection: MigrationMovementDirection | null;
+  };
+  evaluatedAtMs: number;
+}
+
+export type GuidedMigrationPhase =
+  | "idle"
+  | "journey-introduction"
+  | "summer-context"
+  | "summer-demonstration"
+  | "summer-practice-prompt"
+  | "summer-practice"
+  | "summer-success"
+  | "summer-story-transition"
+  | "autumn-departure-context"
+  | "autumn-departure-demonstration"
+  | "autumn-departure-practice-prompt"
+  | "autumn-departure-practice"
+  | "autumn-departure-success"
+  | "autumn-migration-context"
+  | "autumn-migration-demonstration"
+  | "autumn-migration-practice-prompt"
+  | "autumn-migration-practice"
+  | "autumn-migration-success"
+  | "autumn-migration-story"
+  | "autumn-arrival-context"
+  | "autumn-arrival-demonstration"
+  | "autumn-arrival-practice-prompt"
+  | "autumn-arrival-practice"
+  | "autumn-arrival-success"
+  | "winter-context"
+  | "winter-demonstration"
+  | "winter-practice-prompt"
+  | "winter-practice"
+  | "winter-success"
+  | "winter-story-transition"
+  | "spring-departure-context"
+  | "spring-departure-practice-prompt"
+  | "spring-departure-practice"
+  | "spring-departure-success"
+  | "spring-migration-context"
+  | "spring-migration-demonstration"
+  | "spring-migration-practice-prompt"
+  | "spring-migration-practice"
+  | "spring-migration-success"
+  | "spring-migration-story"
+  | "spring-arrival-context"
+  | "spring-arrival-practice-prompt"
+  | "spring-arrival-practice"
+  | "spring-arrival-success"
+  | "cycle-complete";
+
+export type GuidedMigrationStatus =
+  | "idle"
+  | "context"
+  | "demonstrating"
+  | "prompt"
+  | "practicing"
+  | "success"
+  | "transition"
+  | "completed";
+
+export interface GuidedMigrationState {
+  phase: GuidedMigrationPhase;
+  activeMovementId: string | null;
+  activeGestureId: StoryGestureId | null;
+  demonstrationIndex: number;
+  demonstrationCount: number;
+  successfulBars: number;
+  requiredSuccessfulBars: number;
+  learnedMovementIds: string[];
+  facilitatorCompletedPhases: GuidedMigrationPhase[];
+  completionCount: number;
+  status: GuidedMigrationStatus;
+}
 
 export type MigrationGestureEvaluationStatus =
   "success" | "failed" | "not_evaluable";
@@ -155,7 +338,9 @@ export type MigrationInfoPanelActionId =
   | "markGestureSuccessful"
   | "repeatGesture"
   | "continueGesture"
-  | "continueToNextAct";
+  | "continueToNextAct"
+  | "startGuidedJourney"
+  | "forceCompleteGuidedStep";
 
 export interface MigrationInfoPanelAction {
   id: MigrationInfoPanelActionId;
@@ -173,6 +358,11 @@ export interface MigrationActInfoPanelModel {
   feedbackTitle?: string;
   feedbackText?: string;
   tone: MigrationInfoPanelTone;
+  progress?: {
+    current: number;
+    total: number;
+    label: string;
+  };
   movements: readonly MigrationMovementListItem[];
   actions: readonly MigrationInfoPanelAction[];
 }

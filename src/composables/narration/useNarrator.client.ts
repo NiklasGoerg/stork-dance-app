@@ -17,6 +17,9 @@ interface NarrationRequest {
   utterance: SpeechSynthesisUtterance;
   resolve: (result: NarrationResult) => void;
   resolved: boolean;
+  rate: number;
+  voiceName: string | null;
+  onEnd?: NarrationSpeakOptions["onEnd"];
 }
 
 const voices = ref<SpeechSynthesisVoice[]>([]);
@@ -95,6 +98,12 @@ const resolveRequest = (request: NarrationRequest, result: NarrationResult) => {
     activeUtterance.value = null;
   }
 
+  request.onEnd?.({
+    status: result.status,
+    rate: request.rate,
+    voiceName: request.voiceName,
+  });
+
   request.resolve(result);
   syncSpeechState();
 };
@@ -110,6 +119,11 @@ const isCancellationError = (event: SpeechSynthesisErrorEvent) =>
 
 const getLocaleString = (locale: string | string[] | null | undefined) =>
   Array.isArray(locale) ? locale[0] : locale;
+
+export const resolveNarrationSpeechRate = (
+  requestedRate: number | undefined,
+  settingsRate: number,
+) => requestedRate ?? settingsRate;
 
 export const useNarrator = () => {
   const settingsStore = useNarrationSettingsStore();
@@ -213,7 +227,10 @@ export const useNarrator = () => {
     const utterance = new SpeechSynthesisUtterance(text);
 
     utterance.lang = language ?? voice?.lang ?? "en-US";
-    utterance.rate = options.rate ?? settingsStore.rate;
+    utterance.rate = resolveNarrationSpeechRate(
+      options.rate,
+      settingsStore.rate,
+    );
     utterance.pitch = options.pitch ?? settingsStore.pitch;
     utterance.volume = options.volume ?? settingsStore.volume;
 
@@ -226,6 +243,9 @@ export const useNarrator = () => {
         utterance,
         resolve,
         resolved: false,
+        rate: utterance.rate,
+        voiceName: voice?.name ?? null,
+        onEnd: options.onEnd,
       };
 
       pendingRequests.add(request);
@@ -234,6 +254,10 @@ export const useNarrator = () => {
         activeUtterance.value = utterance;
         isSpeaking.value = true;
         isPaused.value = false;
+        options.onStart?.({
+          rate: utterance.rate,
+          voiceName: voice?.name ?? null,
+        });
       };
       utterance.onend = () => {
         resolveRequest(request, { status: "completed" });
