@@ -80,6 +80,8 @@ type GuidedGesturePracticeOptions = Omit<
   "gestureId" | "demonstrationBars" | "onPreparationBar"
 >;
 
+type GuidedRecognitionPurpose = "idle" | "practice-gating" | "passive-feedback";
+
 export type MigrationActRuntimeDriver = {
   requestFrame: (callback: FrameRequestCallback) => number;
   cancelFrame: (frameId: number) => void;
@@ -184,6 +186,7 @@ export const useMigrationActRuntime = ({
   const tutorialPlaybackMode = ref<
     "demonstration" | "practice" | "story" | null
   >(null);
+  const guidedRecognitionPurpose = ref<GuidedRecognitionPurpose>("idle");
   const tutorialRepetitionIndex = ref(0);
   const guidedStoryTransitionActive = ref(false);
   let tutorialMovement: ResolvedMigrationMovement | null = null;
@@ -201,6 +204,10 @@ export const useMigrationActRuntime = ({
   let guidedTransitionResolver: (() => void) | null = null;
   let guidedTransitionBarIndex = -1;
   let onGuidedTransitionBar: ((index: number) => void) | null = null;
+  let guidedBarWaits: Array<{
+    targetTransportMs: number;
+    resolve: () => void;
+  }> = [];
   const avatarPlaybackOwner = ref<AvatarPlaybackOwner>("idle");
   const scheduledNextOwner = ref<AvatarPlaybackOwner | null>(null);
   const scheduledOwnerSwitchMs = ref<number | null>(null);
@@ -259,6 +266,7 @@ export const useMigrationActRuntime = ({
       seasonalThemeSourceTimeMs: null,
       guidedPhase: store.guided.phase,
       tutorialPlaybackMode: tutorialPlaybackMode.value,
+      guidedRecognitionPurpose: guidedRecognitionPurpose.value,
       gestureState: gestures.store.state,
       gestureId: gestures.store.activeGestureId,
       gestureCompletionStatus:
@@ -285,6 +293,7 @@ export const useMigrationActRuntime = ({
       ownerSwitchPromisePending: scheduledOwnerResolver !== null,
       demonstrationPromisePending: tutorialDemonstrationResolver !== null,
       storyTransitionPromisePending: guidedTransitionResolver !== null,
+      guidedBarWaitsPending: guidedBarWaits.length,
       movementLoaded: usesGestureOwner.value
         ? gestures.store.movementLoaded
         : movement.movementLoaded.value,
@@ -324,6 +333,11 @@ export const useMigrationActRuntime = ({
     });
     scheduledOwnerResolver?.(true);
     scheduledOwnerResolver = null;
+  };
+
+  const switchAvatarOwnerNow = (owner: AvatarPlaybackOwner, reason: string) => {
+    if (avatarPlaybackOwner.value === owner) return;
+    commitOwnerSwitch(owner, audioStore.getBaseRhythmTransportTimeMs(), reason);
   };
 
   const scheduleOwnerSwitch = (
@@ -378,6 +392,40 @@ export const useMigrationActRuntime = ({
     store.setTemporaryMovementFeedback(evaluationId);
     movementFeedbackExpiresAtMs =
       audioStore.getBaseRhythmTransportTimeMs() + 1_000;
+  };
+
+  const startGuidedMovementRecognition = (
+    purpose: Exclude<GuidedRecognitionPurpose, "idle">,
+  ) => {
+    if (!tutorialMovement || tutorialPlaybackStartTransportMs === null) return;
+
+    guidedRecognitionPurpose.value = purpose;
+
+    const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const movementElapsedMs = Math.max(
+      0,
+      currentTransportMs - tutorialPlaybackStartTransportMs,
+    );
+    const recognitionAlreadyAligned =
+      movementRecognition.recognitionActive.value &&
+      movementRecognition.recognitionProfile.value ===
+        tutorialMovement.recognitionProfile &&
+      movementRecognition.diagnostics.value.currentMovementId ===
+        tutorialMovement.movementId;
+
+    if (recognitionAlreadyAligned) return;
+
+    movementRecognition.start(tutorialMovement.recognitionProfile, {
+      transportTimeMs: currentTransportMs,
+      movementElapsedMs,
+      prerollMs: tutorialMovement.playbackTiming.prerollMs,
+      movementId: tutorialMovement.movementId,
+    });
+  };
+
+  const pauseGuidedMovementRecognition = () => {
+    guidedRecognitionPurpose.value = "idle";
+    movementRecognition.pause();
   };
 
   const scheduleFrame = () => {
@@ -452,6 +500,10 @@ export const useMigrationActRuntime = ({
 
     if (!resolved) return;
 
+    switchAvatarOwnerNow(
+      getMovementOwner(resolved),
+      `phase:${resolved.movementId}`,
+    );
     const phaseElapsedMs = getCurrentMovementElapsedMs();
     phaseMovementScheduledStartTransportMs =
       audioStore.getBaseRhythmTransportTimeMs() - phaseElapsedMs;
@@ -521,7 +573,7 @@ export const useMigrationActRuntime = ({
 
   const stopTutorialMovement = () => {
     movement.pause();
-    movementRecognition.pause();
+    pauseGuidedMovementRecognition();
     tutorialPlaybackMode.value = null;
     tutorialRepetitionIndex.value = 0;
     tutorialMovement = null;
@@ -546,6 +598,27 @@ export const useMigrationActRuntime = ({
     const resolve = guidedTransitionResolver;
     guidedTransitionResolver = null;
     resolve?.();
+  };
+
+  const resolveGuidedBarWaits = () => {
+    if (guidedBarWaits.length === 0) return;
+
+    const transportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const ready = guidedBarWaits.filter(
+      (wait) => transportMs >= wait.targetTransportMs,
+    );
+    if (ready.length === 0) return;
+
+    guidedBarWaits = guidedBarWaits.filter(
+      (wait) => transportMs < wait.targetTransportMs,
+    );
+    ready.forEach((wait) => wait.resolve());
+  };
+
+  const cancelGuidedBarWaits = () => {
+    const waits = guidedBarWaits;
+    guidedBarWaits = [];
+    waits.forEach((wait) => wait.resolve());
   };
 
   const enterGuidedInterlude = async (
@@ -670,14 +743,9 @@ export const useMigrationActRuntime = ({
     );
     movement.tick(movementElapsedMs);
 
-    if (mode === "practice") {
-      movementRecognition.start(resolved.recognitionProfile, {
-        transportTimeMs: currentTransportMs,
-        movementElapsedMs,
-        prerollMs: resolved.playbackTiming.prerollMs,
-        movementId: resolved.movementId,
-      });
-    }
+    startGuidedMovementRecognition(
+      mode === "practice" ? "practice-gating" : "passive-feedback",
+    );
 
     lastFrameAtMs = null;
     scheduleFrame();
@@ -690,7 +758,7 @@ export const useMigrationActRuntime = ({
   const continueTutorialMovement = () => {
     if (!tutorialMovement || !movement.movementPlaying.value) return false;
     tutorialPlaybackMode.value = "story";
-    movementRecognition.pause();
+    startGuidedMovementRecognition("passive-feedback");
     return true;
   };
 
@@ -744,7 +812,7 @@ export const useMigrationActRuntime = ({
     onHandoverStart,
     onAttemptStart,
   }: GuidedGesturePreparationOptions): Promise<StoryGestureResult> => {
-    movementRecognition.pause();
+    pauseGuidedMovementRecognition();
     const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
     const countdownStartTransportMs = resolveNextGuidedBarBoundary(
       currentTransportMs,
@@ -772,7 +840,7 @@ export const useMigrationActRuntime = ({
     gestureId: StoryGestureId,
     options: GuidedGesturePracticeOptions = {},
   ): Promise<StoryGestureResult> => {
-    movementRecognition.pause();
+    pauseGuidedMovementRecognition();
     const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
     const countdownStartTransportMs = resolveNextGuidedBarBoundary(
       currentTransportMs,
@@ -844,11 +912,48 @@ export const useMigrationActRuntime = ({
     });
   };
 
+  const waitForGuidedBars = (bars = 1) => {
+    if (!guidedInterludeActive.value || disposed) return Promise.resolve();
+
+    const barCount = Math.max(1, Math.round(bars));
+    const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const barDurationMs =
+      audioStore.getBeatDurationMs() *
+      MIGRATION_RECOGNITION_THRESHOLDS.beatsPerBar;
+    const targetTransportMs = resolveNextGuidedBarBoundary(
+      currentTransportMs + barDurationMs * barCount,
+      audioStore.getBeatDurationMs(),
+      true,
+    );
+
+    if (currentTransportMs >= targetTransportMs) return Promise.resolve();
+
+    scheduleFrame();
+    return new Promise<void>((resolve) => {
+      guidedBarWaits.push({ targetTransportMs, resolve });
+    });
+  };
+
+  const waitForGuidedBeats = (beats = 1) => {
+    if (!guidedInterludeActive.value || disposed) return Promise.resolve();
+
+    const beatCount = Math.max(1, Math.round(beats));
+    const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const beatDurationMs = audioStore.getBeatDurationMs();
+    const targetTransportMs = currentTransportMs + beatDurationMs * beatCount;
+
+    scheduleFrame();
+    return new Promise<void>((resolve) => {
+      guidedBarWaits.push({ targetTransportMs, resolve });
+    });
+  };
+
   const leaveGuidedInterlude = async () => {
     if (!guidedInterludeActive.value) return;
 
     guidedInterludeRevision++;
     cancelGuidedStoryTransition();
+    cancelGuidedBarWaits();
     gestures.cancel();
     stopTutorialMovement();
     guidedInterludeActive.value = false;
@@ -871,6 +976,7 @@ export const useMigrationActRuntime = ({
     guidedInterludeRevision++;
     cancelScheduledOwnerSwitch();
     cancelGuidedStoryTransition();
+    cancelGuidedBarWaits();
     gestures.cancel();
     stopTutorialMovement();
     guidedInterludeActive.value = false;
@@ -881,9 +987,10 @@ export const useMigrationActRuntime = ({
 
   const completeGuidedInterlude = () => {
     cancelGuidedStoryTransition();
+    cancelGuidedBarWaits();
     movement.tick(0);
     movement.pause();
-    movementRecognition.pause();
+    pauseGuidedMovementRecognition();
     audioStore.stopBaseRhythmLoop();
     seasonAudio.fadeOutForCycle(2);
     tutorialPlaybackMode.value = null;
@@ -916,6 +1023,7 @@ export const useMigrationActRuntime = ({
     if (previewEventId || gestures.store.isActive) return;
     const event = store.events.find((item) => item.status === "pending");
     if (!event) return;
+    if (event.gestureId === "arrival") return;
     const remainingMs = event.boundaryTimeMs - store.currentElapsedMs;
     const previewDurationMs =
       audioStore.getBeatDurationMs() *
@@ -928,6 +1036,7 @@ export const useMigrationActRuntime = ({
     movement.pause();
     movementRecognition.pause();
     clearMovementFeedback();
+    switchAvatarOwnerNow(event.gestureId, `gesture-preview:${event.gestureId}`);
     previewResult = gestures.start(event.gestureId, {
       countdownStartTransportMs: boundaryTransportMs - previewDurationMs,
     });
@@ -1002,6 +1111,7 @@ export const useMigrationActRuntime = ({
     store.setActiveEvent(event.id);
     store.addPauseReason("gesture");
     store.setPlaybackState("gesture_lead_in");
+    switchAvatarOwnerNow(event.gestureId, `gesture-event:${event.gestureId}`);
     store.addDiagnostic({
       eventId: event.id,
       actId: store.actId ?? surfaceId,
@@ -1144,6 +1254,7 @@ export const useMigrationActRuntime = ({
           resolve?.();
         }
       }
+      resolveGuidedBarWaits();
 
       if (
         store.playbackState === "playing" &&
@@ -1183,16 +1294,12 @@ export const useMigrationActRuntime = ({
           if (tutorialElapsedMs >= tutorialDemonstrationDurationMs) {
             if (tutorialDemonstrationHandsOffToPractice) {
               tutorialPlaybackMode.value = "practice";
-              movementRecognition.start(tutorialMovement.recognitionProfile, {
-                transportTimeMs: audioStore.getBaseRhythmTransportTimeMs(),
-                movementElapsedMs: tutorialElapsedMs,
-                prerollMs: tutorialMovement.playbackTiming.prerollMs,
-                movementId: tutorialMovement.movementId,
-              });
+              startGuidedMovementRecognition("practice-gating");
             } else {
               movement.pause();
               tutorialPlaybackMode.value = null;
               tutorialPlaybackStartTransportMs = null;
+              pauseGuidedMovementRecognition();
             }
             tutorialDemonstrationHandsOffToPractice = false;
             const resolveDemonstration = tutorialDemonstrationResolver;
@@ -1420,21 +1527,12 @@ export const useMigrationActRuntime = ({
       store.setPlaybackState("playing");
       await synchronizeAudioForPauseReasons();
       movement.resume(movement.movementSourceTimeMs.value);
-      if (
-        tutorialPlaybackMode.value === "practice" &&
-        tutorialMovement &&
-        tutorialPlaybackStartTransportMs !== null
-      ) {
-        const transportTimeMs = audioStore.getBaseRhythmTransportTimeMs();
-        movementRecognition.start(tutorialMovement.recognitionProfile, {
-          transportTimeMs,
-          movementElapsedMs: Math.max(
-            0,
-            transportTimeMs - tutorialPlaybackStartTransportMs,
-          ),
-          prerollMs: tutorialMovement.playbackTiming.prerollMs,
-          movementId: tutorialMovement.movementId,
-        });
+      if (tutorialPlaybackMode.value && tutorialMovement) {
+        startGuidedMovementRecognition(
+          tutorialPlaybackMode.value === "practice"
+            ? "practice-gating"
+            : "passive-feedback",
+        );
       }
       lastFrameAtMs = null;
       scheduleFrame();
@@ -1664,6 +1762,7 @@ export const useMigrationActRuntime = ({
     guidedInterludeActive,
     guidedStoryTransitionActive,
     tutorialPlaybackMode,
+    guidedRecognitionPurpose,
     tutorialRepetitionIndex,
     avatarPlaybackOwner,
     scheduledNextOwner,
@@ -1695,6 +1794,8 @@ export const useMigrationActRuntime = ({
     playGuidedGesturePreparation,
     startGuidedGesturePractice,
     playGuidedStoryTransition,
+    waitForGuidedBars,
+    waitForGuidedBeats,
     completeGuidedInterlude,
     getGuidedTransportMs: () => audioStore.getBaseRhythmTransportTimeMs(),
     stopTutorialMovement,

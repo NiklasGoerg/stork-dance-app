@@ -9,9 +9,9 @@ import {
 } from "~/utils/act2/guidedNarrationCatalog";
 
 const MOVEMENT_FAILURE_COOLDOWN_MS = 8_000;
-const SPOKEN_CUE_START_WINDOW_MS = 550;
-const SPOKEN_CUE_EXPIRY_MS = 4_000;
-export const GUIDED_ACT2_NARRATION_RATE = 1;
+const SPOKEN_CUE_START_WINDOW_MS = 1000;
+const SPOKEN_CUE_EXPIRY_MS = 6_000;
+export const GUIDED_ACT2_NARRATION_RATE = 1.05;
 
 export type GuidedNarrationState =
   | "idle"
@@ -27,7 +27,12 @@ export type GuidedNarrationDiagnosticEvent = {
   id: string;
   eventId: string;
   phase: GuidedMigrationPhase;
+  phaseInstance: number;
   transportMs: number;
+  activeSpeechId: string | null;
+  activeSpeechState: GuidedNarrationState | null;
+  activeSpeechPriority: number | null;
+  panelCueId: string;
   outcome:
     | "scheduled"
     | "ready"
@@ -35,15 +40,18 @@ export type GuidedNarrationDiagnosticEvent = {
     | "speaking"
     | "completed"
     | "disabled"
+    | "unsupported"
+    | "error"
     | "expired"
     | "priority"
+    | "phase"
     | "cooldown"
     | "cancelled";
   reason?: string;
 };
 
 type NarrationService = {
-  speakText: (
+  speakText?: (
     text: string,
     options?: Pick<
       NarrationSpeakOptions,
@@ -60,8 +68,8 @@ type CueLifecycle = {
   text: string;
   title: string;
   priority: number;
-  protectedWindow: boolean;
   phaseInstance: number;
+  scheduledPhase: GuidedMigrationPhase;
   state: GuidedNarrationState;
   scheduledAtTransportMs: number;
   displayStartedAtTransportMs: number | null;
@@ -110,13 +118,19 @@ export const useGuidedAct2Narration = ({
     outcome: GuidedNarrationDiagnosticEvent["outcome"],
     reason?: string,
   ) => {
+    const active = lifecycle.value;
     events.value = [
       ...events.value.slice(-99),
       {
         id,
         eventId,
         phase: phase.value,
+        phaseInstance,
         transportMs: getTransportMs(),
+        activeSpeechId: active?.id ?? null,
+        activeSpeechState: active?.state ?? null,
+        activeSpeechPriority: active?.priority ?? null,
+        panelCueId: currentId.value,
         outcome,
         reason,
       },
@@ -152,15 +166,11 @@ export const useGuidedAct2Narration = ({
 
   const enterPhase = (nextPhase: GuidedMigrationPhase) => {
     if (phase.value === nextPhase) return;
-    phaseInstance++;
     const active = lifecycle.value;
-    if (
-      active &&
-      ["scheduled", "ready", "speaking"].includes(active.state) &&
-      !active.protectedWindow
-    ) {
+    if (active && ["scheduled", "ready", "speaking"].includes(active.state)) {
       cancelActive(`phase:${phase.value}->${nextPhase}`);
     }
+    phaseInstance++;
     phase.value = nextPhase;
   };
 
@@ -190,7 +200,7 @@ export const useGuidedAct2Narration = ({
     ) {
       skipReason.value = `priority:${active.id}`;
       record(id, eventId, "priority", skipReason.value);
-      return true;
+      return false;
     }
     if (failure && now < failureCooldownUntilMs.value) {
       skipReason.value = "failure-cooldown";
@@ -211,8 +221,8 @@ export const useGuidedAct2Narration = ({
       text,
       title,
       priority,
-      protectedWindow: priority >= 60,
       phaseInstance,
+      scheduledPhase: phase.value,
       state: "scheduled",
       scheduledAtTransportMs: now,
       displayStartedAtTransportMs: null,
@@ -233,10 +243,10 @@ export const useGuidedAct2Narration = ({
     skipReason.value = null;
     record(id, eventId, "scheduled");
 
-    if (!narration) {
+    if (!narration?.speakText) {
       cueLifecycle.state = "completed";
       show(cueLifecycle, now);
-      record(id, eventId, "completed", "tts-unavailable");
+      record(id, eventId, "disabled", "tts-unavailable");
       return true;
     }
 
@@ -251,13 +261,18 @@ export const useGuidedAct2Narration = ({
           if (cueToken !== token || lifecycle.value?.token !== cueToken) return;
           const startedAt = getTransportMs();
           const wrongPhase =
-            cueLifecycle.phaseInstance !== phaseInstance &&
-            !cueLifecycle.protectedWindow;
-          if (startedAt > cueLifecycle.latestStartTransportMs || wrongPhase) {
+            cueLifecycle.phaseInstance !== phaseInstance ||
+            cueLifecycle.scheduledPhase !== phase.value;
+          const expired =
+            startedAt > cueLifecycle.latestStartTransportMs ||
+            startedAt > cueLifecycle.expiresAtTransportMs;
+          if (expired || wrongPhase) {
             cueLifecycle.state = "expired";
             cueLifecycle.skipReason = wrongPhase
               ? "phase-invalidated-before-start"
-              : "latest-start-missed";
+              : startedAt > cueLifecycle.expiresAtTransportMs
+                ? "semantic-expired"
+                : "latest-start-missed";
             skipReason.value = cueLifecycle.skipReason;
             record(id, eventId, "expired", cueLifecycle.skipReason);
             narration.stop();
@@ -308,9 +323,23 @@ export const useGuidedAct2Narration = ({
           if (shouldDisplayWithoutSpeech) {
             show(cueLifecycle, getTransportMs());
           }
-          cueLifecycle.state = "skipped";
+          cueLifecycle.state = shouldDisplayWithoutSpeech
+            ? "completed"
+            : "skipped";
           cueLifecycle.skipReason = `tts-${result.status}`;
           skipReason.value = cueLifecycle.skipReason;
+          record(
+            id,
+            eventId,
+            result.status === "unsupported"
+              ? "unsupported"
+              : result.status === "error"
+                ? "error"
+                : result.status === "disabled"
+                  ? "disabled"
+                  : "cancelled",
+            cueLifecycle.skipReason,
+          );
         }
       })
       .catch(() => {
@@ -328,13 +357,16 @@ export const useGuidedAct2Narration = ({
     eventId = `${id}:${getTransportMs()}`,
   ) => {
     if (handledEventIds.has(eventId)) return false;
-    handledEventIds.add(eventId);
     const item = guidedNarrationCatalog[id];
     if (!item.enabled) {
+      handledEventIds.add(eventId);
       record(id, eventId, "disabled");
       return false;
     }
-    if (!item.phases.includes(phase.value)) return false;
+    if (!item.phases.includes(phase.value)) {
+      record(id, eventId, "phase", `phase:${phase.value}`);
+      return false;
+    }
     const text = resolveGuidedNarrationText(id, getTokens());
     if (!item.speak) {
       const now = getTransportMs();
@@ -346,17 +378,17 @@ export const useGuidedAct2Narration = ({
       ) {
         skipReason.value = `priority:${active.id}`;
         record(id, eventId, "priority", skipReason.value);
-        return true;
+        return false;
       }
       const displayLifecycle: CueLifecycle = {
-        token: ++token,
+        token,
         id,
         eventId,
         text,
         title: item.title,
         priority: item.priority,
-        protectedWindow: false,
         phaseInstance,
+        scheduledPhase: phase.value,
         state: "completed",
         scheduledAtTransportMs: now,
         displayStartedAtTransportMs: now,
@@ -372,11 +404,11 @@ export const useGuidedAct2Narration = ({
         cancellationReason: null,
         skipReason: null,
       };
-      lifecycle.value = displayLifecycle;
       show(displayLifecycle, now);
+      handledEventIds.add(eventId);
       return true;
     }
-    return scheduleSpokenCue({
+    const accepted = scheduleSpokenCue({
       id,
       eventId,
       title: item.title,
@@ -385,6 +417,8 @@ export const useGuidedAct2Narration = ({
       estimatedDurationMs: item.estimatedDurationMs,
       failure: item.trigger.type === "movement-failure",
     });
+    if (accepted) handledEventIds.add(eventId);
+    return accepted;
   };
 
   const presentExternal = ({
@@ -401,8 +435,7 @@ export const useGuidedAct2Narration = ({
     eventId: string;
   }) => {
     if (handledEventIds.has(eventId)) return false;
-    handledEventIds.add(eventId);
-    return scheduleSpokenCue({
+    const accepted = scheduleSpokenCue({
       id,
       eventId,
       title,
@@ -411,6 +444,8 @@ export const useGuidedAct2Narration = ({
       estimatedDurationMs: null,
       failure: true,
     });
+    if (accepted) handledEventIds.add(eventId);
+    return accepted;
   };
 
   const reset = (reason = "reset") => {

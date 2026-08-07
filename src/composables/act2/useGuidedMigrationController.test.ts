@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { nextTick, reactive, shallowRef } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useGuidedMigrationController } from "~/composables/act2/useGuidedMigrationController";
+import { GUIDED_ACT2_NARRATION_RATE } from "~/composables/act2/useGuidedAct2Narration";
 import type { MigrationActRuntimeService } from "~/composables/migrationActs/useMigrationActRuntime";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
 import type {
@@ -219,6 +220,8 @@ const createHarness = () => {
         store.setElapsedMs(targetElapsedMs);
       },
     ),
+    waitForGuidedBars: vi.fn(async () => undefined),
+    waitForGuidedBeats: vi.fn(async () => undefined),
     getGuidedTransportMs: vi.fn(() => 0),
     completeGuidedInterlude: vi.fn(),
     resolveCurrentPhaseMovement: vi.fn(() =>
@@ -235,10 +238,13 @@ const createHarness = () => {
   const instructionNarration = {
     play: vi.fn(async () => ({ status: "completed" as const })),
     speakText: vi.fn(async (_text, options) => {
-      options?.onStart?.({ rate: 1.15, voiceName: "Test voice" });
+      options?.onStart?.({
+        rate: GUIDED_ACT2_NARRATION_RATE,
+        voiceName: "Test voice",
+      });
       options?.onEnd?.({
         status: "completed",
-        rate: 1.15,
+        rate: GUIDED_ACT2_NARRATION_RATE,
         voiceName: "Test voice",
       });
       return { status: "completed" as const };
@@ -290,7 +296,7 @@ describe("guided migration controller", () => {
   beforeEach(() => setActivePinia(createPinia()));
   afterEach(() => vi.useRealTimers());
 
-  it.each([1, 2, 3])(
+  it.each([1, 2, 3, 4, 5])(
     "runs the complete annual tutorial deterministically (run %s)",
     async () => {
       const { controller, store, calls, completed, completeMovement, publish } =
@@ -409,7 +415,10 @@ describe("guided migration controller", () => {
     expect(runtime.continueTutorialMovement).not.toHaveBeenCalled();
     expect(instructionNarration.speakText).toHaveBeenLastCalledWith(
       "Now it's your turn. Follow the avatar.",
-      expect.objectContaining({ behavior: "replace", rate: 1.15 }),
+      expect.objectContaining({
+        behavior: "replace",
+        rate: GUIDED_ACT2_NARRATION_RATE,
+      }),
     );
 
     demonstration.resolve(undefined);
@@ -460,14 +469,20 @@ describe("guided migration controller", () => {
       instructionNarration.speakText.mock.calls.length;
     expect(instructionNarration.speakText).toHaveBeenLastCalledWith(
       "Crouch, rise with your hands overhead, then open your arms.",
-      expect.objectContaining({ behavior: "replace", rate: 1.15 }),
+      expect.objectContaining({
+        behavior: "replace",
+        rate: GUIDED_ACT2_NARRATION_RATE,
+      }),
     );
 
     handoverStart?.();
     expect(store.guided.phase).toBe("autumn-departure-practice-prompt");
     expect(instructionNarration.speakText).toHaveBeenCalledWith(
       "Now it's your turn. Depart with the stork.",
-      expect.objectContaining({ behavior: "replace", rate: 1.15 }),
+      expect.objectContaining({
+        behavior: "replace",
+        rate: GUIDED_ACT2_NARRATION_RATE,
+      }),
     );
     expect(instructionNarration.speakText).toHaveBeenCalledTimes(
       preparationNarrationCount + 1,
@@ -533,7 +548,10 @@ describe("guided migration controller", () => {
 
     expect(instructionNarration.speakText).toHaveBeenCalledWith(
       "story.migrationPanel.feedback.handsUp",
-      expect.objectContaining({ behavior: "replace", rate: 1.15 }),
+      expect.objectContaining({
+        behavior: "replace",
+        rate: GUIDED_ACT2_NARRATION_RATE,
+      }),
     );
     controller.dispose();
   });
@@ -558,6 +576,165 @@ describe("guided migration controller", () => {
 
     expect(instructionNarration.stop).toHaveBeenCalled();
     expect(instructionNarration.play).not.toHaveBeenCalled();
+  });
+
+  it("keeps Summer Success in its own transport bar before Story Bar 0", async () => {
+    const wait = createDeferred<undefined>();
+    const { controller, runtime, store, completeMovement } = createHarness();
+    runtime.waitForGuidedBars = vi.fn(async () => await wait.promise);
+
+    controller.startGuidedJourney();
+    await flushFlow();
+    await completeMovement("summer-step", "summer");
+    await flushFlow();
+
+    expect(store.guided.phase).toBe("summer-success");
+    expect(runtime.waitForGuidedBars).toHaveBeenCalledWith(1);
+    expect(runtime.playGuidedStoryTransition).not.toHaveBeenCalled();
+
+    wait.resolve(undefined);
+    await flushFlow();
+    expect(store.guided.phase).toBe("autumn-migration-practice");
+    expect(
+      controller.narrationDiagnostics.value.events
+        .filter((event) => event.outcome === "scheduled")
+        .map((event) => event.id),
+    ).toContain("act2.summer.story.breeding");
+  });
+
+  it("keeps Departure Success in its own transport bar before Migration context", async () => {
+    const wait = createDeferred<undefined>();
+    const { controller, runtime, store, completeMovement } = createHarness();
+    runtime.waitForGuidedBars = vi.fn().mockResolvedValueOnce(undefined);
+    runtime.waitForGuidedBeats = vi.fn(async () => await wait.promise);
+
+    controller.startGuidedJourney();
+    await flushFlow();
+    await completeMovement("summer-step", "summer");
+    await flushFlow();
+
+    expect(store.guided.phase).toBe("autumn-departure-success");
+    expect(runtime.waitForGuidedBars).toHaveBeenCalledTimes(1);
+    expect(runtime.waitForGuidedBeats).toHaveBeenCalledWith(2);
+    expect(
+      controller.narrationDiagnostics.value.events
+        .filter((event) => event.outcome === "scheduled")
+        .map((event) => event.id),
+    ).not.toContain("act2.autumnMigration.context");
+
+    wait.resolve(undefined);
+    await flushFlow();
+    expect(
+      controller.narrationDiagnostics.value.events
+        .filter((event) => event.outcome === "scheduled")
+        .map((event) => event.id),
+    ).toContain("act2.autumnMigration.context");
+  });
+
+  it("uses text-only Guided narration when speakText is unavailable", async () => {
+    const { runtime } = createHarness();
+    const textOnlyNarration = {
+      play: vi.fn(async () => ({ status: "completed" as const })),
+      stop: vi.fn(),
+    };
+    const controller = useGuidedMigrationController({
+      runtime,
+      enabled: true,
+      timing: immediateTiming,
+      instructionNarration: textOnlyNarration,
+    });
+
+    controller.initialize();
+    controller.startGuidedJourney();
+    await flushFlow();
+
+    expect(textOnlyNarration.play).not.toHaveBeenCalled();
+    expect(controller.panelModel.value.instruction).toContain(
+      "Follow the avatar",
+    );
+    controller.dispose();
+  });
+
+  it("routes passive successful bars to transient panel feedback without progress", async () => {
+    const { controller, runtime, store, publish } = createHarness();
+    vi.useFakeTimers();
+    store.setGuidedState({
+      phase: "summer-demonstration",
+      status: "demonstrating",
+      activeMovementId: "summer-step",
+      successfulBars: 0,
+      requiredSuccessfulBars: 3,
+    });
+    runtime.getGuidedTransportMs = vi.fn(() => 10_000);
+
+    await publish("summer-step", "passive-1", "success");
+    expect(store.guided.successfulBars).toBe(0);
+    expect(controller.panelModel.value.feedbackText).toBeUndefined();
+
+    await publish("summer-step", "passive-2", "success");
+    expect(store.guided.successfulBars).toBe(0);
+    expect(controller.panelModel.value.instruction).toBe(
+      controller.narrationDiagnostics.value.currentNarrationText,
+    );
+    expect(controller.panelModel.value.feedbackText).toBe("Good!");
+
+    vi.advanceTimersByTime(1_250);
+    await nextTick();
+    expect(controller.panelModel.value.feedbackText).toBeUndefined();
+    controller.dispose();
+  });
+
+  it("keeps passive failures silent during demonstration", async () => {
+    const { controller, store, publish, instructionNarration } =
+      createHarness();
+    store.setGuidedState({
+      phase: "summer-demonstration",
+      status: "demonstrating",
+      activeMovementId: "summer-step",
+      successfulBars: 0,
+    });
+    const callsBefore = instructionNarration.speakText.mock.calls.length;
+
+    await publish("summer-step", "passive-fail", "failed");
+    await publish("summer-step", "passive-tracking", "not_evaluable");
+
+    expect(store.guided.successfulBars).toBe(0);
+    expect(controller.panelModel.value.feedbackText).toBeUndefined();
+    expect(instructionNarration.speakText).toHaveBeenCalledTimes(callsBefore);
+    controller.dispose();
+  });
+
+  it("throttles passive full-bar panel feedback", async () => {
+    const { controller, runtime, store, publish } = createHarness();
+    vi.useFakeTimers();
+    store.setGuidedState({
+      phase: "summer-story-transition",
+      status: "transition",
+      activeMovementId: "summer-step",
+      successfulBars: 3,
+      requiredSuccessfulBars: 3,
+    });
+    let transportMs = 0;
+    runtime.getGuidedTransportMs = vi.fn(() => transportMs);
+
+    await publish("summer-step", "cadence-1", "success");
+    await publish("summer-step", "cadence-2", "success");
+    expect(controller.panelModel.value.feedbackText).toBe("Good!");
+
+    vi.advanceTimersByTime(1_250);
+    await nextTick();
+    expect(controller.panelModel.value.feedbackText).toBeUndefined();
+
+    for (let index = 3; index <= 5; index++) {
+      transportMs += 1_000;
+      await publish("summer-step", `cadence-${index}`, "success");
+    }
+    expect(controller.panelModel.value.feedbackText).toBeUndefined();
+
+    transportMs = 16_000;
+    await publish("summer-step", "cadence-6", "success");
+    expect(controller.panelModel.value.feedbackText).toBe("Good!");
+    controller.dispose();
   });
 
   it("does not resume the flow after reset during movement preload", async () => {

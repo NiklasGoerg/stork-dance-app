@@ -1,4 +1,4 @@
-import { computed, watch, type WatchStopHandle } from "vue";
+import { computed, ref, watch, type WatchStopHandle } from "vue";
 import { useGuidedAct2Narration } from "~/composables/act2/useGuidedAct2Narration";
 import type { MigrationActRuntimeService } from "~/composables/migrationActs/useMigrationActRuntime";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
@@ -7,6 +7,7 @@ import type {
   GuidedMigrationPhase,
   MigrationActInfoPanelModel,
   MigrationInfoPanelActionId,
+  MigrationMovementBarEvaluation,
   ResolvedMigrationMovement,
 } from "~/types/migrationAct";
 import {
@@ -47,6 +48,10 @@ type ContinuousPractice = {
   resolve: (completed: boolean) => void;
 };
 
+const PASSIVE_POSITIVE_FEEDBACK_MIN_BARS = 2;
+const PASSIVE_POSITIVE_FEEDBACK_COOLDOWN_MS = 6_000;
+const PASSIVE_POSITIVE_FEEDBACK_DURATION_MS = 1_250;
+
 export type GuidedMigrationController = ReturnType<
   typeof useGuidedMigrationController
 >;
@@ -65,7 +70,7 @@ export const useGuidedMigrationController = ({
   onGuidedCycleCompleted?: () => void;
   translate?: (key: string) => string;
   instructionNarration?: {
-    play: (
+    play?: (
       cueKey: string,
       options?: { behavior?: "replace" },
     ) => Promise<NarrationResult> | NarrationResult;
@@ -82,22 +87,20 @@ export const useGuidedMigrationController = ({
   const store = useMigrationActStore();
   const translateText = translate ?? ((key: string) => key);
   const processedEvaluationIds = new Set<string>();
+  const processedPassiveEvaluationIds = new Set<string>();
+  const passivePositiveFeedbackText = ref<string | null>(null);
   let activePractice: ContinuousPractice | null = null;
   let runId = 0;
   let disposed = false;
   let flowStarted = false;
+  let passiveSuccessfulBarsSinceFeedback = 0;
+  let passiveFeedbackCooldownUntilMs = 0;
+  let passiveFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
   const narration = useGuidedAct2Narration({
     narration: instructionNarration
       ? {
-          speakText: async (text, options) => {
-            if (instructionNarration.speakText) {
-              return await instructionNarration.speakText(text, options);
-            }
-            return await instructionNarration.play(text, {
-              behavior: "replace",
-            });
-          },
+          speakText: instructionNarration.speakText,
           stop: instructionNarration.stop,
         }
       : undefined,
@@ -126,6 +129,7 @@ export const useGuidedMigrationController = ({
   const invalidateRun = () => {
     runId++;
     cancelPractice();
+    resetPassiveFeedbackState();
     return runId;
   };
 
@@ -135,11 +139,86 @@ export const useGuidedMigrationController = ({
     patch: Partial<typeof store.guided> = {},
   ) => {
     narration.enterPhase(phase);
+    if (!isPassiveContinuousPhase(phase)) clearPassivePositiveFeedback();
     store.setGuidedState({ phase, status, ...patch });
   };
 
   const cue = (id: GuidedNarrationId, eventId?: string) =>
     narration.present(id, eventId);
+
+  const waitForSuccessBar = async (currentRunId: number) => {
+    if (!isCurrentRun(currentRunId)) return false;
+    await runtime.waitForGuidedBars?.(1);
+    return isCurrentRun(currentRunId);
+  };
+
+  const waitForGestureSuccessWindow = async (currentRunId: number) => {
+    if (!isCurrentRun(currentRunId)) return false;
+    await (runtime.waitForGuidedBeats?.(2) ?? runtime.waitForGuidedBars?.(1));
+    return isCurrentRun(currentRunId);
+  };
+
+  const clearPassivePositiveFeedback = () => {
+    if (passiveFeedbackTimer) {
+      clearTimeout(passiveFeedbackTimer);
+      passiveFeedbackTimer = null;
+    }
+    passivePositiveFeedbackText.value = null;
+  };
+
+  const resetPassiveFeedbackState = () => {
+    processedPassiveEvaluationIds.clear();
+    passiveSuccessfulBarsSinceFeedback = 0;
+    passiveFeedbackCooldownUntilMs = 0;
+    clearPassivePositiveFeedback();
+  };
+
+  const isPassiveContinuousPhase = (phase: GuidedMigrationPhase) =>
+    phase.startsWith("summer-") ||
+    phase.startsWith("autumn-migration-") ||
+    phase.startsWith("winter-") ||
+    phase.startsWith("spring-migration-");
+
+  const showPassivePositiveFeedback = () => {
+    const goodText = translateText("story.acts.act5.movementText.good");
+    passivePositiveFeedbackText.value =
+      goodText === "story.acts.act5.movementText.good" ? "Good!" : goodText;
+    if (passiveFeedbackTimer) clearTimeout(passiveFeedbackTimer);
+    passiveFeedbackTimer = setTimeout(() => {
+      passivePositiveFeedbackText.value = null;
+      passiveFeedbackTimer = null;
+    }, PASSIVE_POSITIVE_FEEDBACK_DURATION_MS);
+  };
+
+  const handlePassiveEvaluation = (
+    evaluation: MigrationMovementBarEvaluation,
+  ) => {
+    if (
+      !isPassiveContinuousPhase(store.guided.phase) ||
+      !store.guided.activeMovementId ||
+      evaluation.movementId !== store.guided.activeMovementId ||
+      evaluation.status !== "success" ||
+      processedPassiveEvaluationIds.has(evaluation.evaluationId)
+    ) {
+      return;
+    }
+
+    processedPassiveEvaluationIds.add(evaluation.evaluationId);
+    passiveSuccessfulBarsSinceFeedback++;
+
+    const now = runtime.getGuidedTransportMs?.() ?? 0;
+    if (
+      passiveSuccessfulBarsSinceFeedback < PASSIVE_POSITIVE_FEEDBACK_MIN_BARS ||
+      now < passiveFeedbackCooldownUntilMs
+    ) {
+      return;
+    }
+
+    passiveSuccessfulBarsSinceFeedback = 0;
+    passiveFeedbackCooldownUntilMs =
+      now + PASSIVE_POSITIVE_FEEDBACK_COOLDOWN_MS;
+    showPassivePositiveFeedback();
+  };
 
   const getContinuousCuePrefix = (phase: GuidedMigrationPhase) =>
     phase.startsWith("summer-")
@@ -270,7 +349,7 @@ export const useGuidedMigrationController = ({
       `act2.${cuePrefix}.success` as GuidedNarrationId,
       `${currentRunId}:${cuePrefix}:success`,
     );
-    return isCurrentRun(currentRunId);
+    return await waitForSuccessBar(currentRunId);
   };
 
   const markGuidedEventCompleted = (eventType: StorkMigrationEvent) => {
@@ -377,7 +456,7 @@ export const useGuidedMigrationController = ({
         `act2.${gesturePrefix}.success` as GuidedNarrationId,
         `${currentRunId}:${gesturePrefix}:success`,
       );
-      return isCurrentRun(currentRunId);
+      return await waitForGestureSuccessWindow(currentRunId);
     }
 
     const result = await runtime.startGuidedGesturePractice(gestureId, {
@@ -405,7 +484,7 @@ export const useGuidedMigrationController = ({
       `act2.${gesturePrefix}.success` as GuidedNarrationId,
       `${currentRunId}:${gesturePrefix}:success`,
     );
-    return isCurrentRun(currentRunId);
+    return await waitForGestureSuccessWindow(currentRunId);
   };
 
   const getEventElapsedMs = (eventType: StorkMigrationEvent) => {
@@ -744,12 +823,17 @@ export const useGuidedMigrationController = ({
     runtime.movementRecognition.lastBarEvaluation,
     (evaluation) => {
       const practice = activePractice;
+      if (!enabled || disposed || !evaluation) {
+        return;
+      }
+
+      if (!practice) {
+        handlePassiveEvaluation(evaluation);
+        return;
+      }
+
       if (
-        !enabled ||
-        disposed ||
-        !practice ||
         !isCurrentRun(practice.runId) ||
-        !evaluation ||
         evaluation.movementId !== practice.movementId ||
         processedEvaluationIds.has(evaluation.evaluationId)
       ) {
@@ -861,8 +945,11 @@ export const useGuidedMigrationController = ({
         : isContinuousPractice
           ? `${state.successfulBars} of ${state.requiredSuccessfulBars}`
           : undefined,
-      feedbackText: undefined,
-      tone: isSuccess || isCompleted ? "success" : "neutral",
+      feedbackText: passivePositiveFeedbackText.value ?? undefined,
+      tone:
+        isSuccess || isCompleted || passivePositiveFeedbackText.value
+          ? "success"
+          : "neutral",
       progress: isContinuousPractice
         ? {
             current: state.successfulBars,

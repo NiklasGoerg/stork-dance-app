@@ -127,6 +127,7 @@ export interface GuidedAct2Trace {
   seasonalThemeSourceTimeMs: number | null;
   guidedPhase: GuidedMigrationPhase;
   tutorialPlaybackMode: "demonstration" | "practice" | "story" | null;
+  guidedRecognitionPurpose: "idle" | "practice-gating" | "passive-feedback";
   gestureState: string;
   gestureId: StoryGestureId | null;
   gestureCompletionStatus: MigrationGestureEvaluationStatus | null;
@@ -145,6 +146,7 @@ export interface GuidedAct2Trace {
   ownerSwitchPromisePending: boolean;
   demonstrationPromisePending: boolean;
   storyTransitionPromisePending: boolean;
+  guidedBarWaitsPending: number;
   movementLoaded: boolean;
   movementLoadError: string | null;
 }

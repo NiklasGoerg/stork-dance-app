@@ -194,7 +194,10 @@ const createFakeGestures = (
   const state = {
     state: "inactive",
     isActive: false,
+    activeGestureId: null as "departure" | "arrival" | null,
     currentSourceTimeMs: 0,
+    movementLoaded: false,
+    movementLoadError: null as string | null,
   };
   const calls = {
     preload: 0,
@@ -221,8 +224,12 @@ const createFakeGestures = (
     ) => {
       calls.starts.push({ id, ...options });
       state.isActive = true;
+      state.activeGestureId = id;
+      state.movementLoaded = true;
+      state.state = "waiting-for-lead-in";
       const result = await start();
       state.isActive = false;
+      state.activeGestureId = null;
       return result;
     },
     demonstrate: async () => undefined,
@@ -236,11 +243,13 @@ const createFakeGestures = (
       calls.cancel++;
       state.state = "idle";
       state.isActive = false;
+      state.activeGestureId = null;
     },
     cleanup: () => {
       calls.cleanup++;
       state.state = "idle";
       state.isActive = false;
+      state.activeGestureId = null;
     },
   } as unknown as MigrationActGestureService;
 
@@ -394,12 +403,81 @@ describe("migration act runtime", () => {
     expect(gestures.calls.starts).toEqual([
       { id: "departure", countdownStartTransportMs: boundaryMs },
     ]);
+    expect(controller.avatarPlaybackOwner.value).toBe("departure");
+    expect(controller.guidedTrace.value).toMatchObject({
+      avatarPlaybackOwner: "departure",
+      renderedMovementId: "departure",
+      avatarSourceTimeMs: 0,
+    });
 
-    raf.step(4_000);
+    raf.step(16);
+    expect(controller.guidedTrace.value).toMatchObject({
+      renderedMovementId: "departure",
+    });
+    expect(controller.guidedTrace.value.avatarSourceTimeMs).toBeGreaterThan(0);
+
+    raf.step(3_984);
     expect(controller.store.currentElapsedMs).toBe(boundaryMs);
     expect(controller.store.isGestureActive).toBe(true);
     gesture.resolve("completed");
     await flushPromises();
+  });
+
+  it("runs migration to the arrival boundary before freezing for the arrival gesture", async () => {
+    const gesture = createDeferred<StoryGestureResult>();
+    const { controller, raf, audio, gestures } = createHarness({
+      gestureStart: () => gesture.promise,
+    });
+
+    await controller.initialize();
+    await controller.startStory();
+    await finishInitialCountdown(raf);
+    const arrival = controller.store.events.find(
+      (event) => event.eventType === "autumn_arrival",
+    )!;
+
+    await controller.seekToElapsedMs(arrival.boundaryTimeMs - 4_000);
+    await flushPromises();
+    raf.step(0);
+
+    expect(controller.store.currentElapsedMs).toBe(
+      arrival.boundaryTimeMs - 4_000,
+    );
+    expect(controller.store.playbackState).toBe("playing");
+    expect(controller.avatarPlaybackOwner.value).toBe("autumn-migration");
+    expect(gestures.calls.starts.some((call) => call.id === "arrival")).toBe(
+      false,
+    );
+
+    raf.step(3_999);
+    expect(controller.store.currentElapsedMs).toBe(arrival.boundaryTimeMs - 1);
+    expect(controller.store.playbackState).toBe("playing");
+    expect(gestures.calls.starts.some((call) => call.id === "arrival")).toBe(
+      false,
+    );
+
+    raf.step(1);
+    expect(controller.store.currentElapsedMs).toBe(arrival.boundaryTimeMs);
+    expect(controller.store.playbackState).toBe("gesture_lead_in");
+    expect(controller.avatarPlaybackOwner.value).toBe("arrival");
+    expect(gestures.calls.starts.at(-1)).toEqual({ id: "arrival" });
+    expect(controller.guidedTrace.value).toMatchObject({
+      avatarPlaybackOwner: "arrival",
+      renderedMovementId: "arrival",
+      storyTimeMs: arrival.boundaryTimeMs,
+    });
+
+    const transportAtBoundary = audio.state.currentOffsetSeconds;
+    raf.step(1_000);
+    expect(controller.store.currentElapsedMs).toBe(arrival.boundaryTimeMs);
+    expect(controller.guidedTrace.value.avatarSourceTimeMs).toBeGreaterThan(0);
+    expect(audio.state.currentOffsetSeconds).toBeGreaterThan(
+      transportAtBoundary,
+    );
+
+    gesture.resolve("completed");
+    await flushPromises();
+    expect(controller.store.playbackState).toBe("playing");
   });
 
   it("initializes idle and uses exactly one delta-based RAF across pause and resume", async () => {
@@ -691,7 +769,7 @@ describe("migration act runtime", () => {
     expect(controller.guidedStoryTransitionActive.value).toBe(false);
   });
 
-  it("ends tutorial preroll on beat one and plays two bars without recognition", async () => {
+  it("ends tutorial preroll on beat one and plays two bars with passive recognition", async () => {
     const { controller, raf, audio } = createHarness();
     const repetitions: number[] = [];
     const summerMovement = resolveMigrationMovement({
@@ -711,7 +789,8 @@ describe("migration act runtime", () => {
       expect(repetitions).toEqual([1]);
     });
 
-    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(true);
+    expect(controller.guidedRecognitionPurpose.value).toBe("passive-feedback");
     expect(controller.movement.movementSourceTimeMs.value).toBe(1_000);
     raf.step(0);
     raf.step(1_000);
@@ -723,9 +802,10 @@ describe("migration act runtime", () => {
     expect(repetitions).toEqual([1, 2]);
     expect(controller.tutorialPlaybackMode.value).toBeNull();
     expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+    expect(controller.guidedRecognitionPurpose.value).toBe("idle");
   });
 
-  it("keeps four opening bars recognition-free and hands over without a restart", async () => {
+  it("keeps four opening bars passively recognized and hands over without a restart", async () => {
     const { controller, raf } = createHarness();
     const repetitions: number[] = [];
     const movement = resolveMigrationMovement({
@@ -745,12 +825,13 @@ describe("migration act runtime", () => {
 
     raf.step(0);
     raf.step(1_000);
-    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+    expect(controller.movementRecognition.recognitionActive.value).toBe(true);
+    expect(controller.guidedRecognitionPurpose.value).toBe("passive-feedback");
     raf.step(4_000);
     raf.step(4_000);
-    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+    expect(controller.guidedRecognitionPurpose.value).toBe("passive-feedback");
     raf.step(4_000);
-    expect(controller.movementRecognition.recognitionActive.value).toBe(false);
+    expect(controller.guidedRecognitionPurpose.value).toBe("passive-feedback");
     raf.step(3_000);
     await demonstration;
 
@@ -758,6 +839,7 @@ describe("migration act runtime", () => {
     expect(controller.tutorialPlaybackMode.value).toBe("practice");
     expect(controller.movement.movementPlaying.value).toBe(true);
     expect(controller.movementRecognition.recognitionActive.value).toBe(true);
+    expect(controller.guidedRecognitionPurpose.value).toBe("practice-gating");
     expect(controller.movement.movementSourceTimeMs.value).toBe(1_000);
   });
 
@@ -822,6 +904,7 @@ describe("migration act runtime", () => {
       expect(repetitions).toEqual([1, 2, 3]);
       expect(controller.tutorialPlaybackMode.value).toBe("practice");
       expect(controller.movementRecognition.recognitionActive.value).toBe(true);
+      expect(controller.guidedRecognitionPurpose.value).toBe("practice-gating");
     },
   );
 

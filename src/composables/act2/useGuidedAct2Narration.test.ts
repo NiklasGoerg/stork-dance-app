@@ -13,7 +13,9 @@ const tokens = {
   northboundRoute: "north across Europe",
 };
 
-const createHarness = () => {
+const createHarness = ({
+  withSpeech = true,
+}: { withSpeech?: boolean } = {}) => {
   let transportMs = 0;
   const pending: Array<{
     options: NarrationSpeakOptions;
@@ -27,7 +29,7 @@ const createHarness = () => {
   );
   const stop = vi.fn();
   const scheduler = useGuidedAct2Narration({
-    narration: { speakText, stop },
+    narration: withSpeech ? { speakText, stop } : { stop },
     getTransportMs: () => transportMs,
     getTokens: () => tokens,
   });
@@ -78,11 +80,23 @@ describe("useGuidedAct2Narration", () => {
     );
   });
 
-  it("expires a cue that misses its 250 ms start window", () => {
+  it("allows a cold first TTS start inside the 1000 ms start window", () => {
     const { scheduler, advance, start, stop } = createHarness();
     scheduler.enterPhase("summer-story-transition");
     scheduler.present("act2.summer.story.breeding", "run-1:story:0");
-    advance(251);
+    advance(700);
+    start();
+
+    expect(stop).not.toHaveBeenCalled();
+    expect(scheduler.diagnostics.value.currentNarrationState).toBe("speaking");
+    expect(scheduler.panelContent.value.id).toBe("act2.summer.story.breeding");
+  });
+
+  it("expires a cue that misses its 1000 ms start window", () => {
+    const { scheduler, advance, start, stop } = createHarness();
+    scheduler.enterPhase("summer-story-transition");
+    scheduler.present("act2.summer.story.breeding", "run-1:story:0");
+    advance(1_001);
     start();
 
     expect(stop).toHaveBeenCalledOnce();
@@ -104,23 +118,26 @@ describe("useGuidedAct2Narration", () => {
     expect(scheduler.diagnostics.value.skipReason).toBe("tts-cancelled");
   });
 
-  it("skips lower-priority context while a protected handover is active", () => {
+  it("does not mark priority-blocked cues as permanently handled", async () => {
     const { scheduler, start, speakText } = createHarness();
-    scheduler.enterPhase("summer-practice-prompt");
-    scheduler.present("act2.summer.handover", "run-1:handover");
+    scheduler.enterPhase("summer-practice");
+    scheduler.present("act2.feedback.bodyNotVisible", "run-1:tracking");
     start();
-    scheduler.enterPhase("summer-story-transition");
-    scheduler.present("act2.summer.story.breeding", "run-1:story:0");
+    expect(
+      scheduler.present("act2.summer.progress", "run-1:summer:progress"),
+    ).toBe(false);
+
+    scheduler.reset("retry");
+    scheduler.enterPhase("summer-practice");
+    expect(
+      scheduler.present("act2.summer.progress", "run-1:summer:progress"),
+    ).toBe(true);
 
     expect(speakText).toHaveBeenCalledOnce();
-    expect(scheduler.panelContent.value.id).toBe("act2.summer.handover");
-    expect(scheduler.diagnostics.value.events.at(-1)).toMatchObject({
-      id: "act2.summer.story.breeding",
-      outcome: "priority",
-    });
+    expect(scheduler.panelContent.value.id).toBe("act2.summer.progress");
   });
 
-  it("cancels stale optional speech on phase change and reset", () => {
+  it("cancels stale speech on phase change and reset", () => {
     const { scheduler, start, stop } = createHarness();
     scheduler.enterPhase("summer-story-transition");
     scheduler.present("act2.summer.story.breeding", "run-1:story:0");
@@ -146,20 +163,43 @@ describe("useGuidedAct2Narration", () => {
     expect(scheduler.diagnostics.value.currentNarrationState).toBe("idle");
   });
 
-  it("keeps success feedback visible when a lower-priority progress cue arrives", () => {
-    const { scheduler, start, speakText } = createHarness();
-    scheduler.enterPhase("summer-success");
-    scheduler.present("act2.summer.success", "run-1:summer-success");
+  it("does not let display-only updates invalidate active speech callbacks", () => {
+    const { scheduler, start, end } = createHarness();
+    scheduler.enterPhase("cycle-complete");
+    scheduler.present("act2.completion.journeyComplete", "run-1:complete:0");
     start();
-    scheduler.enterPhase("summer-story-transition");
-    scheduler.present("act2.summer.story.breeding", "run-1:story:0");
+    scheduler.present("act2.completion.title", "run-1:complete:title");
 
-    expect(speakText).toHaveBeenCalledOnce();
-    expect(scheduler.panelContent.value.id).toBe("act2.summer.success");
-    expect(scheduler.diagnostics.value.events.at(-1)).toMatchObject({
-      id: "act2.summer.story.breeding",
-      outcome: "priority",
-    });
+    expect(scheduler.panelContent.value.id).toBe("act2.completion.title");
+    end(0);
+    expect(scheduler.diagnostics.value.currentNarrationState).toBe("completed");
+  });
+
+  it("shows text and completes cleanly when speakText is unavailable", () => {
+    const { scheduler, speakText } = createHarness({ withSpeech: false });
+    scheduler.enterPhase("journey-introduction");
+    expect(scheduler.present("act2.introduction.annualJourney", "no-tts")).toBe(
+      true,
+    );
+
+    expect(speakText).not.toHaveBeenCalled();
+    expect(scheduler.panelContent.value.id).toBe(
+      "act2.introduction.annualJourney",
+    );
+    expect(scheduler.diagnostics.value.currentNarrationState).toBe("completed");
+  });
+
+  it("discards a semantically stale cue before speech begins", () => {
+    const { scheduler, advance, start, stop } = createHarness();
+    scheduler.enterPhase("journey-introduction");
+    scheduler.present("act2.introduction.annualJourney", "run-1:intro");
+    scheduler.enterPhase("summer-demonstration");
+    advance(500);
+    start();
+
+    expect(stop).toHaveBeenCalled();
+    expect(scheduler.diagnostics.value.currentNarrationState).toBe("cancelled");
+    expect(scheduler.diagnostics.value.cancellationReason).toContain("phase:");
   });
 
   it("ignores disabled movement failures but retains technical tracking", () => {
@@ -192,6 +232,6 @@ describe("useGuidedAct2Narration", () => {
 
     expect(GUIDED_ACT2_NARRATION_RATE).toBeGreaterThanOrEqual(1);
     expect(GUIDED_ACT2_NARRATION_RATE).toBeLessThanOrEqual(1.25);
-    expect(speakText.mock.calls[0]?.[1]?.rate).toBe(1.15);
+    expect(speakText.mock.calls[0]?.[1]?.rate).toBe(GUIDED_ACT2_NARRATION_RATE);
   });
 });
