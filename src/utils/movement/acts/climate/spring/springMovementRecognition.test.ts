@@ -15,7 +15,8 @@ const point = (x: number, y: number): PoseLandmarkLike => ({
 const midpoint = (
   first: PoseLandmarkLike,
   second: PoseLandmarkLike,
-): PoseLandmarkLike => point((first.x + second.x) / 2, (first.y + second.y) / 2);
+): PoseLandmarkLike =>
+  point((first.x + second.x) / 2, (first.y + second.y) / 2);
 
 const createSpringLandmarks = ({
   leftWrist = point(0.5, 0.56),

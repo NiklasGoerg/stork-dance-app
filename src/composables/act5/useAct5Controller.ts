@@ -604,18 +604,16 @@ export const useAct5Controller = ({
 
         return result;
       })
-      .catch(
-        (error: unknown) => {
-          warnStoryTts("RESULT", {
-            narrationEventId,
-            cueId: resolution.cue.id,
-            status: "error",
-            error,
-          });
+      .catch((error: unknown) => {
+        warnStoryTts("RESULT", {
+          narrationEventId,
+          cueId: resolution.cue.id,
+          status: "error",
+          error,
+        });
 
-          return { status: "error", error } satisfies NarrationResult;
-        },
-      )
+        return { status: "error", error } satisfies NarrationResult;
+      })
       .finally(() => {
         if (!isCurrentRun(currentRunId)) return;
         if (activeNarrationPromise === promise) {
@@ -1136,7 +1134,13 @@ export const useAct5Controller = ({
 
     if (!cue) return;
 
-    await playTutorialCue(target, store.currentTargetIndex, cue, {}, currentRunId);
+    await playTutorialCue(
+      target,
+      store.currentTargetIndex,
+      cue,
+      {},
+      currentRunId,
+    );
   };
 
   const scheduleAdvance = (nextTargetIndex: number, currentRunId: number) => {
@@ -1409,11 +1413,11 @@ export const useAct5Controller = ({
     recognition.updateFrame(getRecognitionFrame());
   };
 
-  const getRecognitionPlaybackState = ():
-    Act5RecognitionFrame["playbackState"] =>
-    cycle.playbackState.value === "previewing"
-      ? "idle"
-      : cycle.playbackState.value;
+  const getRecognitionPlaybackState =
+    (): Act5RecognitionFrame["playbackState"] =>
+      cycle.playbackState.value === "previewing"
+        ? "idle"
+        : cycle.playbackState.value;
 
   const getSeasonPhase = () => {
     if (cycle.seasonPhase) return cycle.seasonPhase.value;

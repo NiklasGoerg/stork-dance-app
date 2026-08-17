@@ -123,29 +123,28 @@ const mockClimateRows = vi.hoisted<ClimateSeasonDataRow[]>(() => {
       ["2015-2019", 5, 2015, 2019, [50, 40, 60, 50]],
       ["2020-2024", 6, 2020, 2024, [100, 30, 60, 80]],
     ].flatMap(([interval, intervalOrder, intervalStart, intervalEnd, values]) =>
-      (["winter", "spring", "summer", "autumn"] as const).map(
-        (season, index) =>
-          createRow({
-            intervalOrder: intervalOrder as number,
-            interval: interval as string,
-            intervalStart: intervalStart as number,
-            intervalEnd: intervalEnd as number,
-            seasonOrder: index + 1,
-            season,
-            absoluteValue: 1 + Number(intervalOrder) + index,
-            displayValue:
-              interval === "2010-2014" && season === "winter"
-                ? -0.32
-                : interval === "2020-2024" && season === "winter"
-                  ? 2.33
-                  : 0.2 + Number(intervalOrder) / 10 + index / 10,
-            displayValueType: "difference_from_1995_1999",
-            displayUnit: "degC",
-            normalizedValue:
-              interval === "2020-2024" && season === "winter" ? 1 : 0.2,
-            movementPercent: (values as number[])[index] ?? 0,
-            isBaseline: false,
-          }),
+      (["winter", "spring", "summer", "autumn"] as const).map((season, index) =>
+        createRow({
+          intervalOrder: intervalOrder as number,
+          interval: interval as string,
+          intervalStart: intervalStart as number,
+          intervalEnd: intervalEnd as number,
+          seasonOrder: index + 1,
+          season,
+          absoluteValue: 1 + Number(intervalOrder) + index,
+          displayValue:
+            interval === "2010-2014" && season === "winter"
+              ? -0.32
+              : interval === "2020-2024" && season === "winter"
+                ? 2.33
+                : 0.2 + Number(intervalOrder) / 10 + index / 10,
+          displayValueType: "difference_from_1995_1999",
+          displayUnit: "degC",
+          normalizedValue:
+            interval === "2020-2024" && season === "winter" ? 1 : 0.2,
+          movementPercent: (values as number[])[index] ?? 0,
+          isBaseline: false,
+        }),
       ),
     ),
   ];
@@ -365,7 +364,9 @@ const createHarness = (
       async (_config: SeasonalCycleConfig, _withCountdown?: boolean) =>
         undefined,
     ),
-    prepareCustomCycle: vi.fn(async (_config: SeasonalCycleConfig) => undefined),
+    prepareCustomCycle: vi.fn(
+      async (_config: SeasonalCycleConfig) => undefined,
+    ),
     startExplanationPreview: vi.fn(async (seasonIndex: number) => {
       currentSeasonIndex.value = seasonIndex;
       playbackState.value = "previewing";
@@ -484,7 +485,10 @@ const advanceToTargetIndex = async (
   while (controller.store.currentTargetIndex < targetIndex) {
     const nextTargetIndex = controller.store.currentTargetIndex + 1;
 
-    controller.handleRecognitionResult(controller.store.currentTarget!, success());
+    controller.handleRecognitionResult(
+      controller.store.currentTarget!,
+      success(),
+    );
     await queuedRestarts.at(-1)?.beforeRestart?.();
     await enterTargetPreview(cycle, nextTargetIndex);
   }
@@ -836,13 +840,14 @@ describe("useAct5Controller narration", () => {
     }
 
     expect(controller.store.currentTarget?.season).toBe("autumn");
-    controller.handleRecognitionResult(controller.store.currentTarget!, success());
+    controller.handleRecognitionResult(
+      controller.store.currentTarget!,
+      success(),
+    );
     await queuedRestarts.at(-1)?.beforeRestart?.();
     await enterTargetPreview(cycle, 4);
 
-    expect(
-      narration.play.mock.calls.map(([cueKey]) => cueKey),
-    ).toEqual([
+    expect(narration.play.mock.calls.map(([cueKey]) => cueKey)).toEqual([
       "story.acts.act5.narration.story.intro.chart",
       "story.acts.act5.narration.story.intro.reference",
       "story.acts.act5.narration.story.reference.winter",
@@ -870,7 +875,10 @@ describe("useAct5Controller narration", () => {
     ) {
       const nextTargetIndex = controller.store.currentTargetIndex + 1;
 
-      controller.handleRecognitionResult(controller.store.currentTarget!, success());
+      controller.handleRecognitionResult(
+        controller.store.currentTarget!,
+        success(),
+      );
       await queuedRestarts.at(-1)?.beforeRestart?.();
       await enterTargetPreview(cycle, nextTargetIndex);
     }
@@ -898,7 +906,10 @@ describe("useAct5Controller narration", () => {
     ) {
       const nextTargetIndex = controller.store.currentTargetIndex + 1;
 
-      controller.handleRecognitionResult(controller.store.currentTarget!, success());
+      controller.handleRecognitionResult(
+        controller.store.currentTarget!,
+        success(),
+      );
       await queuedRestarts.at(-1)?.beforeRestart?.();
       await enterTargetPreview(cycle, nextTargetIndex);
     }
@@ -989,7 +1000,10 @@ describe("useAct5Controller narration", () => {
     expect(controller.store.currentTarget?.interval).toBe("2000-2004");
     expect(controller.store.currentTarget?.season).toBe("autumn");
 
-    controller.handleRecognitionResult(controller.store.currentTarget!, success());
+    controller.handleRecognitionResult(
+      controller.store.currentTarget!,
+      success(),
+    );
     queuedRestarts.at(-1)?.options?.onInterludeStart?.();
 
     expect(queuedRestarts.at(-1)?.options?.interludeDurationMs).toBe(8_000);
@@ -1067,7 +1081,10 @@ describe("useAct5Controller narration", () => {
     expect(controller.store.currentTarget?.interval).toBe("2020-2024");
     expect(controller.store.currentTarget?.season).toBe("autumn");
 
-    controller.handleRecognitionResult(controller.store.currentTarget!, success());
+    controller.handleRecognitionResult(
+      controller.store.currentTarget!,
+      success(),
+    );
     queuedEndActions.at(-1)?.();
 
     for (let index = 0; index < 20; index += 1) {
@@ -1155,10 +1172,16 @@ describe("useAct5Controller narration", () => {
     await controller.startStoryFlow();
     await flushTargetNarrationWatcher();
 
-    controller.handleRecognitionResult(controller.store.currentTarget!, success());
+    controller.handleRecognitionResult(
+      controller.store.currentTarget!,
+      success(),
+    );
     await queuedRestarts.at(-1)?.beforeRestart?.();
     await enterTargetPreview(cycle, 1);
-    controller.handleRecognitionResult(controller.store.currentTarget!, success());
+    controller.handleRecognitionResult(
+      controller.store.currentTarget!,
+      success(),
+    );
     await queuedRestarts.at(-1)?.beforeRestart?.();
     await enterTargetPreview(cycle, 2);
 
@@ -1166,12 +1189,18 @@ describe("useAct5Controller narration", () => {
 
     expect(summerTarget?.season).toBe("summer");
 
-    controller.handleRecognitionResult(summerTarget!, fail("RAISE_ARMS_HIGHER"));
+    controller.handleRecognitionResult(
+      summerTarget!,
+      fail("RAISE_ARMS_HIGHER"),
+    );
     queuedRestarts.at(-1)?.options?.onInterludeStart?.();
     await queuedRestarts.at(-1)?.beforeRestart?.();
     await enterTargetPreview(cycle, 2);
 
-    controller.handleRecognitionResult(summerTarget!, fail("RAISE_ARMS_HIGHER"));
+    controller.handleRecognitionResult(
+      summerTarget!,
+      fail("RAISE_ARMS_HIGHER"),
+    );
     queuedRestarts.at(-1)?.options?.onInterludeStart?.();
 
     const summerReferenceCueCount = narration.play.mock.calls.filter(
@@ -1199,12 +1228,18 @@ describe("useAct5Controller narration", () => {
     expect(comparisonTarget?.interval).toBe("2000-2004");
     expect(comparisonTarget?.season).toBe("winter");
 
-    controller.handleRecognitionResult(comparisonTarget!, fail("CONTRACT_MORE"));
+    controller.handleRecognitionResult(
+      comparisonTarget!,
+      fail("CONTRACT_MORE"),
+    );
     queuedRestarts.at(-1)?.options?.onInterludeStart?.();
     await queuedRestarts.at(-1)?.beforeRestart?.();
     await enterTargetPreview(cycle, 4);
 
-    controller.handleRecognitionResult(comparisonTarget!, fail("CONTRACT_MORE"));
+    controller.handleRecognitionResult(
+      comparisonTarget!,
+      fail("CONTRACT_MORE"),
+    );
     queuedRestarts.at(-1)?.options?.onInterludeStart?.();
 
     const comparisonCueCount = narration.play.mock.calls.filter(

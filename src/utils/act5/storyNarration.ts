@@ -14,11 +14,10 @@ export type Act5StoryTargetCueId =
   | `act5.story.reference.${ClimateSeason}`
   | `act5.story.${Exclude<Act5StoryPeriodId, "reference">}.${ClimateSeason}`;
 
-export type Act5StoryPeriodTransitionCueId =
-  `act5.story.transition.${Exclude<
-    Act5StoryPeriodId,
-    "reference" | "2020_2024"
-  >}`;
+export type Act5StoryPeriodTransitionCueId = `act5.story.transition.${Exclude<
+  Act5StoryPeriodId,
+  "reference" | "2020_2024"
+>}`;
 
 export type Act5StoryCompletionCueId =
   | "act5.story.completed.embodied"

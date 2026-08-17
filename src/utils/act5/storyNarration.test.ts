@@ -271,9 +271,10 @@ describe("Act 5 story narration", () => {
     expect(Object.keys(expectedComparisonCopy)).toHaveLength(20);
 
     Object.entries(expectedComparisonCopy).forEach(([cueId, expectedText]) => {
-      const cue = act5StoryNarrationCatalog[
-        cueId as keyof typeof act5StoryNarrationCatalog
-      ];
+      const cue =
+        act5StoryNarrationCatalog[
+          cueId as keyof typeof act5StoryNarrationCatalog
+        ];
       const text = getTranslation(cue.textKey);
       const temperaturePlaceholder = expectedText.includes("{deltaAbsSpoken}")
         ? "{deltaAbsSpoken}"
@@ -373,21 +374,19 @@ describe("Act 5 story narration", () => {
     expect(
       resolveAct5StoryNarrationCue(winter2010!)?.params.deltaAbsSpoken,
     ).toBe("point three");
-    expect(
-      en.story.acts.act5.narration.story["2010_2014"].winter,
-    ).toContain("{deltaAbsSpoken} degrees below");
+    expect(en.story.acts.act5.narration.story["2010_2014"].winter).toContain(
+      "{deltaAbsSpoken} degrees below",
+    );
     expect(
       en.story.acts.act5.narration.story["2010_2014"].winter,
     ).not.toContain("minus {deltaAbsSpoken}");
-    expect(
-      en.story.acts.act5.narration.story["2010_2014"].winter,
-    ).toContain("minus 10 percent");
+    expect(en.story.acts.act5.narration.story["2010_2014"].winter).toContain(
+      "minus 10 percent",
+    );
 
     const winter2020Resolution = resolveAct5StoryNarrationCue(winter2020!);
 
-    expect(winter2020Resolution?.params.deltaSpoken).toBe(
-      "two point three",
-    );
+    expect(winter2020Resolution?.params.deltaSpoken).toBe("two point three");
 
     expect(winter2020).toBeDefined();
     expect(winter2020!.climateData!.displayValue).toBeCloseTo(2.33, 3);

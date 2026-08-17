@@ -164,11 +164,10 @@ export const act5TutorialNarrationCatalog = {
     "story.acts.act5.narration.tutorial.autumn.complete",
     { speak: true, priority: 65 },
   ),
-  "act5.tutorial.complete": createCue(
-    "act5.tutorial.complete",
-    "",
-    { speak: false, priority: 70 },
-  ),
+  "act5.tutorial.complete": createCue("act5.tutorial.complete", "", {
+    speak: false,
+    priority: 70,
+  }),
 } as const satisfies Record<
   Act5TutorialNarrationCueId,
   Act5TutorialNarrationCue

@@ -11,33 +11,34 @@ import {
 
 describe("Act 5 tutorial narration", () => {
   it("defines every required tutorial narration key", () => {
-    expect(Object.values(act5TutorialNarrationCatalog).map((cue) => cue.textKey))
-      .toEqual(
-        expect.arrayContaining([
-          "story.acts.act5.narration.tutorial.intro.context",
-          "story.acts.act5.narration.tutorial.intro.encoding",
-          "story.acts.act5.narration.tutorial.intro.scale",
-          "story.acts.act5.narration.tutorial.intro.range",
-          "story.acts.act5.narration.tutorial.intro.measureLength",
-          "story.acts.act5.narration.tutorial.intro.watchThenMove",
-          "story.acts.act5.narration.tutorial.winter.encoding",
-          "story.acts.act5.narration.tutorial.winter.maximum",
-          "story.acts.act5.narration.tutorial.winter.minimum",
-          "story.acts.act5.narration.tutorial.winter.complete",
-          "story.acts.act5.narration.tutorial.spring.encoding",
-          "story.acts.act5.narration.tutorial.spring.maximum",
-          "story.acts.act5.narration.tutorial.spring.minimum",
-          "story.acts.act5.narration.tutorial.spring.complete",
-          "story.acts.act5.narration.tutorial.summer.encoding",
-          "story.acts.act5.narration.tutorial.summer.maximum",
-          "story.acts.act5.narration.tutorial.summer.minimum",
-          "story.acts.act5.narration.tutorial.summer.complete",
-          "story.acts.act5.narration.tutorial.autumn.encoding",
-          "story.acts.act5.narration.tutorial.autumn.maximum",
-          "story.acts.act5.narration.tutorial.autumn.minimum",
-          "story.acts.act5.narration.tutorial.autumn.complete",
-        ]),
-      );
+    expect(
+      Object.values(act5TutorialNarrationCatalog).map((cue) => cue.textKey),
+    ).toEqual(
+      expect.arrayContaining([
+        "story.acts.act5.narration.tutorial.intro.context",
+        "story.acts.act5.narration.tutorial.intro.encoding",
+        "story.acts.act5.narration.tutorial.intro.scale",
+        "story.acts.act5.narration.tutorial.intro.range",
+        "story.acts.act5.narration.tutorial.intro.measureLength",
+        "story.acts.act5.narration.tutorial.intro.watchThenMove",
+        "story.acts.act5.narration.tutorial.winter.encoding",
+        "story.acts.act5.narration.tutorial.winter.maximum",
+        "story.acts.act5.narration.tutorial.winter.minimum",
+        "story.acts.act5.narration.tutorial.winter.complete",
+        "story.acts.act5.narration.tutorial.spring.encoding",
+        "story.acts.act5.narration.tutorial.spring.maximum",
+        "story.acts.act5.narration.tutorial.spring.minimum",
+        "story.acts.act5.narration.tutorial.spring.complete",
+        "story.acts.act5.narration.tutorial.summer.encoding",
+        "story.acts.act5.narration.tutorial.summer.maximum",
+        "story.acts.act5.narration.tutorial.summer.minimum",
+        "story.acts.act5.narration.tutorial.summer.complete",
+        "story.acts.act5.narration.tutorial.autumn.encoding",
+        "story.acts.act5.narration.tutorial.autumn.maximum",
+        "story.acts.act5.narration.tutorial.autumn.minimum",
+        "story.acts.act5.narration.tutorial.autumn.complete",
+      ]),
+    );
   });
 
   it("keeps the deterministic tutorial target order", () => {

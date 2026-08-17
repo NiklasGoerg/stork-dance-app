@@ -208,12 +208,11 @@ const sweepDirectionCriterion = (
       (metrics.directionLocked &&
         metrics.directionResult !== "negativeProgress" &&
         metrics.detectedDirection !== "unknown"),
-    expectedRange:
-      isAutumn25
-        ? "same side or expected sweep direction"
-        : metrics.expectedStartSide === "left"
-          ? "leftToRight"
-          : "rightToLeft",
+    expectedRange: isAutumn25
+      ? "same side or expected sweep direction"
+      : metrics.expectedStartSide === "left"
+        ? "leftToRight"
+        : "rightToLeft",
     feedbackCode: "WRONG_SWEEP_DIRECTION",
   });
 };
