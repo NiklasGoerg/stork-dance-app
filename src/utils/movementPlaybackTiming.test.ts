@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ACT5_MOVEMENT_TIMING_DEFAULTS } from "~/story/act5IntroCycle";
 import type { MovementPlaybackTiming } from "~/types/movement";
 import { resolveMovementPlaybackPosition } from "~/utils/movementPlaybackTiming";
 
@@ -26,5 +27,24 @@ describe("movement playback timing", () => {
     expect(sourceAt(4_000)).toBe(4_000);
     expect(sourceAt(4_500)).toBe(500);
     expect(sourceAt(5_000)).toBe(1_000);
+  });
+
+  it("maps Act 5 Count 1 to the downbeat for first and second two-bar playback", () => {
+    const sourceAt = (seasonElapsedMs: number) =>
+      resolveMovementPlaybackPosition({
+        elapsedMs: seasonElapsedMs + ACT5_MOVEMENT_TIMING_DEFAULTS.prerollMs,
+        sourceDurationMs: 9_500,
+        timing: ACT5_MOVEMENT_TIMING_DEFAULTS,
+      });
+
+    const firstPlayback = sourceAt(0);
+    const secondPlayback = sourceAt(8_000);
+
+    expect(firstPlayback.sourceTimeMs).toBe(1_000);
+    expect(firstPlayback.loopCount).toBe(0);
+    expect(firstPlayback.isPreroll).toBe(false);
+    expect(secondPlayback.sourceTimeMs).toBe(1_000);
+    expect(secondPlayback.loopCount).toBe(1);
+    expect(secondPlayback.isPreroll).toBe(false);
   });
 });

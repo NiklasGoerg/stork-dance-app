@@ -255,10 +255,16 @@ export const extractSpringRecognitionMetrics = (
         lowerHandHeight <= springMovementConfig.thresholds.returnHeightMax &&
         handsGathered;
   const overheadBloom =
-    lowerHandHeight === null || handsGathered === null
+    lowerHandHeight === null ||
+    normalizedHandDistance === null ||
+    handCenterXOffset === null
       ? null
       : lowerHandHeight >=
-          SPRING_MOVEMENT_REFERENCE["100"].handHeightRange.min && handsGathered;
+          springMovementConfig.thresholds.overheadHandHeightMin &&
+        normalizedHandDistance <=
+          springMovementConfig.thresholds.overheadHandsGatheredMax &&
+        Math.abs(handCenterXOffset) <=
+          springMovementConfig.thresholds.overheadCenterMaxOffset;
   const leftElbowAngle = bodyMetrics.leftElbowAngle;
   const rightElbowAngle = bodyMetrics.rightElbowAngle;
   const averageElbowAngle = bodyMetrics.averageElbowAngle;

@@ -106,6 +106,9 @@
           <button class="btn" type="button" @click="triggerSkeletonPulseTest">
             {{ t("story.acts.act5.debug.testSkeletonPulse") }}
           </button>
+          <button class="btn" type="button" @click="controller.playDebugOutro">
+            {{ t("story.acts.act5.debug.playOutro") }}
+          </button>
           <button
             v-for="season in debugSeasonConfigs"
             :key="`debug-start-${season.id}`"
@@ -148,12 +151,6 @@
           <dt>{{ t("story.acts.act5.status.time") }}</dt>
           <dd>{{ timeLabel }}</dd>
         </div>
-        <template v-if="isDebugMode">
-          <div v-for="item in movementDebugRows" :key="item.label">
-            <dt>{{ item.label }}</dt>
-            <dd>{{ item.value }}</dd>
-          </div>
-        </template>
       </dl>
 
       <button
@@ -210,6 +207,7 @@ const climateDataUserError = computed(() =>
 
 const cycle = useSeasonalLearningCycle(act5IntroCycleConfig);
 const {
+  currentBar,
   currentBeat,
   currentFrame: instructorFrame,
   currentMovementSourceAspect: instructorSourceAspect,
@@ -226,17 +224,7 @@ const {
   seasonElapsedMs,
   seasonPhase,
   showInstructorAvatar,
-  configuredMovementId,
-  movementFrameCount,
-  movementIntensity,
   movementLoaded,
-  movementLoopCount,
-  movementLoopEndMs,
-  movementLoopStartMs,
-  movementPrerollMs,
-  movementSourceDurationMs,
-  movementSourceFps,
-  movementSourceTimeMs,
   totalDurationMs,
 } = cycle;
 
@@ -252,6 +240,8 @@ const recognition = useAct5Recognition({
     () =>
       act5Store.sequenceStatus === "periodTransition" ||
       act5Store.sequenceStatus === "retryInterlude" ||
+      act5Store.sequenceStatus === "tutorialExplanation" ||
+      act5Store.sequenceStatus === "tutorialCompleted" ||
       act5Store.isCompleted,
   ),
   autoProgressEnabled: computed(() => act5Store.debug.autoProgressEnabled),
@@ -265,6 +255,8 @@ const controller = useAct5Controller({
     currentSeason,
     currentSeasonIndex,
     playbackState,
+    currentBar,
+    seasonPhase,
     seasonElapsedMs,
     repetitionIndex,
     isTransition,
@@ -276,6 +268,10 @@ const controller = useAct5Controller({
     play: cycle.play,
     cleanup: cycle.cleanup,
     startCustomCycle: cycle.startCustomCycle,
+    prepareCustomCycle: cycle.prepareCustomCycle,
+    startExplanationPreview: cycle.startExplanationPreview,
+    waitForExplanationPreviewBars: cycle.waitForExplanationPreviewBars,
+    startPreparedCycleFromIndex: cycle.startPreparedCycleFromIndex,
     queueSeasonIndexRestart: cycle.queueSeasonIndexRestart,
     queueSeasonIndexEndAction: cycle.queueSeasonIndexEndAction,
   },
@@ -340,106 +336,6 @@ const timeLabel = computed(
   () =>
     `${(elapsedMs.value / 1000).toFixed(1)} / ${(totalDurationMs.value / 1000).toFixed(0)} s`,
 );
-type AutumnDebugMetrics = {
-  expectedStartSide?: string;
-  detectedDirection?: string;
-  activeArm?: string;
-  outerElbowAngle?: number | null;
-  normalizedShoulderWristDistance?: number | null;
-  armExtended?: boolean | null;
-  sweepPositionValid?: boolean | null;
-};
-type AutumnDebugSnapshot = {
-  currentRepetitionIndex?: number | null;
-  metrics?: AutumnDebugMetrics;
-};
-const formatDebugNumber = (value: number | null | undefined) =>
-  typeof value === "number" ? value.toFixed(3) : "n/a";
-const autumnDebugSnapshot = computed(
-  () =>
-    recognition.debugSnapshots.value.autumn as AutumnDebugSnapshot | undefined,
-);
-const currentAutumnMetrics = computed(() => autumnDebugSnapshot.value?.metrics);
-const lastCriterionFailure = computed(
-  () =>
-    recognition.currentEvaluation.value?.criteria.find(
-      (criterion) => criterion.status === "failed",
-    )?.id ?? "none",
-);
-const movementDebugRows = computed(() => {
-  const isAutumn =
-    (act5Store.currentSeason ?? currentSeason.value.id) === "autumn";
-  const metrics = isAutumn ? currentAutumnMetrics.value : undefined;
-
-  return [
-    {
-      label: "activeSeason",
-      value: act5Store.currentSeason ?? currentSeason.value.id,
-    },
-    { label: "activeIntensity", value: movementIntensity.value ?? "n/a" },
-    { label: "movementId", value: configuredMovementId.value ?? "none" },
-    { label: "sourceFps", value: movementSourceFps.value ?? "n/a" },
-    { label: "frameCount", value: movementFrameCount.value },
-    {
-      label: "sourceDurationMs",
-      value: formatDebugNumber(movementSourceDurationMs.value),
-    },
-    { label: "prerollMs", value: movementPrerollMs.value },
-    { label: "loopStartMs", value: movementLoopStartMs.value },
-    {
-      label: "loopEndMs",
-      value: formatDebugNumber(movementLoopEndMs.value),
-    },
-    {
-      label: "sourceTimeMs",
-      value: formatDebugNumber(movementSourceTimeMs.value),
-    },
-    { label: "loopCount", value: movementLoopCount.value },
-    {
-      label: "currentMeasure",
-      value:
-        recognition.currentMeasureEvaluation.value?.measureIndex ??
-        repetitionIndex.value ??
-        "n/a",
-    },
-    {
-      label: "currentSweepIndex",
-      value:
-        isAutumn && repetitionIndex.value !== null
-          ? repetitionIndex.value + 1
-          : "n/a",
-    },
-    {
-      label: "expectedSweepDirection",
-      value: isAutumn
-        ? ((
-            recognition.currentEvaluation.value as {
-              expectedDirection?: string;
-            } | null
-          )?.expectedDirection ?? "n/a")
-        : "n/a",
-    },
-    {
-      label: "detectedSweepDirection",
-      value: metrics?.detectedDirection ?? "n/a",
-    },
-    { label: "activeArm", value: metrics?.activeArm ?? "n/a" },
-    {
-      label: "elbowAngle",
-      value: formatDebugNumber(metrics?.outerElbowAngle),
-    },
-    {
-      label: "normalizedShoulderWristDistance",
-      value: formatDebugNumber(metrics?.normalizedShoulderWristDistance),
-    },
-    { label: "armExtended", value: metrics?.armExtended ?? "n/a" },
-    {
-      label: "sweepPositionValid",
-      value: metrics?.sweepPositionValid ?? "n/a",
-    },
-    { label: "lastCriterionFailure", value: lastCriterionFailure.value },
-  ];
-});
 
 const togglePlayback = async () => {
   if (act5Store.isCompleted) return;

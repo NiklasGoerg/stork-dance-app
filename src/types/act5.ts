@@ -109,6 +109,11 @@ export type Act5SequenceStatus =
   | "idle"
   | "countdown"
   | "preview"
+  | "tutorialExplanation"
+  | "tutorialCompleted"
+  | "storyIntro"
+  | "storyReferencePreview"
+  | "storyReferenceComplete"
   | "performing"
   | "evaluating"
   | "retryInterlude"
@@ -171,6 +176,28 @@ export type Act5AttemptState = {
   attemptNumber: number;
   handledEvaluationKey: string;
   retryPreviewFeedbackText: string;
+};
+
+export type Act5TutorialNarrationState = {
+  cueId: string | null;
+  textKey: string;
+  targetIndex: number | null;
+  params: Record<string, string | number>;
+};
+
+export type Act5StoryNarrationPhase =
+  | "idle"
+  | "story-intro"
+  | "target-preview"
+  | "reference-preview"
+  | "reference-complete";
+
+export type Act5StoryNarrationState = {
+  phase: Act5StoryNarrationPhase;
+  cueId: string | null;
+  textKey: string;
+  targetIndex: number | null;
+  params: Record<string, string | number>;
 };
 
 export type Act5FeedbackState = {
@@ -246,7 +273,12 @@ export type Act5InfoTone =
   "instruction" | "neutral" | "excellent" | "success" | "error" | "warning";
 
 export type Act5InfoCardMode =
-  "seasonPreview" | "activeMovement" | "periodTransition" | "completed";
+  | "seasonPreview"
+  | "tutorialExplanation"
+  | "storyNarration"
+  | "activeMovement"
+  | "periodTransition"
+  | "completed";
 
 export type Act5InfoCardModel = {
   mode: Act5InfoCardMode;

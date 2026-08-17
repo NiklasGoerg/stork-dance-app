@@ -21,6 +21,7 @@ export interface NarrationSpeakOptions {
   pitch?: number;
   volume?: number;
   behavior?: NarrationSpeakBehavior;
+  debugLabel?: string;
   onStart?: (details: NarrationSpeechStartDetails) => void;
   onEnd?: (details: NarrationSpeechEndDetails) => void;
 }

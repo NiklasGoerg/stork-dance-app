@@ -193,16 +193,49 @@ export const useNarrator = () => {
 
     settingsStore.loadPersistedSettings();
 
-    if (!settingsStore.enabled) return { status: "disabled" };
-    if (!speechSynthesis || !isSupported.value)
+    if (!settingsStore.enabled) {
+      if (options.debugLabel) {
+        console.warn(`${options.debugLabel} NARRATOR_SKIPPED`, {
+          reason: "disabled",
+        });
+      }
+
+      return { status: "disabled" };
+    }
+    if (!speechSynthesis || !isSupported.value) {
+      if (options.debugLabel) {
+        console.warn(`${options.debugLabel} NARRATOR_SKIPPED`, {
+          reason: "unsupported",
+          hasSpeechSynthesis: Boolean(speechSynthesis),
+          isSupported: isSupported.value,
+        });
+      }
+
       return { status: "unsupported" };
-    if (!text.trim()) return { status: "skipped" };
+    }
+    if (!text.trim()) {
+      if (options.debugLabel) {
+        console.warn(`${options.debugLabel} NARRATOR_SKIPPED`, {
+          reason: "emptyTranslation",
+          text,
+        });
+      }
+
+      return { status: "skipped" };
+    }
 
     const behavior = options.behavior ?? "replace";
 
     syncSpeechState();
 
     if (behavior === "skip-if-speaking" && isSpeaking.value) {
+      if (options.debugLabel) {
+        console.warn(`${options.debugLabel} NARRATOR_SKIPPED`, {
+          reason: "activeNarration",
+          behavior,
+        });
+      }
+
       return { status: "skipped" };
     }
 
@@ -238,6 +271,16 @@ export const useNarrator = () => {
       utterance.voice = voice;
     }
 
+    if (options.debugLabel) {
+      console.log(`${options.debugLabel} NARRATOR`, {
+        text,
+        behavior,
+        language: utterance.lang,
+        rate: utterance.rate,
+        voiceName: voice?.name ?? null,
+      });
+    }
+
     return await new Promise<NarrationResult>((resolve) => {
       const request: NarrationRequest = {
         utterance,
@@ -254,15 +297,36 @@ export const useNarrator = () => {
         activeUtterance.value = utterance;
         isSpeaking.value = true;
         isPaused.value = false;
+        if (options.debugLabel) {
+          console.log(`${options.debugLabel} ON_START`, {
+            rate: utterance.rate,
+            voiceName: voice?.name ?? null,
+          });
+        }
         options.onStart?.({
           rate: utterance.rate,
           voiceName: voice?.name ?? null,
         });
       };
       utterance.onend = () => {
+        if (options.debugLabel) {
+          console.log(`${options.debugLabel} ON_END`, {
+            status: "completed",
+            rate: utterance.rate,
+            voiceName: voice?.name ?? null,
+          });
+        }
         resolveRequest(request, { status: "completed" });
       };
       utterance.onerror = (event) => {
+        if (options.debugLabel) {
+          console.warn(`${options.debugLabel} ON_END`, {
+            status: isCancellationError(event) ? "cancelled" : "error",
+            error: event.error,
+            rate: utterance.rate,
+            voiceName: voice?.name ?? null,
+          });
+        }
         if (isCancellationError(event)) {
           resolveRequest(request, { status: "cancelled" });
 
@@ -282,10 +346,23 @@ export const useNarrator = () => {
       };
 
       try {
+        if (options.debugLabel) {
+          console.log(`${options.debugLabel} SPEECH_SYNTHESIS_SPEAK`, {
+            text,
+            pendingBeforeSpeak: speechSynthesis.pending,
+            speakingBeforeSpeak: speechSynthesis.speaking,
+          });
+        }
         speechSynthesis.speak(utterance);
         syncSpeechState();
       } catch (error) {
         lastError.value = error;
+        if (options.debugLabel) {
+          console.warn(`${options.debugLabel} ON_END`, {
+            status: "error",
+            error,
+          });
+        }
         resolveRequest(request, { status: "error", error });
       }
     });

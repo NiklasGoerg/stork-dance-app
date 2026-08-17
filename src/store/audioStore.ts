@@ -16,10 +16,12 @@ let baseRhythmSource: AudioBufferSourceNode | null = null;
 let baseRhythmStartedAtSeconds = 0;
 let baseRhythmStartOffsetSeconds = 0;
 let seasonalAudioSource: AudioBufferSourceNode | null = null;
+let seasonalAudioGain: GainNode | null = null;
 let seasonalAudioStartedAtSeconds = 0;
 let seasonalAudioStartOffsetSeconds = 0;
 let seasonalAudioDurationSeconds = 0;
 let seasonalAudioActiveCueId: string | null = null;
+let seasonalAudioVolume = 1;
 
 const baseRhythmLoopUrl = new URL(
   "../assets/audio/music/base-rhythm-60bpm-4bar.wav",
@@ -86,8 +88,10 @@ const stopSeasonalAudioSource = () => {
   if (!seasonalAudioSource) return;
 
   const source = seasonalAudioSource;
+  const gain = seasonalAudioGain;
 
   seasonalAudioSource = null;
+  seasonalAudioGain = null;
   source.onended = null;
 
   try {
@@ -97,6 +101,7 @@ const stopSeasonalAudioSource = () => {
   }
 
   source.disconnect();
+  gain?.disconnect();
 };
 
 const getBeatDurationMs = (bpm: number) => 60_000 / bpm;
@@ -151,6 +156,7 @@ export const useAudioStore = defineStore("audio", {
       isPlaying: false,
       currentOffsetSeconds: 0,
       durationSeconds: 0,
+      volume: 1,
       error: null as string | null,
     },
   }),
@@ -467,22 +473,43 @@ export const useAudioStore = defineStore("audio", {
       }
 
       const source = context.createBufferSource();
+      const gain = context.createGain();
 
       source.buffer = buffer;
-      source.connect(context.destination);
+      gain.gain.setValueAtTime(seasonalAudioVolume, context.currentTime);
+      source.connect(gain);
+      gain.connect(context.destination);
       source.onended = () => {
         if (seasonalAudioActiveCueId !== cue.id) return;
 
         seasonalAudioSource = null;
+        seasonalAudioGain = null;
         this.seasonalAudio.isPlaying = false;
         this.seasonalAudio.currentOffsetSeconds = seasonalAudioDurationSeconds;
       };
       source.start(0, offset);
 
       seasonalAudioSource = source;
+      seasonalAudioGain = gain;
       seasonalAudioStartedAtSeconds = context.currentTime;
       seasonalAudioStartOffsetSeconds = offset;
       this.seasonalAudio.isPlaying = true;
+    },
+    setSeasonalAudioVolume(volume: number, fadeSeconds = 0.2) {
+      const context = getSharedAudioContext();
+      const nextVolume = Math.min(Math.max(volume, 0), 1);
+
+      seasonalAudioVolume = nextVolume;
+      this.seasonalAudio.volume = nextVolume;
+
+      if (!context || !seasonalAudioGain) return;
+
+      const gain = seasonalAudioGain.gain;
+      const now = context.currentTime;
+
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(gain.value, now);
+      gain.linearRampToValueAtTime(nextVolume, now + Math.max(fadeSeconds, 0));
     },
     pauseSeasonalAudio() {
       if (!this.seasonalAudio.isPlaying) return;

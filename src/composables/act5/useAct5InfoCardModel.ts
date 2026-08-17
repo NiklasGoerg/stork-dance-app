@@ -185,6 +185,16 @@ export const useAct5InfoCardModel = ({
   const mode = computed<Act5InfoCardMode>(() => {
     if (store.isCompleted) return "completed";
     if (store.sequenceStatus === "periodTransition") return "periodTransition";
+    if (store.sequenceStatus === "tutorialExplanation") {
+      return "tutorialExplanation";
+    }
+    if (
+      store.sequenceStatus === "storyIntro" ||
+      store.sequenceStatus === "storyReferencePreview" ||
+      store.sequenceStatus === "storyReferenceComplete"
+    ) {
+      return "storyNarration";
+    }
 
     const isLargeSeasonPreviewVisible =
       store.isFlowActive &&
@@ -208,6 +218,27 @@ export const useAct5InfoCardModel = ({
       !store.isCompleted,
   );
   const feedback = computed<Act5InfoCardModel["feedback"]>(() => {
+    if (mode.value === "tutorialExplanation") {
+      return store.tutorialNarration.textKey
+        ? {
+            text: t(
+              store.tutorialNarration.textKey,
+              store.tutorialNarration.params,
+            ),
+            tone: "neutral",
+          }
+        : undefined;
+    }
+
+    if (mode.value === "storyNarration") {
+      return store.storyNarration.textKey
+        ? {
+            text: t(store.storyNarration.textKey, store.storyNarration.params),
+            tone: "neutral",
+          }
+        : undefined;
+    }
+
     if (mode.value !== "activeMovement") return undefined;
 
     if (climateDataError.value) {

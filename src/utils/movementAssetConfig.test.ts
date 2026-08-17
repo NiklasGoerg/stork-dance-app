@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { act5SeasonMovementConfig } from "~/story/act5IntroCycle";
+import {
+  ACT5_MOVEMENT_TIMING_DEFAULTS,
+  act5SeasonMovementConfig,
+} from "~/story/act5IntroCycle";
 import type { MovementRecording } from "~/types/movement";
 import { migrationMovementConfig } from "~/utils/migrationActs/migrationMovementConfig";
 import {
@@ -100,6 +103,31 @@ describe("movement asset configuration", () => {
 
       expect(getMovementRecordingDurationMs(recording)).toBeGreaterThan(8_000);
       expect(config.movementLoopDurationMs).toBe(8_000);
+    });
+  });
+
+  it("keeps Act 5 full-intensity seasonal recordings aligned to the shared Count-1 timing", () => {
+    const fullIntensityConfigs = [
+      act5SeasonMovementConfig.winter[100],
+      act5SeasonMovementConfig.spring[100],
+      act5SeasonMovementConfig.summer[100],
+      act5SeasonMovementConfig.autumn[100],
+    ];
+
+    fullIntensityConfigs.forEach((config) => {
+      const movementId = config.configuredMovementId;
+      if (!movementId) throw new Error("Movement ID is required.");
+
+      const recording = readMovement("seasons", movementId);
+      const firstFrameTime = recording.frames[0]?.time;
+      const lastFrameTime = recording.frames.at(-1)?.time;
+
+      expect(Number.isFinite(firstFrameTime)).toBe(true);
+      expect(Number.isFinite(lastFrameTime)).toBe(true);
+      expect(config.movementTiming).toEqual(ACT5_MOVEMENT_TIMING_DEFAULTS);
+      expect(config.movementPrerollMs).toBe(1_000);
+      expect(config.movementLoopDurationMs).toBe(8_000);
+      expect(getMovementRecordingDurationMs(recording)).toBeGreaterThan(8_500);
     });
   });
 

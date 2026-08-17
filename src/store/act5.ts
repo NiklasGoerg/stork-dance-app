@@ -9,6 +9,9 @@ import type {
   Act5LifecycleStatus,
   Act5PeriodTransition,
   Act5SequenceTarget,
+  Act5StoryNarrationPhase,
+  Act5StoryNarrationState,
+  Act5TutorialNarrationState,
 } from "~/types/act5";
 
 type Act5State = {
@@ -19,6 +22,8 @@ type Act5State = {
   currentTargetIndex: number;
   completedStepIds: string[];
   periodTransition: Act5PeriodTransition | null;
+  tutorialNarration: Act5TutorialNarrationState;
+  storyNarration: Act5StoryNarrationState;
   attempt: Act5AttemptState;
   feedback: Act5FeedbackState;
   debug: Act5DebugState;
@@ -39,6 +44,21 @@ const getInitialFeedbackState = (): Act5FeedbackState => ({
   visibleMeasureIndex: null,
 });
 
+const getInitialTutorialNarrationState = (): Act5TutorialNarrationState => ({
+  cueId: null,
+  textKey: "",
+  targetIndex: null,
+  params: {},
+});
+
+const getInitialStoryNarrationState = (): Act5StoryNarrationState => ({
+  phase: "idle",
+  cueId: null,
+  textKey: "",
+  targetIndex: null,
+  params: {},
+});
+
 const getInitialDebugState = (): Act5DebugState => ({
   enabled: false,
   autoProgressEnabled: false,
@@ -54,6 +74,8 @@ const getInitialState = (): Act5State => ({
   currentTargetIndex: 0,
   completedStepIds: [],
   periodTransition: null,
+  tutorialNarration: getInitialTutorialNarrationState(),
+  storyNarration: getInitialStoryNarrationState(),
   attempt: getInitialAttemptState(),
   feedback: getInitialFeedbackState(),
   debug: getInitialDebugState(),
@@ -113,6 +135,8 @@ export const useAct5Store = defineStore("act5", {
       this.currentTargetIndex = 0;
       this.completedStepIds = [];
       this.periodTransition = null;
+      this.tutorialNarration = getInitialTutorialNarrationState();
+      this.storyNarration = getInitialStoryNarrationState();
       this.attempt = getInitialAttemptState();
       this.feedback = getInitialFeedbackState();
       this.debug.feedbackSelection = null;
@@ -123,6 +147,8 @@ export const useAct5Store = defineStore("act5", {
       this.currentTargetIndex = targetIndex;
       this.sequenceStatus = "performing";
       this.periodTransition = null;
+      this.tutorialNarration = getInitialTutorialNarrationState();
+      this.storyNarration = getInitialStoryNarrationState();
       this.attempt.attemptNumber += 1;
       this.attempt.handledEvaluationKey = "";
       this.feedback = getInitialFeedbackState();
@@ -134,6 +160,87 @@ export const useAct5Store = defineStore("act5", {
     },
     setSequenceStatus(status: Act5SequenceStatus) {
       this.sequenceStatus = status;
+    },
+    enterTutorialExplanation({
+      targetIndex,
+      cueId,
+      textKey,
+      params = {},
+    }: {
+      targetIndex: number;
+      cueId: string;
+      textKey: string;
+      params?: Record<string, string | number>;
+    }) {
+      this.currentTargetIndex = targetIndex;
+      this.sequenceStatus = "tutorialExplanation";
+      this.periodTransition = null;
+      this.tutorialNarration = {
+        cueId,
+        textKey,
+        targetIndex,
+        params,
+      };
+      this.feedback = getInitialFeedbackState();
+    },
+    clearTutorialNarration() {
+      this.tutorialNarration = getInitialTutorialNarrationState();
+    },
+    enterStoryNarration({
+      phase,
+      status,
+      targetIndex,
+      cueId,
+      textKey,
+      params = {},
+    }: {
+      phase: Act5StoryNarrationPhase;
+      status: Extract<
+        Act5SequenceStatus,
+        "storyIntro" | "storyReferencePreview" | "storyReferenceComplete"
+      >;
+      targetIndex: number | null;
+      cueId: string;
+      textKey: string;
+      params?: Record<string, string | number>;
+    }) {
+      if (targetIndex !== null) {
+        this.currentTargetIndex = targetIndex;
+      }
+      this.sequenceStatus = status;
+      this.periodTransition = null;
+      this.storyNarration = {
+        phase,
+        cueId,
+        textKey,
+        targetIndex,
+        params,
+      };
+      this.feedback = getInitialFeedbackState();
+    },
+    setTargetStoryNarration({
+      targetIndex,
+      cueId,
+      textKey,
+      params = {},
+    }: {
+      targetIndex: number;
+      cueId: string;
+      textKey: string;
+      params?: Record<string, string | number>;
+    }) {
+      if (targetIndex !== this.currentTargetIndex) return;
+
+      this.storyNarration = {
+        phase: "target-preview",
+        cueId,
+        textKey,
+        targetIndex,
+        params,
+      };
+    },
+    clearStoryNarration() {
+      this.storyNarration = getInitialStoryNarrationState();
     },
     markCurrentTargetCompleted() {
       const target = this.targets[this.currentTargetIndex] ?? null;
@@ -188,6 +295,7 @@ export const useAct5Store = defineStore("act5", {
     enterPeriodTransition(transition: Act5PeriodTransition) {
       this.sequenceStatus = "periodTransition";
       this.periodTransition = transition;
+      this.storyNarration = getInitialStoryNarrationState();
       this.attempt.handledEvaluationKey = "";
       this.feedback = getInitialFeedbackState();
     },
@@ -195,6 +303,8 @@ export const useAct5Store = defineStore("act5", {
       this.lifecycleStatus = "completed";
       this.sequenceStatus = "completed";
       this.periodTransition = null;
+      this.tutorialNarration = getInitialTutorialNarrationState();
+      this.storyNarration = getInitialStoryNarrationState();
       this.attempt.retryPreviewFeedbackText = "";
       this.feedback = getInitialFeedbackState();
       this.markAllClimateTargetsCompleted();

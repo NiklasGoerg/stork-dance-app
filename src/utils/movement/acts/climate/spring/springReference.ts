@@ -30,22 +30,22 @@ export const SPRING_MOVEMENT_REFERENCE: Record<
     value: "40",
     label: "Side bloom",
     maxBeat: 3,
-    handHeightRange: { min: 0.38, max: 0.88 },
-    handOpeningMin: 0.68,
-    wristOutsideShoulderMin: 0.02,
+    handHeightRange: { min: 0.3, max: 1 },
+    handOpeningMin: 0.55,
+    wristOutsideShoulderMin: 0,
   },
   "30": {
     value: "30",
     label: "Small side bloom",
     maxBeat: 3,
-    handHeightRange: { min: 0.24, max: 0.62 },
-    handOpeningMin: 0.32,
+    handHeightRange: { min: 0.18, max: 0.72 },
+    handOpeningMin: 0.24,
   },
   "20": {
     value: "20",
     label: "Small bloom",
     maxBeat: 3,
-    handHeightRange: { min: 0.12, max: 0.42 },
+    handHeightRange: { min: 0.08, max: 0.5 },
   },
 };
 
@@ -79,17 +79,23 @@ export const resolveSpringValue = (
     }))
     .sort((a, b) => a.distance - b.distance)[0];
 
-  return closest?.distance <= 0.035 ? closest.springValue : "100";
+  if (!closest) return "100";
+
+  return closest.distance <= 0.035 ? closest.springValue : "100";
 };
 
 export const springMovementConfig = {
   thresholds: {
-    handsLowMax: 0.4,
+    handsLowMax: 0.56,
     returnHeightMin: 0.52,
     returnHeightMax: 1.08,
     handsGatheredMax: 0.56,
+    overheadHandsGatheredMax: 0.9,
     handsOpenMin: 1.05,
-    handsCloseToBodyMax: 0.92,
+    handsCloseToBodyMax: 1.55,
+    startCenterMaxOffset: 0.72,
+    overheadHandHeightMin: 1.12,
+    overheadCenterMaxOffset: 0.75,
     wristOutsideShoulderMin: 0.12,
     elbowExtendedMin: 126,
     centerMaxOffset: 0.42,

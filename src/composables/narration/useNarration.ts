@@ -12,6 +12,9 @@ export type NarrationCueKey = string;
 export interface PlayNarrationOptions {
   params?: Record<string, string | number>;
   behavior?: NarrationSpeakBehavior;
+  debugLabel?: string;
+  onStart?: NarrationSpeakOptions["onStart"];
+  onEnd?: NarrationSpeakOptions["onEnd"];
 }
 
 export const useNarration = () => {
@@ -26,8 +29,19 @@ export const useNarration = () => {
   ): Promise<NarrationResult> => {
     const text = t(cueKey, options.params ?? {});
 
+    if (options.debugLabel) {
+      console.log(`${options.debugLabel} NARRATION_PLAY`, {
+        cueKey,
+        params: options.params ?? {},
+        text,
+      });
+    }
+
     return await narrator.speakText(text, {
       behavior: options.behavior,
+      debugLabel: options.debugLabel,
+      onStart: options.onStart,
+      onEnd: options.onEnd,
     });
   };
 

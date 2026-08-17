@@ -1,7 +1,12 @@
 export type SeasonalCycleSeasonId = "spring" | "summer" | "autumn" | "winter";
 
 export type SeasonalCyclePlaybackState =
-  "idle" | "countdown" | "playing" | "paused" | "completed";
+  | "idle"
+  | "countdown"
+  | "playing"
+  | "previewing"
+  | "paused"
+  | "completed";
 
 export type SeasonalCyclePhase = "preview" | "performance" | "transition";
 

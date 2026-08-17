@@ -65,8 +65,8 @@ const closeToBodyCriterion = (metrics: SpringRecognitionMetrics) =>
         springMovementConfig.thresholds.handsCloseToBodyMax &&
       (metrics.handCenterXOffset === null ||
         Math.abs(metrics.handCenterXOffset) <=
-          springMovementConfig.thresholds.centerMaxOffset),
-    expectedRange: `distance <= ${springMovementConfig.thresholds.handsCloseToBodyMax}`,
+          springMovementConfig.thresholds.startCenterMaxOffset),
+    expectedRange: `distance <= ${springMovementConfig.thresholds.handsCloseToBodyMax}, center <= ${springMovementConfig.thresholds.startCenterMaxOffset}`,
     feedbackCode: "KEEP_HANDS_CLOSE_TO_BODY",
   });
 
@@ -229,23 +229,12 @@ const shoulderChestHeightCriterion = (metrics: SpringRecognitionMetrics) =>
 const overheadCriterion = (metrics: SpringRecognitionMetrics) =>
   criterion({
     id: "hands-overhead",
-    label: "Hands meet above the head",
+    label: "Hands reach above the head and roughly gather",
     importance: "essential",
     value: metrics.overheadBloom,
     passed: metrics.overheadBloom === true,
-    expectedRange: "hands above head and gathered",
+    expectedRange: `height >= ${springMovementConfig.thresholds.overheadHandHeightMin}, distance <= ${springMovementConfig.thresholds.overheadHandsGatheredMax}`,
     feedbackCode: "REACH_ABOVE_HEAD",
-  });
-
-const gatheredCriterion = (metrics: SpringRecognitionMetrics) =>
-  criterion({
-    id: "hands-gathered-front",
-    label: "Hands gather in front of the body",
-    importance: "essential",
-    value: metrics.handsGathered,
-    passed: metrics.handsGathered === true,
-    expectedRange: "hands close and centered",
-    feedbackCode: "GATHER_HANDS_IN_FRONT",
   });
 
 export const buildSpringBeatCriteria = (
@@ -281,11 +270,7 @@ export const buildSpringBeatCriteria = (
 
   if (beat === 3) {
     return expectedValue === "100"
-      ? [
-          overheadCriterion(metrics),
-          gatheredCriterion(metrics),
-          armsExtendedCriterion(metrics),
-        ]
+      ? [overheadCriterion(metrics), armsExtendedCriterion(metrics)]
       : [
           maxHeightCriterion(metrics, expectedValue),
           endpointArmOpeningCriterion(metrics, expectedValue),
@@ -316,7 +301,6 @@ export const getSpringBeatFeedbackCode = (
     "value-hand-height",
     "endpoint-arm-opening",
     "hands-overhead",
-    "hands-gathered-front",
     "hands-return-prayer",
     "knee-pattern",
     "arms-extended",

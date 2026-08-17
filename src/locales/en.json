@@ -463,10 +463,103 @@
           },
           "intervalTransition": "Next time period: {interval}",
           "completed": "Climate data story completed.",
-          "completionTitle": "Climate story completed",
-          "completionSubtitle": "All seasonal climate periods are revealed."
+          "completionTitle": "30 Years of Seasonal Change",
+          "completionSubtitle": "Winter and autumn show some of the largest later differences. Temperature provides context — not proof of what caused migration changes."
         },
         "narration": {
+          "tutorial": {
+            "intro": {
+              "context": "We saw the storks' migration change over time. Now let's look at one possible environmental factor: temperature.",
+              "encoding": "Each season has its own movement, and one part of that movement represents the data value.",
+              "scale": "We scale the movements to the largest temperature difference in the data: 2.33 degrees. That is 100 percent; 50 percent represents about 1.17 degrees.",
+              "range": "First, you'll learn the largest and smallest version of each movement. For now, 100 percent simply means the full movement.",
+              "measureLength": "Each movement lasts four bars.",
+              "watchThenMove": "In the first bar, watch the avatar to remember the movement. Then perform the movement through the next three bars."
+            },
+            "winter": {
+              "encoding": "First, winter. Your body height carries the value. At 100 percent, you stay at full height; lower values bring your body lower.",
+              "maximum": "Start with {value} percent: stay standing at your full height and follow the avatar.",
+              "minimum": "Great. Now the other end: at {value} percent, make yourself as small as you can and bring your arms over your head.",
+              "complete": "Well done. You now know the winter range."
+            },
+            "spring": {
+              "encoding": "Next, spring. The arm arc carries the value. At 100 percent, complete the full arc above your head; at 50 percent, you would stop around shoulder height.",
+              "maximum": "Now start with {value} percent: complete the full arc until your hands meet above your head.",
+              "minimum": "Great. At {value} percent, follow the same arc, but raise your arms only a little.",
+              "complete": "Well done. You now know the spring range."
+            },
+            "summer": {
+              "encoding": "Now, summer. The circle size carries the value. Start with your hands at your chest: at 100 percent, reach fully up and trace the largest circle; smaller values create a smaller circle.",
+              "maximum": "Now try {value} percent: reach fully up, keep your arms extended, and trace the largest circle.",
+              "minimum": "Great. At {value} percent, reach only a little and trace a very small circle.",
+              "complete": "Good. You now know both ends of the summer scale."
+            },
+            "autumn": {
+              "encoding": "Finally, autumn. The sweep distance carries the value. At 100 percent, move all the way from one side to the other; at 50 percent, you would stop in front of your chest.",
+              "maximum": "Now start with {value} percent: sweep all the way from one side to the other.",
+              "minimum": "Great. At {value} percent, start from the same side but sweep only a quarter of the full distance.",
+              "complete": "Great. You now know all four seasonal movement scales."
+            }
+          },
+          "story": {
+            "intro": {
+              "chart": "Now we'll move through 30 years of seasonal temperatures. The chart below fills in as you complete each movement.",
+              "reference": "We begin with 1995 to 1999, our reference period. For now, use the full movement for each season."
+            },
+            "reference": {
+              "winter": "First, winter. Use the full movement to set our winter reference.",
+              "spring": "Now spring. Again, use the full movement to set the reference.",
+              "summer": "Next, summer. Use the full movement for our summer reference.",
+              "autumn": "Finally, autumn. Complete the full movement to finish our reference period."
+            },
+            "referenceComplete": {
+              "summary": "Our reference is set. From now on, movement size shows how much each season differs from 1995 to 1999.",
+              "scale": "Remember: the full 100 percent movement represents the largest difference in the data."
+            },
+            "2000_2004": {
+              "winter": "Winter: {deltaSpoken} degrees above the reference — {movementValue} percent. Our first increase from the baseline.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. A similar increase.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Close to spring.",
+              "autumn": "Autumn is also {deltaSpoken} degrees above the reference. That's {movementValue} percent."
+            },
+            "2005_2009": {
+              "winter": "Winter: {deltaSpoken} degrees above the reference — {movementValue} percent. Almost unchanged from before.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. Again, little change.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Much closer to the baseline now.",
+              "autumn": "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent. A clear rise from before."
+            },
+            "2010_2014": {
+              "winter": "Winter: {deltaAbsSpoken} degrees below the reference — minus 10 percent. This time, winter reverses direction.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. Unlike winter, it stays above the baseline.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Still close to the baseline.",
+              "autumn": "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent."
+            },
+            "2015_2019": {
+              "winter": "Winter: {deltaSpoken} degrees above the reference — {movementValue} percent. A sharp rise from the previous period.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. It rises as well.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. A much larger difference than before.",
+              "autumn": "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent. Higher again."
+            },
+            "2020_2024": {
+              "winter": "Winter: {deltaSpoken} degrees above the reference — 100 percent. The largest difference in the dataset.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. Slightly lower than before.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Almost unchanged.",
+              "autumn": "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent. A strong final increase."
+            },
+            "transition": {
+              "2000_2004": "All four seasons were above the reference. Next: 2005 to 2009.",
+              "2005_2009": "The seasons begin to diverge: summer moves closer to the baseline, while autumn rises. Next: 2010 to 2014.",
+              "2010_2014": "Winter fell below the reference, while the other seasons stayed above it. Next: 2015 to 2019.",
+              "2015_2019": "Now all four seasons have moved further above the reference. Next: 2020 to 2024."
+            },
+            "completed": {
+              "embodied": "You have now moved through 30 years of seasonal temperature change.",
+              "seasons": "The seasons did not change equally. Winter and autumn end with some of the largest differences, while spring varies much less across the comparison periods.",
+              "maximum": "By the final period, winter is 2.3 degrees above our 1995 to 1999 reference — the largest difference in the dataset.",
+              "maximumContext": "That compares two five-year winter averages, making it a substantial shift in the seasonal conditions captured here.",
+              "migration": "Could changing temperatures be one factor shaping the storks' migration? These data cannot prove that connection, but they reveal part of the changing environment the storks migrate through."
+            }
+          },
           "feedback": {
             "common": {
               "fullBodyNotVisible": "Step back a little so I can see your full body.",
@@ -848,6 +941,7 @@
           "startSpringSequence": "Start Spring Sequence",
           "startWinterSequence": "Start Winter Sequence",
           "testSkeletonPulse": "Test Skeleton Success Pulse",
+          "playOutro": "Play Outro",
           "autoProgress": "Auto Progress",
           "autoProgressFeedback": "Auto progress"
         },

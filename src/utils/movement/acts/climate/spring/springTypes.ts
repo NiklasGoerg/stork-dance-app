@@ -122,8 +122,12 @@ export type SpringThresholds = {
   returnHeightMin: number;
   returnHeightMax: number;
   handsGatheredMax: number;
+  overheadHandsGatheredMax: number;
   handsOpenMin: number;
   handsCloseToBodyMax: number;
+  startCenterMaxOffset: number;
+  overheadHandHeightMin: number;
+  overheadCenterMaxOffset: number;
   wristOutsideShoulderMin: number;
   elbowExtendedMin: number;
   centerMaxOffset: number;

@@ -106,7 +106,11 @@
       </ol>
 
       <p
-        v-if="model.mode === 'activeMovement'"
+        v-if="
+          model.mode === 'activeMovement' ||
+          model.mode === 'tutorialExplanation' ||
+          model.mode === 'storyNarration'
+        "
         class="act5-info-card__feedback"
         :class="[
           `act5-info-card__feedback--${feedbackDisplay.tone}`,

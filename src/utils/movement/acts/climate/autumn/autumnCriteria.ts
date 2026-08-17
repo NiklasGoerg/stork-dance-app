@@ -68,9 +68,9 @@ const hasAtLeastExtension = (
 const usesDetailedArmShapeCriteria = (valueClass: AutumnValueClass) =>
   valueClass === "50" || valueClass === "80" || valueClass === "100";
 
-const AUTUMN_25_RELATIVE_PROGRESS_MIN = 0.012;
-const AUTUMN_25_OUTER_WRIST_TO_CENTER_MIN = 0.16;
-const AUTUMN_25_BEAT2_PROGRESS_MIN = 0.012;
+const AUTUMN_25_RELATIVE_PROGRESS_MIN = 0;
+const AUTUMN_25_OUTER_WRIST_TO_CENTER_MIN = 0;
+const AUTUMN_25_BEAT2_PROGRESS_MIN = 0;
 
 const endpointRegionCriterion = (
   metrics: AutumnRecognitionMetrics,
@@ -186,20 +186,37 @@ const outerArmExtensionCriterion = (
   });
 };
 
-const sweepDirectionCriterion = (metrics: AutumnRecognitionMetrics) =>
-  criterion({
+const sweepDirectionCriterion = (
+  metrics: AutumnRecognitionMetrics,
+  context: BeatContext,
+) => {
+  const isAutumn25 = context.expectedValueClass === "25";
+  const autumn25CompactSweepPassed =
+    isAutumn25 &&
+    metrics.directionResult !== "negativeProgress" &&
+    metrics.normalizedProgress !== null &&
+    metrics.normalizedProgress <=
+      AUTUMN_MOVEMENT_REFERENCE["25"].progressRange.max;
+
+  return criterion({
     id: "sweep-direction",
     label: "Sweep changes toward the expected side",
     importance: "essential",
-    value: metrics.detectedDirection,
+    value: isAutumn25 ? metrics.normalizedProgress : metrics.detectedDirection,
     passed:
-      metrics.directionLocked &&
-      metrics.directionResult !== "negativeProgress" &&
-      metrics.detectedDirection !== "unknown",
+      autumn25CompactSweepPassed ||
+      (metrics.directionLocked &&
+        metrics.directionResult !== "negativeProgress" &&
+        metrics.detectedDirection !== "unknown"),
     expectedRange:
-      metrics.expectedStartSide === "left" ? "leftToRight" : "rightToLeft",
+      isAutumn25
+        ? "same side or expected sweep direction"
+        : metrics.expectedStartSide === "left"
+          ? "leftToRight"
+          : "rightToLeft",
     feedbackCode: "WRONG_SWEEP_DIRECTION",
   });
+};
 
 const outerWristCriterion = (
   metrics: AutumnRecognitionMetrics,
@@ -379,7 +396,7 @@ export const buildAutumnBeatCriteria = (
       : [];
 
     return [
-      sweepDirectionCriterion(metrics),
+      sweepDirectionCriterion(metrics, context),
       endpointRegionCriterion(metrics, context),
       ...(reference.requireProgressFromBeat1
         ? [endpointProgressCriterion(metrics, context)]
