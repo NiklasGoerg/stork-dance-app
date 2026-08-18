@@ -39,6 +39,8 @@ const createTimelineDay = ({
   isRestDay: phase.includes("rest"),
   referenceWeight: 1,
   timingClass: phase.includes("migration") ? "migration" : "rest",
+  canonicalStartMs: relativeDay * 100,
+  canonicalEndMs: (relativeDay + 1) * 100,
   dayDurationMs: 100,
   startMs: relativeDay * 100,
   endMs: (relativeDay + 1) * 100,

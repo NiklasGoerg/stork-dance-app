@@ -14,6 +14,7 @@
         <BirdMap
           data-source="story"
           playback-source="migration-runtime"
+          :camera-mode="store.mapCameraMode"
           :show-controls="false"
           :show-map-navigation="false"
           :story-cycle-ids="activeCycleId ? [activeCycleId] : []"
@@ -22,12 +23,38 @@
           @story-frame="controller.reportMapFrame"
         />
         <StoryProgressSidebar />
+        <CycleTransitionCover
+          v-if="cycleTransitionCoverMounted"
+          :label="t('story.acts.act4.transition.label')"
+          :from-title="store.cycleTransitionOverlay.fromTitle"
+          :to-title="store.cycleTransitionOverlay.toTitle"
+          class="migration-map__cycle-cover"
+        />
         <MigrationGestureCountdown
           v-if="countdownNumber"
           :gesture-id="gestureStore.activeGestureId ?? undefined"
           :count="countdownNumber"
           :initial="Boolean(store.initialCountdownNumber)"
         />
+        <Transition name="migration-cycle-overlay">
+          <div
+            v-if="store.cycleOverlay.visible"
+            class="migration-cycle-overlay"
+            aria-live="polite"
+          >
+            <div class="migration-cycle-overlay__year">
+              {{ store.cycleOverlay.title }}
+            </div>
+            <div class="migration-cycle-overlay__meta">
+              {{
+                t(
+                  store.cycleOverlay.subtitleKey,
+                  store.cycleOverlay.subtitleParams,
+                )
+              }}
+            </div>
+          </div>
+        </Transition>
       </section>
     </template>
 
@@ -86,6 +113,9 @@
         :allow-single-cycle="act.id === 'act-3' || act.id === 'act-4'"
         :show-story-action="showStoryAction"
         :show-reset-action="!guidedController.enabled"
+        :show-debug-toggle="showDebugToggle"
+        :is-debug-mode="store.debug.enabled"
+        :is-auto-progress-enabled="store.debug.autoProgressEnabled"
         :actions="activeInfoPanelModel.actions"
         @start-story="handleStartStory"
         @start-cycle="controller.startSingleCycle"
@@ -93,14 +123,17 @@
         @resume="handleResume"
         @reset="handleReset"
         @action="handlePanelAction"
+        @toggle-debug="controller.toggleDebug"
+        @toggle-auto-progress="controller.toggleAutoProgress"
       />
     </template>
   </MigrationStoryLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from "vue";
+import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import BirdMap from "~/components/map/BirdMap.vue";
+import CycleTransitionCover from "~/components/story/CycleTransitionCover.vue";
 import MovementCamera from "~/components/movement/MovementCamera.vue";
 import MovementStage from "~/components/movement/MovementStage.vue";
 import MigrationActControls from "~/components/story/MigrationActControls.vue";
@@ -118,12 +151,14 @@ import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
 import { migrationStoryCycleDefinitions as storyCycleDefinitions } from "~/utils/migrationStoryData";
 import { getSeasonForDate } from "~/utils/storyCycle";
+import { isCycleTransitionCoverMounted } from "~/utils/migrationActs/cycleTransitionCover";
 import { resolveMigrationActCycleRuns } from "~/utils/migrationActs/config";
 import type { StoryAct } from "~/story/types";
 import type { MigrationInfoPanelActionId } from "~/types/migrationAct";
 
 const props = defineProps<{ act: StoryAct }>();
 const { t, getActTitle } = useStoryTranslations();
+const route = useRoute();
 const store = useMigrationActStore();
 const runtimeStore = useStoryRuntimeStore();
 const storyEngine = useStoryEngine();
@@ -157,7 +192,19 @@ const showBottomControls = computed(
   () =>
     !guidedController.enabled || activeInfoPanelModel.value.actions.length > 0,
 );
+const routeDebugEnabled = computed(
+  () => import.meta.dev && route.query.debug === "true",
+);
+const showDebugToggle = computed(
+  () =>
+    import.meta.dev &&
+    !guidedController.enabled &&
+    (props.act.id === "act-3" || props.act.id === "act-4"),
+);
 const activeCycleId = computed(() => store.activeCycleId);
+const cycleTransitionCoverMounted = computed(() =>
+  isCycleTransitionCoverMounted(store.cycleTransitionOverlay.state),
+);
 const activeCycleDefinitions = computed(() =>
   storyCycleDefinitions.filter((cycle) => cycle.label === activeCycleId.value),
 );
@@ -213,9 +260,14 @@ const handleReset = () => {
 };
 
 onMounted(async () => {
+  store.setDebugEnabled(routeDebugEnabled.value);
   await controller.initialize();
   guidedController.initialize();
 });
+watch(
+  () => routeDebugEnabled.value,
+  (enabled) => store.setDebugEnabled(enabled),
+);
 onBeforeUnmount(() => {
   guidedController.dispose();
   controller.dispose();
@@ -238,6 +290,43 @@ onBeforeUnmount(() => {
 .migration-map--gesture-active :deep(.bird-map) {
   filter: saturate(0.7) brightness(0.82);
   pointer-events: none;
+}
+
+.migration-cycle-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-content: center;
+  gap: var(--space-2);
+  color: #ffffff;
+  text-align: center;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 0.56);
+  pointer-events: none;
+}
+
+.migration-cycle-overlay__year {
+  font-size: clamp(2.6rem, 7vw, 5.8rem);
+  font-weight: 800;
+  line-height: 0.95;
+}
+
+.migration-cycle-overlay__meta {
+  font-size: clamp(1rem, 2vw, 1.5rem);
+  font-weight: 700;
+}
+
+.migration-cycle-overlay-enter-active,
+.migration-cycle-overlay-leave-active {
+  transition:
+    opacity 420ms ease,
+    transform 420ms ease;
+}
+
+.migration-cycle-overlay-enter-from,
+.migration-cycle-overlay-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 .migration-avatar,

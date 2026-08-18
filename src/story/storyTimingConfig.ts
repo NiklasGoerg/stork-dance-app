@@ -6,7 +6,7 @@ export type StoryReferenceFastWindow = {
 
 export const STORY_TIMING_CONFIG = {
   cycleDurationMs: 96_000,
-  referenceFastDayWeight: 0.01,
+  referenceFastDayWeight: 0.35,
   referenceNormalDayWeight: 1.0,
   referenceFastWindows: [
     {

@@ -266,6 +266,10 @@
         "armsOut": "Try again. Stretch your arms out to the sides.",
         "lowerArms": "Try again. Bring your arms down as you land.",
         "genericRetry": "Follow the avatar and try the movement again."
+      },
+      "engagement": {
+        "title": "Stay with the journey",
+        "nudge": "Keep moving with the avatar to stay part of the journey."
       }
     },
     "runtime": {
@@ -362,7 +366,234 @@
       "act4": {
         "title": "Act 4 - Changing Cycles",
         "cycleTitle": "Cycle {step}: {startYear}-{endYear}",
-        "cycleNarration": "Follow the {startYear}-{endYear} {wintering} migration cycle."
+        "cycleNarration": "Follow the {startYear}-{endYear} {wintering} migration cycle.",
+        "overlay": {
+          "reference": "Reference Cycle",
+          "cycle": "Cycle {step} of {total}"
+        },
+        "transition": {
+          "label": "Next Cycle"
+        },
+        "narration": {
+          "intro": {
+            "part1": {
+              "title": "Migration Change Over Time",
+              "text": "You know the migration cycle now. This time, we'll follow five real journeys from 2013 to 2023 without tutorial pauses."
+            },
+            "part2": {
+              "title": "What to Notice",
+              "text": "Notice when each phase begins, how long it lasts, and where each stork spends the winter."
+            }
+          },
+          "cycles": {
+            "2013_2014": {
+              "intro": {
+                "title": "2013 to 2014",
+                "text": "We begin again with 2013 to 2014. This time, experience the cycle without the tutorial pauses."
+              },
+              "autumnPrepare": {
+                "title": "Travel South",
+                "text": "Get ready to travel south. This journey will take about {experienceDurationSecondsSpoken} seconds."
+              },
+              "winterReflection1": {
+                "title": "Morocco",
+                "text": "You've reached Morocco. Remember how long that first journey south felt — it will be our reference for the cycles ahead."
+              },
+              "springPrepare": {
+                "title": "Travel North",
+                "text": "Get ready to travel north. The return journey will take about {experienceDurationSecondsSpoken} seconds."
+              },
+              "breedingReflection1": {
+                "title": "Germany",
+                "text": "Back in Germany on May 27. This completes our reference cycle."
+              },
+              "summerTiming": {
+                "title": "Germany",
+                "text": "For this reference cycle, simply notice how long the stork remains in Germany before leaving south."
+              },
+              "winterTiming": {
+                "title": "Winter Timing",
+                "text": "This long winter stay is part of the timing reference you'll compare with the later cycles."
+              }
+            },
+            "2016_2017": {
+              "intro": {
+                "title": "2016 to 2017",
+                "text": "Next: 2016 to 2017."
+              },
+              "autumnPrepare": {
+                "title": "Travel South",
+                "text": "Get ready to travel south — about {experienceDurationSecondsSpoken} seconds this time."
+              },
+              "winterReflection1": {
+                "title": "Morocco",
+                "text": "Back in Morocco — but the journey south was much shorter this time. It took less than three weeks."
+              },
+              "springPrepare": {
+                "title": "Travel North",
+                "text": "Now head north again — about {experienceDurationSecondsSpoken} seconds."
+              },
+              "breedingReflection1": {
+                "title": "Germany",
+                "text": "Back in Germany by March 26 — more than two months earlier than in our reference cycle."
+              },
+              "summerTiming": {
+                "title": "Still in Germany",
+                "text": "By this point, our reference stork had already left Germany. This stork is still here."
+              },
+              "winterTiming": {
+                "title": "Winter Timing",
+                "text": "By mid-September, the stork is already in its wintering area. In our reference cycle, it was still migrating south."
+              }
+            },
+            "2018_2019": {
+              "intro": {
+                "title": "2018 to 2019",
+                "text": "Now: 2018 to 2019."
+              },
+              "autumnPrepare": {
+                "title": "Travel South",
+                "text": "Get ready to travel south — about {experienceDurationSecondsSpoken} seconds."
+              },
+              "winterReflection1": {
+                "title": "Iberian Peninsula",
+                "text": "Something changed this time. The journey ended on the Iberian Peninsula instead of Morocco."
+              },
+              "winterReflection2": {
+                "title": "Closer Wintering",
+                "text": "The stork is now wintering much closer to Germany."
+              },
+              "springPrepare": {
+                "title": "Travel North",
+                "text": "Time to head north — about {experienceDurationSecondsSpoken} seconds."
+              },
+              "breedingReflection1": {
+                "title": "Germany",
+                "text": "Back in Germany on March 13. The return has shifted earlier again."
+              },
+              "summerTiming": {
+                "title": "Still in Germany",
+                "text": "Again, we're past our reference departure point, and the stork is still in Germany."
+              },
+              "winterTiming": {
+                "title": "Winter Timing",
+                "text": "The winter stay begins at almost the same time as in 2016, but much farther north."
+              }
+            },
+            "2020_2021": {
+              "intro": {
+                "title": "2020 to 2021",
+                "text": "Next: 2020 to 2021."
+              },
+              "autumnPrepare": {
+                "title": "Travel South",
+                "text": "Get ready — this journey south will be very short: about {experienceDurationSecondsSpoken} seconds."
+              },
+              "winterReflection1": {
+                "title": "Short Autumn",
+                "text": "That was a remarkably short autumn migration — only six days in the tracking data."
+              },
+              "winterReflection2": {
+                "title": "Iberian Peninsula",
+                "text": "Again, the stork spends the winter on the Iberian Peninsula."
+              },
+              "springPrepare": {
+                "title": "Travel North",
+                "text": "Get ready to return north — about {experienceDurationSecondsSpoken} seconds."
+              },
+              "breedingReflection1": {
+                "title": "Germany",
+                "text": "Back in Germany on February 23. Across this cycle, the two migrations together lasted only 22 days."
+              },
+              "breedingReflection2": {
+                "title": "Reference Comparison",
+                "text": "Compare that with the 129 migration days in our 2013 reference cycle."
+              },
+              "summerTiming": {
+                "title": "Still in Germany",
+                "text": "The previous two cycles had already started south by now. This stork is still in Germany."
+              },
+              "winterTiming": {
+                "title": "Winter Timing",
+                "text": "Despite leaving Germany later, the stork reached its wintering area by the same date as in 2018."
+              }
+            },
+            "2022_2023": {
+              "intro": {
+                "title": "2022 to 2023",
+                "text": "One final cycle: 2022 to 2023."
+              },
+              "autumnPrepare": {
+                "title": "Travel South",
+                "text": "Get ready to travel south — about {experienceDurationSecondsSpoken} seconds."
+              },
+              "winterReflection1": {
+                "title": "Iberian Peninsula",
+                "text": "The autumn journey was a little longer again, but the stork still winters on the Iberian Peninsula."
+              },
+              "springPrepare": {
+                "title": "Travel North",
+                "text": "Already heading north — about {experienceDurationSecondsSpoken} seconds."
+              },
+              "breedingReflection1": {
+                "title": "Germany",
+                "text": "Back in Germany on February 15. This spring migration began in January — the earliest of the five cycles."
+              },
+              "breedingReflection2": {
+                "title": "Not Linear",
+                "text": "The autumn journey became a little longer again, while the return shifted even earlier."
+              },
+              "summerTiming": {
+                "title": "Still in Germany",
+                "text": "We're even later in the year now, and the stork is still in Germany."
+              },
+              "winterTiming": {
+                "title": "Winter Timing",
+                "text": "This time, the winter stay begins later again, after the longer autumn journey."
+              }
+            }
+          },
+          "completed": {
+            "structure": {
+              "title": "Five Journeys",
+              "text": "The annual cycle stayed recognizable, but its timing, duration, and destination changed across these five journeys."
+            },
+            "pattern": {
+              "title": "Observed Pattern",
+              "text": "Later examples included much shorter migrations, wintering closer to Germany, and substantially earlier returns."
+            },
+            "qualification": {
+              "title": "Tracked Examples",
+              "text": "The changes were not identical in every cycle, and these five tracked journeys are individual examples rather than a complete population trend."
+            },
+            "question": {
+              "title": "Open Question",
+              "text": "So what might be shaping these changing journeys?"
+            },
+            "climateTransition": {
+              "title": "Seasonal Environment",
+              "text": "To broaden the picture, let's look at how the seasonal environment has changed over time."
+            }
+          },
+          "transitions": {
+            "2016_2017": {
+              "title": "Next Cycle",
+              "text": "Next: 2016 to 2017."
+            },
+            "2018_2019": {
+              "title": "Next Cycle",
+              "text": "Now we move to 2018 to 2019."
+            },
+            "2020_2021": {
+              "title": "Next Cycle",
+              "text": "Next: 2020 to 2021."
+            },
+            "2022_2023": {
+              "title": "Final Cycle",
+              "text": "One final cycle: 2022 to 2023."
+            }
+          }
+        }
       },
       "act5": {
         "title": "Act 5 - Climate Act",

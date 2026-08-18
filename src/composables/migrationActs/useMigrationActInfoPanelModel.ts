@@ -48,6 +48,8 @@ export const useMigrationActInfoPanelModel = ({
       gestureFeedbackVisible: gestureStore.isEvaluationFeedbackVisible,
       gestureCanContinue: gestureStore.canContinue,
       movementFeedbackVisible: Boolean(store.temporaryMovementFeedbackId),
+      storyNarrationTitle: store.storyNarration.title,
+      storyNarrationText: store.storyNarration.text,
       showDevActions: unref(showDevActions),
       completed: unref(completed),
       showContinueAction: unref(showContinueAction),

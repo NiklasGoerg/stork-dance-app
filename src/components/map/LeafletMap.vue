@@ -48,7 +48,10 @@ import {
 import { useStoryMarkerInterpolation } from "~/composables/useStoryMarkerInterpolation";
 import { useStorkData } from "~/composables/useStorkData";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
-import type { MigrationActMapFrame } from "~/types/migrationAct";
+import type {
+  MigrationActMapFrame,
+  MigrationMapCameraMode,
+} from "~/types/migrationAct";
 import type { StorkDataSource, StorkStoryCycleDefinition } from "~/types/stork";
 import { migrationStoryCycleDefinitions as defaultStoryCycleDefinitions } from "~/utils/migrationStoryData";
 import {
@@ -60,6 +63,8 @@ import { getMigrationTimelineDayAtElapsedMs } from "~/utils/migrationActs/timeli
 type LeafletMapInstance = LeafletRouteMap & {
   remove: () => void;
   invalidateSize: () => void;
+  on: (eventTypes: string, handler: () => void) => void;
+  off: (eventTypes: string, handler: () => void) => void;
 };
 
 type LeafletModule = LeafletRouteModule & {
@@ -88,6 +93,7 @@ const props = withDefaults(
     singleStoryCycleMode?: boolean;
     dataSource?: StorkDataSource;
     playbackSource?: "story-playback" | "migration-runtime";
+    cameraMode?: MigrationMapCameraMode;
   }>(),
   {
     showControls: true,
@@ -97,6 +103,7 @@ const props = withDefaults(
     singleStoryCycleMode: false,
     dataSource: "raw",
     playbackSource: "migration-runtime",
+    cameraMode: "migration",
   },
 );
 const emit = defineEmits<{
@@ -186,13 +193,129 @@ const interpolationTimeline = computed(() => {
     : [];
 });
 
+const currentTimelineDay = computed(() =>
+  usesMigrationRuntime.value
+    ? getMigrationTimelineDayAtElapsedMs(
+        interpolationTimeline.value,
+        currentElapsedMs.value,
+      )
+    : getWeightedStoryTimelineDayAtElapsedMs(
+        interpolationTimeline.value,
+        currentElapsedMs.value,
+      ),
+);
+
+const semanticCameraConfig = {
+  migration: {
+    bounds: [
+      [31.5, -8.5],
+      [53, 13],
+    ] as Array<[number, number]>,
+    center: [42.25, 2.25] as [number, number],
+    padding: [12, 12] as [number, number],
+    zoom: 6,
+    maxZoom: 8,
+  },
+  residence: {
+    padding: [80, 80] as [number, number],
+    maxZoom: 7,
+  },
+};
+
+let lastSemanticCameraKey = "";
+let markerRefreshFrame = 0;
+
+function scheduleStoryMarkerRefresh() {
+  if (selectedMapMode.value !== "story") return;
+
+  if (markerRefreshFrame) {
+    cancelAnimationFrame(markerRefreshFrame);
+  }
+
+  markerRefreshFrame = requestAnimationFrame(() => {
+    markerRefreshFrame = 0;
+    storyMarkerInterpolation.updateImmediately();
+  });
+}
+
+const handleMapViewportChanged = () => {
+  scheduleStoryMarkerRefresh();
+};
+
+const getActiveResidencePoints = () => {
+  const route = interpolationRoute.value;
+  const day = currentTimelineDay.value;
+
+  if (!route || !day) return [];
+
+  return route.points.filter(
+    (point) => point.story?.phase === day.phase && point.story?.isRestDay,
+  );
+};
+
+const fitCameraToPoints = (
+  points: Array<{ lat: number; lng: number }>,
+  options: { maxZoom: number; padding: [number, number]; animate: boolean },
+) => {
+  if (!map.value || !leaflet.value || !points.length) return;
+
+  map.value.stop?.();
+
+  if (points.length === 1) {
+    map.value.setView?.([points[0]!.lat, points[0]!.lng], options.maxZoom, {
+      animate: options.animate,
+    });
+    return;
+  }
+
+  const boundsLine = leaflet.value.polyline(
+    points.map((point) => [point.lat, point.lng]),
+    {},
+  );
+  map.value.fitBounds(boundsLine.getBounds(), options);
+};
+
+const getSemanticCameraKey = () => {
+  const day = currentTimelineDay.value;
+  const route = interpolationRoute.value;
+
+  if (!usesMigrationRuntime.value || selectedMapMode.value !== "story") {
+    return "";
+  }
+
+  return props.cameraMode === "migration"
+    ? `${route?.id ?? "none"}:migration`
+    : `${route?.id ?? "none"}:residence:${day?.phase ?? "none"}`;
+};
+
+const applySemanticCamera = (animate = true, force = false) => {
+  if (!usesMigrationRuntime.value || selectedMapMode.value !== "story") return;
+
+  const cameraKey = getSemanticCameraKey();
+  if (!force && cameraKey && cameraKey === lastSemanticCameraKey) return;
+  lastSemanticCameraKey = cameraKey;
+
+  if (props.cameraMode === "migration") {
+    const config = semanticCameraConfig.migration;
+    map.value?.stop?.();
+    map.value?.setView?.(config.center, config.zoom, { animate });
+    scheduleStoryMarkerRefresh();
+    return;
+  }
+
+  const config = semanticCameraConfig.residence;
+  fitCameraToPoints(getActiveResidencePoints(), {
+    padding: config.padding,
+    maxZoom: config.maxZoom,
+    animate,
+  });
+  scheduleStoryMarkerRefresh();
+};
+
 const getStoryMarkerFrame = () => {
   const route = interpolationRoute.value;
-  const timeline = interpolationTimeline.value;
   const elapsedMs = migrationActStore.currentElapsedMs;
-  const currentDay = usesMigrationRuntime.value
-    ? getMigrationTimelineDayAtElapsedMs(timeline, elapsedMs)
-    : getWeightedStoryTimelineDayAtElapsedMs(timeline, elapsedMs);
+  const currentDay = currentTimelineDay.value;
 
   if (!route || !currentDay) return null;
 
@@ -208,6 +331,11 @@ const getStoryMarkerFrame = () => {
         date: currentPoint.date,
         phase: currentDay.phase,
         event: currentDay.event,
+        markerLatLng: {
+          lat: currentPoint.lat,
+          lng: currentPoint.lng,
+        },
+        cameraReady: Boolean(map.value),
       });
     }
   }
@@ -347,6 +475,7 @@ onMounted(() => {
       attributionControl: true,
     });
     map.value = leafletMap;
+    leafletMap.on("zoomend moveend viewreset resize", handleMapViewportChanged);
 
     leafletModule
       .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -360,6 +489,7 @@ onMounted(() => {
     requestAnimationFrame(() => {
       leafletMap.invalidateSize();
       renderCurrentMode();
+      applySemanticCamera(false, true);
       storyMarkerInterpolation.updateImmediately();
     });
   };
@@ -412,6 +542,8 @@ watch(
   () => {
     configureStoryMode();
     renderCurrentMode();
+    applySemanticCamera(true, true);
+    scheduleStoryMarkerRefresh();
   },
 );
 
@@ -420,6 +552,8 @@ watch(
   () => {
     configureStoryMode();
     renderCurrentMode();
+    applySemanticCamera(true, true);
+    scheduleStoryMarkerRefresh();
   },
 );
 
@@ -432,6 +566,8 @@ watch(
   ],
   () => {
     renderCurrentMode();
+    applySemanticCamera(true, true);
+    scheduleStoryMarkerRefresh();
   },
 );
 
@@ -464,8 +600,14 @@ watch(seekRevision, () => {
 
 watch([playbackSessionId, activeCycleId, cycleDurationMs], () => {
   lastEmittedStoryFrameKey = "";
+  lastSemanticCameraKey = "";
   renderCurrentMode();
+  applySemanticCamera(false, true);
   storyMarkerInterpolation.updateImmediately();
+});
+
+watch(getSemanticCameraKey, () => {
+  applySemanticCamera();
 });
 
 watch(selectedRoutePoint, (point) => {
@@ -484,11 +626,20 @@ watch([storyTimelinePoints, showStoryCyclesTogether], () => {
   if (selectedMapMode.value !== "story") return;
 
   renderCurrentMode();
+  scheduleStoryMarkerRefresh();
 });
 
 onBeforeUnmount(() => {
+  if (markerRefreshFrame) {
+    cancelAnimationFrame(markerRefreshFrame);
+    markerRefreshFrame = 0;
+  }
   storyMarkerInterpolation.stop();
   map.value?.stop?.();
+  map.value?.off?.(
+    "zoomend moveend viewreset resize",
+    handleMapViewportChanged,
+  );
   clearRoute(map.value);
   map.value?.remove();
   map.value = null;

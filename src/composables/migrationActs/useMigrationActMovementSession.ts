@@ -31,6 +31,7 @@ import {
   resolveGestureCountdownSourceTime,
 } from "~/utils/migrationActs/migrationMovementDefinitions";
 import { normalizeMovementRecordingToViewport } from "~/utils/movementFrames";
+import { resolveNextGuidedBarBoundary } from "~/utils/act2/guidedTiming";
 
 type MovementLoadTiming = { start: number; end: number };
 type GestureStartOptions = {
@@ -41,6 +42,7 @@ type GestureStartOptions = {
   onCountdown?: (count: number) => void;
   onHandoverStart?: () => void;
   onAttemptStart?: () => void;
+  autoProgressEnabled?: () => boolean;
 };
 
 const sampleBufferDurationMs = 2_000;
@@ -90,6 +92,7 @@ export const useMigrationActMovementSession = () => {
   let handoverStarted = false;
   let onHandoverStart: (() => void) | null = null;
   let onAttemptStart: (() => void) | null = null;
+  let isAutoProgressEnabled: (() => boolean) | null = null;
   let attemptBeat1TransportMs: number | null = null;
   let baselineCollectionStartMs: number | null = null;
   let baselineCollectionEndMs: number | null = null;
@@ -145,6 +148,7 @@ export const useMigrationActMovementSession = () => {
       | "onCountdown"
       | "onHandoverStart"
       | "onAttemptStart"
+      | "autoProgressEnabled"
     > = {},
   ) => {
     resetAttemptData();
@@ -158,6 +162,7 @@ export const useMigrationActMovementSession = () => {
     );
     onHandoverStart = options.onHandoverStart ?? null;
     onAttemptStart = options.onAttemptStart ?? null;
+    isAutoProgressEnabled = options.autoProgressEnabled ?? null;
     store.setSessionState({
       state: "waiting-for-lead-in",
       countdownNumber: null,
@@ -282,9 +287,11 @@ export const useMigrationActMovementSession = () => {
           checkpointEvaluations,
         );
     result.id = `${result.id}-${store.startedAt ?? 0}`;
+    const beatDurationMs = audio.getBeatDurationMs();
     segmentStartTransportMs =
       result.status === "success"
-        ? transportTimeMs
+        ? resolveNextGuidedBarBoundary(transportTimeMs, beatDurationMs, true) -
+          beatDurationMs
         : transportTimeMs + audio.getMsUntilNextBaseRhythmBeat(1);
     store.setSessionState({
       state: result.status === "success" ? "success-exit" : "retry-scheduled",
@@ -457,7 +464,7 @@ export const useMigrationActMovementSession = () => {
       evaluateClosedCheckpoints(sourceTimeMs);
       if (sourceTimeMs >= definition.attemptEndSourceTimeMs) {
         evaluateClosedCheckpoints(Number.POSITIVE_INFINITY);
-        showResult(transportTimeMs);
+        showResult(transportTimeMs, isAutoProgressEnabled?.() === true);
       }
     } else if (store.state === "success-exit") {
       if (transportTimeMs - segmentStartTransportMs >= beatDurationMs) {
@@ -506,6 +513,7 @@ export const useMigrationActMovementSession = () => {
     onCountdown = null;
     onHandoverStart = null;
     onAttemptStart = null;
+    isAutoProgressEnabled = null;
     return result;
   };
 

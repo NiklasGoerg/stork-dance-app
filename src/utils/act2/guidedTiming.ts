@@ -35,6 +35,19 @@ export const resolveNextGuidedBarBoundary = (
   return normalizedMs + (barMs - remainder || barMs);
 };
 
+export const resolvePreviousGuidedBarBoundary = (
+  transportMs: number,
+  beatDurationMs = 1_000,
+  includeCurrent = false,
+) => {
+  const barMs = Math.max(1, beatDurationMs) * 4;
+  const normalizedMs = Math.max(0, transportMs);
+  const remainder = normalizedMs % barMs;
+
+  if (includeCurrent && remainder <= 40) return normalizedMs - remainder;
+  return Math.max(0, normalizedMs - remainder - (remainder <= 40 ? barMs : 0));
+};
+
 export const resolveGuidedMovementSourceTime = ({
   transportMs,
   ownerStartedAtMs,

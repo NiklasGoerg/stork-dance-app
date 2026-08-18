@@ -26,12 +26,16 @@ export const logPreparedStoryTimelineDiagnosticOnce = (
     referenceFastDayCount: diagnostic.referenceFastDayCount,
     referenceNormalDayCount: diagnostic.referenceNormalDayCount,
     referenceTotalWeight: diagnostic.referenceTotalWeight,
-    migrationDayDurationMs: diagnostic.migrationDayDurationMs,
-    restDayDurationMs: diagnostic.restDayDurationMs,
+    normalDayDurationMs: diagnostic.normalDayDurationMs,
+    referenceFastDayDurationMs: diagnostic.referenceFastDayDurationMs,
     migrationBudgetMs: diagnostic.migrationBudgetMs,
     restBudgetMs: diagnostic.restBudgetMs,
     firstTimelineDate: diagnostic.firstTimelineDate,
     lastTimelineDate: diagnostic.lastTimelineDate,
   });
   console.info("[StoryTiming] Planned phase durations", diagnostic.phases);
+  console.info(
+    "[StoryTiming] Residence phase rows",
+    diagnostic.phases.filter((phase) => phase.uniformSecondsPerDay !== null),
+  );
 };

@@ -40,7 +40,10 @@
       </button>
     </div>
 
-    <div v-if="allowSingleCycle" class="migration-act-controls__cycles">
+    <div
+      v-if="allowSingleCycle && isDebugMode"
+      class="migration-act-controls__cycles"
+    >
       <button
         v-for="cycle in cycleRuns"
         :key="cycle.id"
@@ -59,6 +62,23 @@
       >
         {{ getMigrationCycleButtonLabel(cycle) }}
       </button>
+      <button
+        class="migration-act-controls__auto-toggle"
+        type="button"
+        :class="{
+          'migration-act-controls__auto-toggle--active': isAutoProgressEnabled,
+        }"
+        :aria-pressed="isAutoProgressEnabled"
+        @click="$emit('toggle-auto-progress')"
+      >
+        <span
+          class="migration-act-controls__auto-toggle-track"
+          aria-hidden="true"
+        >
+          <span class="migration-act-controls__auto-toggle-thumb" />
+        </span>
+        <span>Auto Progress: {{ isAutoProgressEnabled ? "ON" : "OFF" }}</span>
+      </button>
     </div>
 
     <dl class="migration-act-controls__status">
@@ -75,6 +95,17 @@
         <dd>{{ activeCycleLabel }}</dd>
       </div>
     </dl>
+
+    <button
+      v-if="showDebugToggle"
+      class="migration-act-controls__debug-toggle"
+      type="button"
+      :class="{ 'migration-act-controls__debug-toggle--active': isDebugMode }"
+      :aria-pressed="isDebugMode"
+      @click="$emit('toggle-debug')"
+    >
+      Debug
+    </button>
   </section>
 </template>
 
@@ -94,9 +125,19 @@ withDefaults(
     allowSingleCycle: boolean;
     showStoryAction?: boolean;
     showResetAction?: boolean;
+    showDebugToggle?: boolean;
+    isDebugMode?: boolean;
+    isAutoProgressEnabled?: boolean;
     actions?: readonly MigrationInfoPanelAction[];
   }>(),
-  { showStoryAction: true, showResetAction: true, actions: () => [] },
+  {
+    showStoryAction: true,
+    showResetAction: true,
+    showDebugToggle: false,
+    isDebugMode: false,
+    isAutoProgressEnabled: false,
+    actions: () => [],
+  },
 );
 
 const emit = defineEmits<{
@@ -106,6 +147,8 @@ const emit = defineEmits<{
   resume: [];
   reset: [];
   action: [actionId: MigrationInfoPanelActionId];
+  "toggle-debug": [];
+  "toggle-auto-progress": [];
 }>();
 
 const store = useMigrationActStore();
@@ -164,7 +207,7 @@ const onPlaybackToggle = () => {
 <style scoped>
 .migration-act-controls {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto max-content;
   align-items: center;
   gap: var(--space-3);
 }
@@ -191,6 +234,82 @@ const onPlaybackToggle = () => {
 .migration-act-controls__cycle--active {
   border-color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 14%, white);
+}
+
+.migration-act-controls__auto-toggle {
+  flex: 0 0 auto;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid rgb(31 49 39 / 18%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 72%);
+  color: var(--color-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.migration-act-controls__auto-toggle--active {
+  border-color: color-mix(in srgb, var(--color-primary) 42%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 18%, white);
+  color: var(--color-primary);
+}
+
+.migration-act-controls__auto-toggle-track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgb(31 49 39 / 22%);
+  transition: background 140ms ease;
+}
+
+.migration-act-controls__auto-toggle--active
+  .migration-act-controls__auto-toggle-track {
+  background: var(--color-primary);
+}
+
+.migration-act-controls__auto-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(31 49 39 / 22%);
+  transition: transform 140ms ease;
+}
+
+.migration-act-controls__auto-toggle--active
+  .migration-act-controls__auto-toggle-thumb {
+  transform: translateX(12px);
+}
+
+.migration-act-controls__debug-toggle {
+  justify-self: end;
+  min-height: 34px;
+  padding: 5px 10px;
+  border: 1px solid rgb(31 49 39 / 18%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 66%);
+  color: color-mix(in srgb, var(--color-text) 68%, transparent);
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.migration-act-controls__debug-toggle--active {
+  border-color: color-mix(in srgb, var(--color-text) 36%, transparent);
+  background: color-mix(in srgb, var(--color-text) 92%, black);
+  color: #ffffff;
 }
 
 .migration-act-controls__status {

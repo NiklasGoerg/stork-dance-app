@@ -3,7 +3,10 @@ import { useMovementPlayback } from "~/composables/useMovementPlayback";
 import type { ResolvedMigrationMovement } from "~/types/migrationAct";
 import type { MovementRecording } from "~/types/movement";
 import { normalizeMovementRecordingToViewport } from "~/utils/movementFrames";
-import { migrationMovementRecognitionConfig } from "~/utils/migrationActs/migrationMovementConfig";
+import {
+  migrationMovementConfig,
+  migrationMovementRecognitionConfig,
+} from "~/utils/migrationActs/migrationMovementConfig";
 import {
   getMovementRecordingDurationMs,
   resolveMovementPlaybackPosition,
@@ -12,6 +15,19 @@ import {
 const movementLoaders = import.meta.glob<MovementRecording>(
   "../../assets/movement_library/migration/*.json",
   { import: "default" },
+);
+
+const knownMigrationMovementIds = Array.from(
+  new Set([
+    migrationMovementConfig.summerRest.movementId,
+    migrationMovementConfig.winterRest.movementId,
+    ...Object.values(migrationMovementConfig.outbound).map(
+      (slot) => slot.movementId,
+    ),
+    ...Object.values(migrationMovementConfig.return).map(
+      (slot) => slot.movementId,
+    ),
+  ]),
 );
 
 export const useMigrationActMovement = () => {
@@ -90,6 +106,22 @@ export const useMigrationActMovement = () => {
 
   const preload = async (movement: ResolvedMigrationMovement) =>
     Boolean(await loadMovement(movement.movementId));
+
+  const preloadAll = async () => {
+    const results = await Promise.all(
+      knownMigrationMovementIds.map((movementId) => loadMovement(movementId)),
+    );
+
+    return results.every(Boolean);
+  };
+
+  const isMovementReady = (movementId: string) =>
+    cachedRecordings.has(movementId);
+
+  const isActiveMovementReady = (movementId: string) =>
+    resolvedMovement.value?.movementId === movementId &&
+    movementLoaded.value &&
+    isMovementReady(movementId);
 
   const select = (movement: ResolvedMigrationMovement | null) => {
     if (resolvedMovement.value?.movementId === movement?.movementId) {
@@ -245,6 +277,9 @@ export const useMigrationActMovement = () => {
     recognitionEnabled,
     select,
     preload,
+    preloadAll,
+    isMovementReady,
+    isActiveMovementReady,
     activate,
     start,
     tick,

@@ -179,6 +179,8 @@ export const buildMigrationActInfoPanelModel = ({
   gestureFeedbackVisible,
   gestureCanContinue,
   movementFeedbackVisible,
+  storyNarrationTitle,
+  storyNarrationText,
   showDevActions,
   completed,
   showContinueAction,
@@ -197,6 +199,8 @@ export const buildMigrationActInfoPanelModel = ({
   gestureFeedbackVisible: boolean;
   gestureCanContinue: boolean;
   movementFeedbackVisible: boolean;
+  storyNarrationTitle?: string;
+  storyNarrationText?: string;
   showDevActions: boolean;
   completed: boolean;
   showContinueAction: boolean;
@@ -339,6 +343,17 @@ export const buildMigrationActInfoPanelModel = ({
       title: translate("story.acts.act5.movementText.good"),
       instruction: translate(metadata.instructionKey),
       tone: "success",
+      movements,
+      actions: [],
+    };
+  }
+
+  if (storyNarrationTitle || storyNarrationText) {
+    return {
+      mode: "storyNarration",
+      title: storyNarrationTitle ?? translate(metadata.labelKey),
+      instruction: storyNarrationText,
+      tone: "neutral",
       movements,
       actions: [],
     };

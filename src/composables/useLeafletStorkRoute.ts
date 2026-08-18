@@ -29,6 +29,11 @@ export type LeafletRouteMap = {
   stop?: () => void;
   invalidateSize?: () => void;
   removeLayer: (layer: LeafletRouteLayer) => void;
+  setView?: (
+    center: LatLng,
+    zoom: number,
+    options?: { animate?: boolean },
+  ) => void;
   fitBounds: (
     bounds: unknown,
     options?: {

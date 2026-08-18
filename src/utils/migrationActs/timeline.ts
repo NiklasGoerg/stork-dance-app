@@ -83,5 +83,10 @@ export const getMigrationMapFrame = (
     date: point.date,
     phase: day.phase,
     event: day.event,
+    markerLatLng: {
+      lat: point.lat,
+      lng: point.lng,
+    },
+    cameraReady: true,
   };
 };

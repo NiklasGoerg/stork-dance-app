@@ -13,6 +13,7 @@ let metronomeTimer: ReturnType<typeof setInterval> | null = null;
 let baseRhythmBuffer: AudioBuffer | null = null;
 let baseRhythmLoadPromise: Promise<void> | null = null;
 let baseRhythmSource: AudioBufferSourceNode | null = null;
+let baseRhythmGain: GainNode | null = null;
 let baseRhythmStartedAtSeconds = 0;
 let baseRhythmStartOffsetSeconds = 0;
 let seasonalAudioSource: AudioBufferSourceNode | null = null;
@@ -71,8 +72,10 @@ const stopBaseRhythmSource = () => {
   if (!baseRhythmSource) return;
 
   const source = baseRhythmSource;
+  const gain = baseRhythmGain;
 
   baseRhythmSource = null;
+  baseRhythmGain = null;
   source.onended = null;
 
   try {
@@ -82,6 +85,7 @@ const stopBaseRhythmSource = () => {
   }
 
   source.disconnect();
+  gain?.disconnect();
 };
 
 const stopSeasonalAudioSource = () => {
@@ -399,15 +403,19 @@ export const useAudioStore = defineStore("audio", {
 
       const offset = normalizeLoopOffset(offsetSeconds, loopDurationSeconds);
       const source = context.createBufferSource();
+      const gain = context.createGain();
 
       source.buffer = baseRhythmBuffer;
       source.loop = true;
       source.loopStart = 0;
       source.loopEnd = loopDurationSeconds;
-      source.connect(context.destination);
+      gain.gain.setValueAtTime(1, context.currentTime);
+      source.connect(gain);
+      gain.connect(context.destination);
       source.start(0, offset);
 
       baseRhythmSource = source;
+      baseRhythmGain = gain;
       baseRhythmStartedAtSeconds = context.currentTime;
       baseRhythmStartOffsetSeconds = offset;
       this.baseRhythmLoop.currentOffsetSeconds = offset;
@@ -435,6 +443,39 @@ export const useAudioStore = defineStore("audio", {
     },
     resetBaseRhythmLoop() {
       this.stopBaseRhythmLoop();
+    },
+    fadeOutBaseRhythmLoop(durationSeconds = 4) {
+      const context = getSharedAudioContext();
+      const source = baseRhythmSource;
+      const gain = baseRhythmGain;
+
+      if (!context || !source || !gain || !this.baseRhythmLoop.isPlaying) {
+        this.stopBaseRhythmLoop();
+        return;
+      }
+
+      const fadeSeconds = Math.max(0, durationSeconds);
+      if (fadeSeconds === 0) {
+        this.stopBaseRhythmLoop();
+        return;
+      }
+
+      this.syncBaseRhythmLoopOffset();
+      const now = context.currentTime;
+      const endTime = now + fadeSeconds;
+
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0, endTime);
+      source.stop(endTime);
+      source.onended = () => {
+        if (baseRhythmSource !== source) return;
+        stopBaseRhythmSource();
+        this.baseRhythmLoop.isPlaying = false;
+        this.baseRhythmLoop.currentOffsetSeconds = 0;
+        baseRhythmStartedAtSeconds = 0;
+        baseRhythmStartOffsetSeconds = 0;
+      };
     },
     async startSeasonalAudio(
       cue: { id: string; url: string },

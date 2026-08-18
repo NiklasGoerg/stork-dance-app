@@ -69,6 +69,8 @@ export type StoryTimelineDay = {
   event: StorkMigrationEvent | null;
   referenceWeight: number;
   timingClass: StoryTimelineTimingClass;
+  canonicalStartMs: number;
+  canonicalEndMs: number;
   dayDurationMs: number;
   startMs: number;
   endMs: number;
@@ -333,6 +335,36 @@ const clampStoryDateToCycle = (
 const isValidSegment = (startDate: string, endDate: string) =>
   startDate < endDate;
 
+const getSharedStoryReferenceTotalWeight = (cycleStartDate: string) =>
+  Array.from({ length: 365 }, (_, index) =>
+    getStoryReferenceWeight(addStoryDays(cycleStartDate, index)),
+  ).reduce((sum, weight) => sum + weight, 0);
+
+type StoryTimelineInput = {
+  point: StorkDataPoint;
+  story: NonNullable<StorkDataPoint["story"]>;
+  referenceWeight: number;
+  canonicalStartMs: number;
+  canonicalEndMs: number;
+};
+
+const findResidenceSegmentEndIndex = (
+  timingInputs: StoryTimelineInput[],
+  startIndex: number,
+) => {
+  const phase = timingInputs[startIndex]?.story.phase;
+  let endIndex = startIndex;
+
+  while (
+    timingInputs[endIndex + 1]?.story.isRestDay &&
+    timingInputs[endIndex + 1]?.story.phase === phase
+  ) {
+    endIndex++;
+  }
+
+  return endIndex;
+};
+
 export const getCycleSegments = (
   cycle: StorkStoryCycleDefinition | null | undefined,
   cycleStart: StoryDateInput,
@@ -482,62 +514,78 @@ export const buildPreparedStoryTimeline = (
     };
   });
 
-  const migrationDayCount = timingInputs.filter(
-    ({ story }) => story.isMigrationDay,
-  ).length;
-  const restDayCount = timingInputs.length - migrationDayCount;
-  if (restDayCount <= 0) {
-    throw new Error(
-      `Story cycle ${cycleId} must contain at least one rest day.`,
-    );
-  }
-
-  const referenceTotalWeight = timingInputs.reduce(
-    (sum, day) => sum + day.referenceWeight,
-    0,
+  const referenceTotalWeight = getSharedStoryReferenceTotalWeight(
+    firstPoint.date,
   );
-  const migrationDayDurationMs = cycleDurationMs / referenceTotalWeight;
-  const migrationBudgetMs = migrationDayCount * migrationDayDurationMs;
-  const restBudgetMs = cycleDurationMs - migrationBudgetMs;
-
-  if (restBudgetMs <= 0) {
-    throw new Error(
-      `Story cycle ${cycleId} has no positive rest budget: ${restBudgetMs} ms.`,
-    );
-  }
-
-  const baseRestBudgetMs = timingInputs.reduce(
-    (sum, day) =>
-      day.story.isRestDay
-        ? sum + migrationDayDurationMs * day.referenceWeight
-        : sum,
-    0,
-  );
-  const budgetToleranceMs = Math.max(1e-7, cycleDurationMs * 1e-10);
-  if (Math.abs(restBudgetMs - baseRestBudgetMs) > budgetToleranceMs) {
-    throw new Error(
-      `Story cycle ${cycleId} has inconsistent rest budgets: remaining=${restBudgetMs} ms, ` +
-        `reference=${baseRestBudgetMs} ms.`,
-    );
-  }
-
-  const restDayDurationMs = restBudgetMs / restDayCount;
-  let cursorMs = 0;
-
-  return timingInputs.map(({ point, story, referenceWeight }, index) => {
-    const startMs = cursorMs;
-    const plannedDayDurationMs = story.isMigrationDay
-      ? migrationDayDurationMs
-      : restDayDurationMs;
-    const endMs =
+  const normalDayDurationMs = cycleDurationMs / referenceTotalWeight;
+  let canonicalCursorMs = 0;
+  const canonicalInputs = timingInputs.map((input, index) => {
+    const canonicalStartMs = canonicalCursorMs;
+    const plannedDayDurationMs = normalDayDurationMs * input.referenceWeight;
+    const canonicalEndMs =
       index === timingInputs.length - 1
         ? cycleDurationMs
-        : startMs + plannedDayDurationMs;
-    const dayDurationMs = endMs - startMs;
+        : canonicalStartMs + plannedDayDurationMs;
 
-    cursorMs = endMs;
+    canonicalCursorMs = canonicalEndMs;
 
     return {
+      ...input,
+      canonicalStartMs,
+      canonicalEndMs,
+    };
+  });
+
+  const timeline: StoryTimelineDay[] = [];
+  let cursorMs = 0;
+
+  for (let index = 0; index < canonicalInputs.length; index++) {
+    const input = canonicalInputs[index]!;
+    const { point, story, referenceWeight } = input;
+
+    if (story.isRestDay) {
+      const endIndex = findResidenceSegmentEndIndex(canonicalInputs, index);
+      const segment = canonicalInputs.slice(index, endIndex + 1);
+      const segmentDurationMs =
+        segment.at(-1)!.canonicalEndMs - segment[0]!.canonicalStartMs;
+      const uniformDayDurationMs = segmentDurationMs / segment.length;
+
+      for (const [segmentIndex, segmentInput] of segment.entries()) {
+        const segmentStartMs = cursorMs;
+        const segmentEndMs =
+          segmentIndex === segment.length - 1
+            ? segmentInput.canonicalEndMs
+            : segmentStartMs + uniformDayDurationMs;
+
+        timeline.push({
+          date: segmentInput.point.date,
+          relativeDay: segmentInput.story.relativeDay,
+          phase: segmentInput.story.phase,
+          isMigrationDay: segmentInput.story.isMigrationDay,
+          isRestDay: segmentInput.story.isRestDay,
+          event: segmentInput.story.event,
+          referenceWeight: segmentInput.referenceWeight,
+          timingClass: "rest",
+          canonicalStartMs: segmentInput.canonicalStartMs,
+          canonicalEndMs: segmentInput.canonicalEndMs,
+          dayDurationMs: segmentEndMs - segmentStartMs,
+          startMs: segmentStartMs,
+          endMs: segmentEndMs,
+        });
+        cursorMs = segmentEndMs;
+      }
+
+      index = endIndex;
+      continue;
+    }
+
+    const startMs = cursorMs;
+    const endMs =
+      index === canonicalInputs.length - 1
+        ? cycleDurationMs
+        : input.canonicalEndMs;
+
+    timeline.push({
       date: point.date,
       relativeDay: story.relativeDay,
       phase: story.phase,
@@ -545,19 +593,29 @@ export const buildPreparedStoryTimeline = (
       isRestDay: story.isRestDay,
       event: story.event,
       referenceWeight,
-      timingClass: story.isMigrationDay ? "migration" : "rest",
-      dayDurationMs,
+      timingClass: "migration",
+      canonicalStartMs: input.canonicalStartMs,
+      canonicalEndMs: input.canonicalEndMs,
+      dayDurationMs: endMs - startMs,
       startMs,
       endMs,
-    };
-  });
+    });
+    cursorMs = endMs;
+  }
+
+  return timeline;
 };
 
 export type StoryTimelinePhaseDiagnostic = {
+  cycleId: string;
   phase: StorkMigrationPhase;
   startDate: string;
   endDate: string;
+  canonicalStartSeconds: number;
+  canonicalEndSeconds: number;
+  anchoredDurationSeconds: number;
   dayCount: number;
+  uniformSecondsPerDay: number | null;
   plannedDurationMs: number;
 };
 
@@ -569,9 +627,8 @@ export type StoryTimelineDiagnostic = {
   referenceFastDayCount: number;
   referenceNormalDayCount: number;
   referenceTotalWeight: number;
-  migrationDayDurationMs: number;
+  normalDayDurationMs: number;
   referenceFastDayDurationMs: number;
-  restDayDurationMs: number;
   migrationBudgetMs: number;
   restBudgetMs: number;
   firstTimelineDate: string;
@@ -593,6 +650,10 @@ export const getPreparedStoryTimelineDiagnostic = (
 
   const migrationDays = timeline.filter((day) => day.isMigrationDay);
   const restDays = timeline.filter((day) => day.isRestDay);
+  const cycleDurationMs = lastDay.endMs;
+  const referenceTotalWeight = getSharedStoryReferenceTotalWeight(
+    firstDay.date,
+  );
   const referenceFastDayCount = timeline.filter(
     (day) => day.referenceWeight === STORY_TIMING_CONFIG.referenceFastDayWeight,
   ).length;
@@ -604,12 +665,27 @@ export const getPreparedStoryTimelineDiagnostic = (
       current.endDate = day.date;
       current.dayCount++;
       current.plannedDurationMs += day.dayDurationMs;
+      current.canonicalEndSeconds = day.canonicalEndMs / 1_000;
+      current.anchoredDurationSeconds =
+        current.canonicalEndSeconds - current.canonicalStartSeconds;
+      current.uniformSecondsPerDay =
+        day.isRestDay && current.dayCount > 0
+          ? current.anchoredDurationSeconds / current.dayCount
+          : null;
     } else {
       phases.push({
+        cycleId,
         phase: day.phase,
         startDate: day.date,
         endDate: day.date,
+        canonicalStartSeconds: day.canonicalStartMs / 1_000,
+        canonicalEndSeconds: day.canonicalEndMs / 1_000,
+        anchoredDurationSeconds:
+          (day.canonicalEndMs - day.canonicalStartMs) / 1_000,
         dayCount: 1,
+        uniformSecondsPerDay: day.isRestDay
+          ? (day.canonicalEndMs - day.canonicalStartMs) / 1_000
+          : null,
         plannedDurationMs: day.dayDurationMs,
       });
     }
@@ -617,7 +693,7 @@ export const getPreparedStoryTimelineDiagnostic = (
 
   return {
     cycleId,
-    cycleDurationMs: lastDay.endMs,
+    cycleDurationMs,
     migrationDayCount: migrationDays.length,
     restDayCount: restDays.length,
     referenceFastDayCount,
@@ -626,11 +702,10 @@ export const getPreparedStoryTimelineDiagnostic = (
       (sum, day) => sum + day.referenceWeight,
       0,
     ),
-    migrationDayDurationMs: migrationDays[0]?.dayDurationMs ?? 0,
+    normalDayDurationMs: cycleDurationMs / referenceTotalWeight,
     referenceFastDayDurationMs:
-      (migrationDays[0]?.dayDurationMs ?? 0) *
+      (cycleDurationMs / referenceTotalWeight) *
       STORY_TIMING_CONFIG.referenceFastDayWeight,
-    restDayDurationMs: restDays[0]?.dayDurationMs ?? 0,
     migrationBudgetMs: migrationDays.reduce(
       (sum, day) => sum + day.dayDurationMs,
       0,

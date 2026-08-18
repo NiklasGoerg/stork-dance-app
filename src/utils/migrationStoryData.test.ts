@@ -6,7 +6,13 @@ import {
   migrationStoryPoints,
   parseMigrationStoryCsv,
 } from "~/utils/migrationStoryData";
-import { buildPreparedStoryTimeline } from "~/utils/storyCycle";
+import {
+  buildPreparedStoryTimeline,
+  getPreparedStoryTimelineDiagnostic,
+  getWeightedStoryTimelineElapsedMsForDate,
+  STORY_CYCLE_DURATION_MS,
+} from "~/utils/storyCycle";
+import { getStoryReferenceWeight } from "~/story/storyTimingConfig";
 
 describe("migration story preprocessing output", () => {
   it("contains exactly the five curated cycles", () => {
@@ -184,5 +190,133 @@ describe("migration story preprocessing output", () => {
     expect(beforeDeparture?.timingClass).toBe("rest");
     expect(departure?.phase).toBe("autumn_migration");
     expect(departure?.timingClass).toBe("migration");
+  });
+
+  const getCanonicalElapsedMsByDate = (cycleStartDate: string) => {
+    const totalWeight = Array.from({ length: 365 }, (_, index) => {
+      const date = new Date(`${cycleStartDate}T00:00:00.000Z`);
+      date.setUTCDate(date.getUTCDate() + index);
+      return getStoryReferenceWeight(date);
+    }).reduce((sum, weight) => sum + weight, 0);
+    const normalDayDurationMs = STORY_CYCLE_DURATION_MS / totalWeight;
+    const result = new Map<string, number>();
+    let cursorMs = 0;
+
+    for (let index = 0; index < 365; index++) {
+      const date = new Date(`${cycleStartDate}T00:00:00.000Z`);
+      date.setUTCDate(date.getUTCDate() + index);
+      result.set(date.toISOString().slice(0, 10), cursorMs);
+      cursorMs += normalDayDurationMs * getStoryReferenceWeight(date);
+    }
+
+    return result;
+  };
+
+  it("anchors each residence to the canonical weighted map and paces its days uniformly", () => {
+    for (const cycle of migrationStoryCycleDefinitions) {
+      const points = getMigrationStoryCyclePoints(cycle.label);
+      const timeline = buildPreparedStoryTimeline(points);
+      const canonicalElapsedMsByDate = getCanonicalElapsedMsByDate(
+        `${cycle.targetYear}-06-01`,
+      );
+
+      expect(timeline[0]?.startMs).toBe(0);
+      expect(timeline.at(-1)?.endMs).toBe(STORY_CYCLE_DURATION_MS);
+
+      let index = 0;
+      while (index < timeline.length) {
+        const firstDay = timeline[index]!;
+        let endIndex = index;
+        while (
+          timeline[endIndex + 1]?.phase === firstDay.phase &&
+          timeline[endIndex + 1]?.isRestDay === firstDay.isRestDay
+        ) {
+          endIndex++;
+        }
+
+        const lastDay = timeline[endIndex]!;
+        expect(firstDay.startMs).toBeCloseTo(
+          canonicalElapsedMsByDate.get(firstDay.date)!,
+          8,
+        );
+        expect(lastDay.endMs).toBeCloseTo(lastDay.canonicalEndMs, 8);
+
+        if (firstDay.isRestDay) {
+          const residence = timeline.slice(index, endIndex + 1);
+          const deltas = residence.map((day) => day.dayDurationMs);
+          for (const delta of deltas) {
+            expect(delta).toBeCloseTo(deltas[0]!, 8);
+          }
+        }
+
+        index = endIndex + 1;
+      }
+    }
+  });
+
+  it("reports residence timing diagnostics with anchored uniform day durations", () => {
+    for (const cycle of migrationStoryCycleDefinitions) {
+      const points = getMigrationStoryCyclePoints(cycle.label);
+      const timeline = buildPreparedStoryTimeline(points);
+      const diagnostic = getPreparedStoryTimelineDiagnostic(points, timeline);
+
+      expect(diagnostic.cycleDurationMs).toBe(STORY_CYCLE_DURATION_MS);
+      for (const phase of diagnostic.phases.filter(
+        (item) => item.uniformSecondsPerDay !== null,
+      )) {
+        expect(phase.cycleId).toBe(cycle.label);
+        expect(phase.anchoredDurationSeconds).toBeGreaterThan(0);
+        expect(phase.uniformSecondsPerDay).toBeCloseTo(
+          phase.anchoredDurationSeconds / phase.dayCount,
+          8,
+        );
+      }
+    }
+  });
+
+  it.each(["2013-11-10", "2014-01-10", "2014-02-10"])(
+    "keeps winter residence interval %s to next day uniform",
+    (date) => {
+      const cycle = migrationStoryCycleDefinitions[0]!;
+      const timeline = buildPreparedStoryTimeline(
+        getMigrationStoryCyclePoints(cycle.label),
+      );
+      const day = timeline.find((item) => item.date === date)!;
+      const nextDay = timeline[day.relativeDay + 1]!;
+      const referenceWinterDay = timeline.find(
+        (item) => item.date === "2013-11-10",
+      )!;
+
+      expect(day.phase).toBe("winter_rest");
+      expect(nextDay.phase).toBe("winter_rest");
+      expect(nextDay.startMs - day.startMs).toBeCloseTo(
+        referenceWinterDay.dayDurationMs,
+        8,
+      );
+    },
+  );
+
+  it("keeps the July to August compression boundary continuous", () => {
+    const cycle = migrationStoryCycleDefinitions[0]!;
+    const timeline = buildPreparedStoryTimeline(
+      getMigrationStoryCyclePoints(cycle.label),
+    );
+    const elapsed = ["07-30", "07-31", "08-01", "08-02"].map((monthDay) =>
+      getWeightedStoryTimelineElapsedMsForDate(
+        timeline,
+        `${cycle.targetYear}-${monthDay}`,
+      ),
+    );
+    const intervals = elapsed.slice(1).map((value, index) => {
+      const previous = elapsed[index]!;
+
+      return value - previous;
+    });
+
+    expect(elapsed).toEqual([...elapsed].sort((a, b) => a - b));
+    for (const interval of intervals) {
+      expect(interval).toBeGreaterThan(0);
+    }
+    expect(Math.max(...intervals) / Math.min(...intervals)).toBeCloseTo(1, 8);
   });
 });

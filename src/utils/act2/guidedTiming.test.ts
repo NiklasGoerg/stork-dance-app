@@ -4,6 +4,7 @@ import {
   resolveGuidedMovementSourceTime,
   resolveGuidedTransportPosition,
   resolveNextGuidedBarBoundary,
+  resolvePreviousGuidedBarBoundary,
 } from "~/utils/act2/guidedTiming";
 
 describe("guided Act 2 transport timing", () => {
@@ -24,6 +25,12 @@ describe("guided Act 2 transport timing", () => {
     expect(resolveNextGuidedBarBoundary(0)).toBe(4_000);
     expect(resolveNextGuidedBarBoundary(0, 1_000, true)).toBe(0);
     expect(resolveNextGuidedBarBoundary(4_001)).toBe(8_000);
+  });
+
+  it("resolves the previous global bar boundary for anticipatory event countdowns", () => {
+    expect(resolvePreviousGuidedBarBoundary(13_500)).toBe(12_000);
+    expect(resolvePreviousGuidedBarBoundary(12_000)).toBe(8_000);
+    expect(resolvePreviousGuidedBarBoundary(12_000, 1_000, true)).toBe(12_000);
   });
 
   it("maps the owner's downbeat to the movement loop start", () => {

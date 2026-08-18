@@ -1,16 +1,25 @@
 import { defineStore } from "pinia";
 import type {
   MigrationActCycleRun,
+  MigrationActDebugState,
   MigrationActEvent,
   MigrationActEventDiagnostic,
   MigrationActEventStatus,
+  MigrationActLatLng,
   MigrationActMapFrame,
+  MigrationActNarrationEventPayload,
   MigrationActPauseReason,
   MigrationActPlaybackMode,
   MigrationActPlaybackState,
+  MigrationActStoryNarrationState,
   MigrationActSurfaceId,
+  MigrationCycleOverlayState,
+  MigrationCycleTransitionTraceEntry,
+  MigrationCycleTransitionOverlayState,
+  MigrationMapCameraMode,
   GuidedMigrationState,
   MigrationSeasonAudioState,
+  CycleTransitionState,
 } from "~/types/migrationAct";
 import type { StoryTimelineDay } from "~/utils/storyCycle";
 import { getMigrationRuntimeSnapshot } from "~/utils/migrationActs/timeline";
@@ -40,6 +49,19 @@ type MigrationActState = {
   seasonAudio: MigrationSeasonAudioState;
   temporaryMovementFeedbackId: string | null;
   initialCountdownNumber: number | null;
+  cycleOverlay: MigrationCycleOverlayState;
+  cycleTransitionOverlay: MigrationCycleTransitionOverlayState;
+  cycleTransitionTrace: MigrationCycleTransitionTraceEntry[];
+  mapCameraMode: MigrationMapCameraMode;
+  lastNarrationEventIds: string[];
+  latestNarrationEvent: MigrationActNarrationEventPayload | null;
+  storyNarration: MigrationActStoryNarrationState;
+  engagementNudge: {
+    phaseKey: string | null;
+    consecutiveLowParticipationBars: number;
+    nudged: boolean;
+  };
+  debug: MigrationActDebugState;
   error: string;
   guided: GuidedMigrationState;
 };
@@ -62,6 +84,46 @@ const getInitialSeasonAudioState = (): MigrationSeasonAudioState => ({
   currentSeason: null,
   isReady: false,
   error: "",
+});
+
+const getInitialCycleOverlayState = (): MigrationCycleOverlayState => ({
+  visible: false,
+  cycleRunId: null,
+  title: "",
+  subtitleKey: "",
+  subtitleParams: {},
+  remainingMs: 0,
+});
+
+const getInitialCycleTransitionOverlayState =
+  (): MigrationCycleTransitionOverlayState => ({
+    visible: false,
+    state: "idle",
+    fromTitle: "",
+    toTitle: "",
+    sourceCycleId: null,
+    targetCycleId: null,
+    targetDate: null,
+    targetPhase: null,
+    coverStartedTransportMs: null,
+    revealTransportMs: null,
+    oneBarDurationMs: 0,
+    mapReady: false,
+    mapReadyTransportMs: null,
+    markerLatLng: null,
+    cameraReady: false,
+    remainingMs: 0,
+  });
+
+const getInitialStoryNarrationState = (): MigrationActStoryNarrationState => ({
+  eventId: null,
+  title: "",
+  text: "",
+});
+
+const getInitialDebugState = (): MigrationActDebugState => ({
+  enabled: false,
+  autoProgressEnabled: false,
 });
 
 const getInitialState = (): MigrationActState => ({
@@ -89,6 +151,19 @@ const getInitialState = (): MigrationActState => ({
   seasonAudio: getInitialSeasonAudioState(),
   temporaryMovementFeedbackId: null,
   initialCountdownNumber: null,
+  cycleOverlay: getInitialCycleOverlayState(),
+  cycleTransitionOverlay: getInitialCycleTransitionOverlayState(),
+  cycleTransitionTrace: [],
+  mapCameraMode: "residence",
+  lastNarrationEventIds: [],
+  latestNarrationEvent: null,
+  storyNarration: getInitialStoryNarrationState(),
+  engagementNudge: {
+    phaseKey: null,
+    consecutiveLowParticipationBars: 0,
+    nudged: false,
+  },
+  debug: getInitialDebugState(),
   error: "",
   guided: getInitialGuidedState(),
 });
@@ -108,6 +183,13 @@ export const useMigrationActStore = defineStore("migrationAct", {
     hasUserPause: (state) => state.pauseReasons.includes("user"),
   },
   actions: {
+    setDebugEnabled(enabled: boolean) {
+      this.debug.enabled = enabled;
+      if (!enabled) this.debug.autoProgressEnabled = false;
+    },
+    setAutoProgressEnabled(enabled: boolean) {
+      this.debug.autoProgressEnabled = this.debug.enabled && enabled;
+    },
     prepare({
       actId,
       cycleRuns,
@@ -117,12 +199,15 @@ export const useMigrationActStore = defineStore("migrationAct", {
       cycleRuns: MigrationActCycleRun[];
       activeCycleIndex?: number;
     }) {
+      const debug = { ...this.debug };
+
       Object.assign(this, getInitialState(), {
         actId,
         cycleRuns,
         activeCycleIndex,
         selectedCycleRunId: cycleRuns[activeCycleIndex]?.id ?? null,
         playbackSessionId: this.playbackSessionId + 1,
+        debug,
       });
     },
     prepareCycle({
@@ -228,6 +313,182 @@ export const useMigrationActStore = defineStore("migrationAct", {
     setInitialCountdownNumber(count: number | null) {
       this.initialCountdownNumber = count;
     },
+    showCycleOverlay({
+      cycleRunId,
+      title,
+      subtitleKey,
+      subtitleParams = {},
+      durationMs,
+    }: {
+      cycleRunId: string;
+      title: string;
+      subtitleKey: string;
+      subtitleParams?: Record<string, string | number>;
+      durationMs: number;
+    }) {
+      this.cycleOverlay = {
+        visible: true,
+        cycleRunId,
+        title,
+        subtitleKey,
+        subtitleParams,
+        remainingMs: Math.max(0, durationMs),
+      };
+    },
+    tickCycleOverlay(deltaMs: number) {
+      if (!this.cycleOverlay.visible) return;
+
+      const remainingMs = Math.max(0, this.cycleOverlay.remainingMs - deltaMs);
+      this.cycleOverlay = {
+        ...this.cycleOverlay,
+        visible: remainingMs > 0,
+        remainingMs,
+      };
+    },
+    hideCycleOverlay() {
+      this.cycleOverlay = getInitialCycleOverlayState();
+    },
+    appendCycleTransitionTrace(transportMs: number) {
+      const transition = this.cycleTransitionOverlay;
+
+      this.cycleTransitionTrace.push({
+        state: transition.state,
+        transportMs,
+        sourceCycleId: transition.sourceCycleId,
+        targetCycleId: transition.targetCycleId,
+        targetDate: transition.targetDate,
+        targetPhase: transition.targetPhase,
+        mapReady: transition.mapReady,
+        mapReadyTransportMs: transition.mapReadyTransportMs,
+        markerLatLng: transition.markerLatLng,
+        cameraReady: transition.cameraReady,
+        oneBarDurationMs: transition.oneBarDurationMs,
+      });
+    },
+    showCycleTransitionOverlay({
+      fromTitle,
+      toTitle,
+      sourceCycleId,
+      targetCycleId,
+      targetDate,
+      targetPhase,
+      durationMs,
+      coverStartedTransportMs,
+    }: {
+      fromTitle: string;
+      toTitle: string;
+      sourceCycleId: string;
+      targetCycleId: string;
+      targetDate: string;
+      targetPhase: StoryTimelineDay["phase"];
+      durationMs: number;
+      coverStartedTransportMs: number;
+    }) {
+      this.cycleTransitionOverlay = {
+        visible: true,
+        state: "covering",
+        fromTitle,
+        toTitle,
+        sourceCycleId,
+        targetCycleId,
+        targetDate,
+        targetPhase,
+        coverStartedTransportMs,
+        revealTransportMs: null,
+        oneBarDurationMs: Math.max(0, durationMs),
+        mapReady: false,
+        mapReadyTransportMs: null,
+        markerLatLng: null,
+        cameraReady: false,
+        remainingMs: Math.max(0, durationMs),
+      };
+      this.appendCycleTransitionTrace(coverStartedTransportMs);
+    },
+    setCycleTransitionState(state: CycleTransitionState, transportMs: number) {
+      this.cycleTransitionOverlay = {
+        ...this.cycleTransitionOverlay,
+        state,
+        revealTransportMs:
+          state === "revealing"
+            ? transportMs
+            : this.cycleTransitionOverlay.revealTransportMs,
+      };
+      this.appendCycleTransitionTrace(transportMs);
+    },
+    tickCycleTransitionOverlay(deltaMs: number) {
+      if (!this.cycleTransitionOverlay.visible) return;
+
+      const remainingMs = Math.max(
+        0,
+        this.cycleTransitionOverlay.remainingMs - deltaMs,
+      );
+      this.cycleTransitionOverlay = {
+        ...this.cycleTransitionOverlay,
+        remainingMs,
+      };
+    },
+    markCycleTransitionMapReady({
+      markerLatLng = null,
+      cameraReady = true,
+      transportMs,
+    }: {
+      markerLatLng?: MigrationActLatLng | null;
+      cameraReady?: boolean;
+      transportMs: number;
+    }) {
+      if (!this.cycleTransitionOverlay.visible) return;
+
+      this.cycleTransitionOverlay = {
+        ...this.cycleTransitionOverlay,
+        state: "ready",
+        mapReady: true,
+        mapReadyTransportMs: transportMs,
+        markerLatLng,
+        cameraReady,
+      };
+      this.appendCycleTransitionTrace(transportMs);
+    },
+    hideCycleTransitionOverlay(transportMs = 0) {
+      this.cycleTransitionOverlay = {
+        ...this.cycleTransitionOverlay,
+        visible: false,
+        state: "idle",
+        remainingMs: 0,
+      };
+      this.appendCycleTransitionTrace(transportMs);
+      this.cycleTransitionOverlay = getInitialCycleTransitionOverlayState();
+    },
+    setMapCameraMode(mode: MigrationMapCameraMode) {
+      this.mapCameraMode = mode;
+    },
+    recordNarrationEvent(event: MigrationActNarrationEventPayload) {
+      this.latestNarrationEvent = event;
+      if (!this.lastNarrationEventIds.includes(event.eventId)) {
+        this.lastNarrationEventIds.push(event.eventId);
+      }
+    },
+    setStoryNarration(narration: MigrationActStoryNarrationState) {
+      this.storyNarration = narration;
+    },
+    clearStoryNarration() {
+      this.storyNarration = getInitialStoryNarrationState();
+    },
+    resetEngagementNudge(phaseKey: string | null) {
+      this.engagementNudge = {
+        phaseKey,
+        consecutiveLowParticipationBars: 0,
+        nudged: false,
+      };
+    },
+    recordEngagementEvaluation(status: "success" | "failed" | "not_evaluable") {
+      this.engagementNudge.consecutiveLowParticipationBars =
+        status === "success"
+          ? 0
+          : this.engagementNudge.consecutiveLowParticipationBars + 1;
+    },
+    markEngagementNudged() {
+      this.engagementNudge.nudged = true;
+    },
     setError(error: string) {
       this.error = error;
       this.playbackState = "error";
@@ -253,12 +514,14 @@ export const useMigrationActStore = defineStore("migrationAct", {
       const cycleRuns = [...this.cycleRuns];
       const diagnostics = this.diagnostics;
       const playbackSessionId = this.playbackSessionId + 1;
+      const debug = { ...this.debug };
 
       Object.assign(this, getInitialState(), {
         actId,
         cycleRuns,
         diagnostics,
         playbackSessionId,
+        debug,
       });
     },
     dispose() {

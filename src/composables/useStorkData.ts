@@ -11,8 +11,10 @@ import type {
   StorkYearPoint,
   StorkYearRoute,
 } from "~/types/stork";
-import { migrationStoryPoints } from "~/utils/migrationStoryData";
-import { migrationStoryCycleDefinitions as storyCycleDefinitions } from "~/utils/migrationStoryData";
+import {
+  migrationStoryCycleDefinitions as storyCycleDefinitions,
+  migrationStoryPoints,
+} from "~/utils/migrationStoryData";
 import {
   formatStoryDate,
   getDayProgressInStoryCycle,

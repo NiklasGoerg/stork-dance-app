@@ -6,6 +6,7 @@ import {
 import { useMigrationActMovementSession } from "~/composables/migrationActs/useMigrationActMovementSession";
 import { useMigrationActMovement } from "~/composables/migrationActs/useMigrationActMovement";
 import { useMigrationActMovementRecognition } from "~/composables/migrationActs/useMigrationActMovementRecognition";
+import { useNarration } from "~/composables/narration/useNarration";
 import { useStoryEngine } from "~/composables/useStoryEngine";
 import { useAudioStore } from "~/store/audioStore";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
@@ -17,10 +18,15 @@ import type {
   AvatarPlaybackOwner,
   GuidedOwnerSwitchTrace,
   MigrationActCycleRun,
+  MigrationActDebugSnapshot,
   MigrationActEvent,
   MigrationActMapFrame,
+  MigrationActNarrationEventPayload,
+  MigrationActNarrationCueRole,
+  MigrationActNarrationSemanticEvent,
   MigrationActPauseReason,
   MigrationActSurfaceId,
+  MigrationMapCameraMode,
   ResolvedMigrationMovement,
 } from "~/types/migrationAct";
 import type { PoseLandmarkLike } from "~/types/pose";
@@ -42,7 +48,6 @@ import {
   resolveGuidedTransportPosition,
   resolveNextGuidedBarBoundary,
 } from "~/utils/act2/guidedTiming";
-import { getMigrationGestureMovementDefinition } from "~/utils/migrationActs/migrationMovementDefinitions";
 import {
   buildPreparedStoryTimeline,
   STORY_CYCLE_DURATION_MS,
@@ -51,12 +56,25 @@ import {
   getMigrationStoryCyclePoints,
   migrationStoryCycleDefinitions,
 } from "~/utils/migrationStoryData";
+import {
+  buildMigrationNarrationTimingAudit,
+  buildMigrationActResidenceNarrationSchedule,
+  estimateMigrationNarrationSpeechDurationSeconds,
+  getMigrationActStoryArrivalCueIds,
+  getMigrationActStoryCycleIntroCueId,
+  getMigrationActStoryDepartureCueId,
+  getMigrationActStoryTransitionCueId,
+  migrationActStoryCompletionCueIds,
+  migrationActStoryIntroCueIds,
+  resolveMigrationActStoryNarrationCue,
+  type MigrationActScheduledResidenceNarrationCue,
+  type MigrationActStoryNarrationCueId,
+} from "~/utils/migrationActs/storyNarration";
 
 type MigrationActRuntimeOptions = {
   act?: StoryAct;
   surfaceId?: MigrationActSurfaceId;
   cycleRuns?: MigrationActCycleRun[];
-  transitionDurationMs?: number;
   runtimeDriver?: MigrationActRuntimeDriver;
   clock?: MigrationActClock;
   audioService?: MigrationActAudioService;
@@ -64,6 +82,8 @@ type MigrationActRuntimeOptions = {
   movementService?: MigrationActMovementService;
   movementRecognitionService?: MigrationActMovementRecognitionService;
   seasonAudioService?: MigrationActSeasonAudioService;
+  narrationService?: MigrationActNarrationService;
+  translate?: (key: string, params?: Record<string, string | number>) => string;
 };
 
 type GuidedGesturePreparationOptions = {
@@ -81,6 +101,16 @@ type GuidedGesturePracticeOptions = Omit<
 >;
 
 type GuidedRecognitionPurpose = "idle" | "practice-gating" | "passive-feedback";
+type PendingStoryNarrationSequence = {
+  runId: number;
+  cueIds: readonly MigrationActStoryNarrationCueId[];
+  payload: MigrationActNarrationEventPayload;
+  startTransportMs: number;
+};
+
+type PrepareCycleOptions = {
+  preserveMovement?: boolean;
+};
 
 export type MigrationActRuntimeDriver = {
   requestFrame: (callback: FrameRequestCallback) => number;
@@ -99,6 +129,7 @@ export type MigrationActAudioService = Pick<
   | "resumeBaseRhythmLoop"
   | "stopBaseRhythmLoop"
   | "resetBaseRhythmLoop"
+  | "fadeOutBaseRhythmLoop"
   | "getBaseRhythmTransportTimeMs"
   | "getBeatDurationMs"
   | "getMsUntilNextBaseRhythmBeat"
@@ -114,6 +145,11 @@ export type MigrationActMovementService = ReturnType<
 
 export type MigrationActMovementRecognitionService = ReturnType<
   typeof useMigrationActMovementRecognition
+>;
+
+export type MigrationActNarrationService = Pick<
+  ReturnType<typeof useNarration>,
+  "play" | "stop"
 >;
 
 const browserRuntimeDriver: MigrationActRuntimeDriver = {
@@ -143,7 +179,6 @@ export const useMigrationActRuntime = ({
   act,
   surfaceId = act?.id ?? "story-stage",
   cycleRuns: providedCycleRuns,
-  transitionDurationMs = 1_800,
   runtimeDriver = browserRuntimeDriver,
   clock = browserClock,
   audioService,
@@ -151,8 +186,15 @@ export const useMigrationActRuntime = ({
   movementService,
   movementRecognitionService,
   seasonAudioService,
+  narrationService,
+  translate,
 }: MigrationActRuntimeOptions) => {
   const store = useMigrationActStore();
+  const i18n = translate ? null : useI18n();
+  const t =
+    translate ??
+    ((key: string, params?: Record<string, string | number>) =>
+      String(i18n?.t(key, params ?? {})));
   const audioStore = audioService ?? useAudioStore();
   const storyEngine = useStoryEngine();
   const storyRuntimeStore = useStoryRuntimeStore();
@@ -166,6 +208,7 @@ export const useMigrationActRuntime = ({
       getTransportSeconds: () =>
         audioStore.getBaseRhythmTransportTimeMs() / 1000,
     });
+  const narration = narrationService ?? useNarration();
   const cycleRuns =
     providedCycleRuns ?? (act ? resolveMigrationActCycleRuns(act) : []);
 
@@ -177,11 +220,18 @@ export const useMigrationActRuntime = ({
   let movementFeedbackExpiresAtMs: number | null = null;
   let handledMovementFeedbackId: string | null = null;
   let initialCountdownStartTransportMs: number | null = null;
-  let previewEventId: string | null = null;
-  let previewResult: ReturnType<MigrationActGestureService["start"]> | null =
-    null;
+  let pendingStoryNarrationSequences: PendingStoryNarrationSequence[] = [];
   let pausedFromState: "initial_countdown" | "playing" | null = null;
   let phaseMovementScheduledStartTransportMs: number | null = null;
+  let cycleTransitionStartedAtTransportMs: number | null = null;
+  let cycleTransitionTargetIndex: number | null = null;
+  let suppressNextCycleIntro = false;
+  let residenceNarrationSchedule: MigrationActScheduledResidenceNarrationCue[] =
+    [];
+  let authoredNarrationActiveEventId: string | null = null;
+  let authoredNarrationQueuedCount = 0;
+  let lastAuthoredNarrationEndedTransportMs: number | null = null;
+  let handledResidenceNarrationCueIds = new Set<string>();
   const guidedInterludeActive = ref(false);
   const tutorialPlaybackMode = ref<
     "demonstration" | "practice" | "story" | null
@@ -214,6 +264,7 @@ export const useMigrationActRuntime = ({
   const lastOwnerSwitchReason = ref<string | null>(null);
   const ownerSwitchTrace = ref<GuidedOwnerSwitchTrace[]>([]);
   let scheduledOwnerResolver: ((switched: boolean) => void) | null = null;
+  let handledRecognitionBarEvaluationId: string | null = null;
 
   const activeEvent = computed(
     () =>
@@ -225,6 +276,35 @@ export const useMigrationActRuntime = ({
   const migrationPhaseDurationSeconds = computed(
     () => (movementPhaseTiming.value?.durationMs ?? 0) / 1_000,
   );
+  const activeCycleDefinition = computed(() =>
+    migrationStoryCycleDefinitions.find(
+      (cycle) => cycle.label === store.activeCycleId,
+    ),
+  );
+  const getMapCameraModeForPhase = (
+    phase: typeof store.currentPhase,
+  ): MigrationMapCameraMode =>
+    phase === "autumn_migration" || phase === "spring_migration"
+      ? "migration"
+      : "residence";
+  const debugSnapshot = computed((): MigrationActDebugSnapshot => {
+    const nextEvent =
+      store.events.find((event) => event.status === "pending") ?? null;
+
+    return {
+      cycle: store.activeCycleRun?.title ?? store.activeCycleId ?? "",
+      currentStoryDate: store.currentDate,
+      experienceTimeSeconds: store.currentElapsedMs / 1_000,
+      nextEvent: nextEvent?.eventType ?? null,
+      nextEventExperienceTimeSeconds: nextEvent
+        ? nextEvent.boundaryTimeMs / 1_000
+        : null,
+      phase: store.currentPhase,
+      mapCameraMode: store.mapCameraMode,
+      overlayVisible: store.cycleOverlay.visible,
+      cycleTransitionOverlayVisible: store.cycleTransitionOverlay.visible,
+    };
+  });
   const usesGestureOwner = computed(
     () =>
       avatarPlaybackOwner.value === "departure" ||
@@ -371,6 +451,521 @@ export const useMigrationActRuntime = ({
   };
 
   const isCurrentRun = (candidate: number) => !disposed && candidate === runId;
+  const isAutoProgressEnabled = () =>
+    store.debug.enabled && store.debug.autoProgressEnabled;
+
+  const getDateDistanceDays = (startDate: string, endDate: string) =>
+    Math.max(
+      0,
+      Math.round(
+        (new Date(`${endDate}T00:00:00.000Z`).getTime() -
+          new Date(`${startDate}T00:00:00.000Z`).getTime()) /
+          (24 * 60 * 60 * 1000),
+      ),
+    );
+
+  const getCycleLabel = (cycleRun: MigrationActCycleRun) =>
+    `${cycleRun.cycleStartYear}-${cycleRun.cycleStartYear + 1}`;
+
+  const getNarrationBasePayload = (
+    event: MigrationActNarrationSemanticEvent,
+    options: {
+      cueId?: string;
+      cueRole?: MigrationActNarrationCueRole;
+      eventId?: string;
+    } = {},
+  ): MigrationActNarrationEventPayload => {
+    const cycleRun = store.activeCycleRun;
+    const definition = activeCycleDefinition.value;
+    const previousDefinition =
+      store.activeCycleIndex > 0
+        ? migrationStoryCycleDefinitions.find(
+            (cycle) =>
+              cycle.label ===
+              store.cycleRuns[store.activeCycleIndex - 1]?.cycleId,
+          )
+        : null;
+    const referenceDefinition = migrationStoryCycleDefinitions[0] ?? null;
+
+    return {
+      event,
+      eventId:
+        options.eventId ??
+        `${runId}:${cycleRun?.id ?? "none"}:${options.cueId ?? event}`,
+      cueId: options.cueId,
+      cueRole: options.cueRole,
+      cycleRunId: cycleRun?.id ?? null,
+      cycleId: cycleRun?.cycleId ?? null,
+      step: definition?.step ?? null,
+      totalCycles: store.cycleRuns.length,
+      startYear: cycleRun?.cycleStartYear ?? null,
+      endYear: cycleRun ? cycleRun.cycleStartYear + 1 : null,
+      currentPhase: store.currentPhase,
+      winterRegion: definition?.wintering ?? null,
+      previousWinterRegion: previousDefinition?.wintering ?? null,
+      referenceWinterRegion: referenceDefinition?.wintering ?? null,
+    };
+  };
+
+  const getMigrationEventPayload = (
+    semanticEvent: MigrationActNarrationSemanticEvent,
+    departure: MigrationActEvent,
+    arrival: MigrationActEvent | null,
+    direction: "south" | "north",
+    options: {
+      cueId?: string;
+      cueRole?: MigrationActNarrationCueRole;
+      eventId?: string;
+    } = {},
+  ): MigrationActNarrationEventPayload => ({
+    ...getNarrationBasePayload(semanticEvent, options),
+    realDepartureDate: departure.boundaryDate,
+    realArrivalDate: arrival?.boundaryDate,
+    realMigrationDurationDays: arrival
+      ? getDateDistanceDays(departure.boundaryDate, arrival.boundaryDate)
+      : undefined,
+    experienceMigrationDurationSeconds: arrival
+      ? Math.max(0, arrival.boundaryTimeMs - departure.boundaryTimeMs) / 1_000
+      : undefined,
+    experienceMigrationDurationSecondsExact: arrival
+      ? Math.max(0, arrival.boundaryTimeMs - departure.boundaryTimeMs) / 1_000
+      : undefined,
+    experienceMigrationDurationSecondsSpoken: arrival
+      ? Math.round(
+          Math.max(0, arrival.boundaryTimeMs - departure.boundaryTimeMs) /
+            1_000,
+        )
+      : undefined,
+    direction,
+  });
+
+  const emitNarrationEvent = (
+    payload: MigrationActNarrationEventPayload,
+    options: {
+      displayTitle?: string;
+      displayText?: string;
+      cueKey?: string;
+      cueParams?: Record<string, string | number>;
+      speak?: boolean;
+      behavior?: "replace" | "queue" | "skip-if-speaking";
+    } = {},
+  ) => {
+    if (store.lastNarrationEventIds.includes(payload.eventId)) return false;
+
+    store.recordNarrationEvent(payload);
+    if ((options.displayTitle || options.displayText) && !options.speak) {
+      store.setStoryNarration({
+        eventId: payload.eventId,
+        title: options.displayTitle ?? "",
+        text: options.displayText ?? "",
+      });
+    }
+    if (options.speak && options.cueKey) {
+      void narration.play(options.cueKey, {
+        params: options.cueParams,
+        behavior: options.behavior ?? "replace",
+        onStart: () => {
+          if (options.displayTitle || options.displayText) {
+            store.setStoryNarration({
+              eventId: payload.eventId,
+              title: options.displayTitle ?? "",
+              text: options.displayText ?? "",
+            });
+          }
+        },
+      });
+    }
+
+    return true;
+  };
+
+  const getStoryCueParams = (
+    payload: MigrationActNarrationEventPayload,
+  ): Record<string, string | number> => ({
+    ...(payload.startYear !== null ? { startYear: payload.startYear } : {}),
+    ...(payload.endYear !== null ? { endYear: payload.endYear } : {}),
+    ...(payload.step !== null ? { step: payload.step } : {}),
+    ...(payload.totalCycles ? { totalCycles: payload.totalCycles } : {}),
+    ...(payload.realDepartureDate
+      ? { realDepartureDate: payload.realDepartureDate }
+      : {}),
+    ...(payload.realArrivalDate
+      ? { realArrivalDate: payload.realArrivalDate }
+      : {}),
+    ...(payload.realMigrationDurationDays !== undefined
+      ? { realMigrationDays: payload.realMigrationDurationDays }
+      : {}),
+    ...(payload.experienceMigrationDurationSecondsExact !== undefined
+      ? {
+          experienceDurationSecondsExact:
+            payload.experienceMigrationDurationSecondsExact,
+          experienceMigrationDurationSecondsExact:
+            payload.experienceMigrationDurationSecondsExact,
+        }
+      : {}),
+    ...(payload.experienceMigrationDurationSecondsSpoken !== undefined
+      ? {
+          experienceDurationSecondsSpoken:
+            payload.experienceMigrationDurationSecondsSpoken,
+          experienceMigrationDurationSecondsSpoken:
+            payload.experienceMigrationDurationSecondsSpoken,
+        }
+      : {}),
+    ...(payload.direction ? { direction: payload.direction } : {}),
+    ...(payload.currentPhase ? { currentPhase: payload.currentPhase } : {}),
+    ...(payload.winterRegion ? { winterRegion: payload.winterRegion } : {}),
+    ...(payload.previousWinterRegion
+      ? { previousWinterRegion: payload.previousWinterRegion }
+      : {}),
+    ...(payload.referenceWinterRegion
+      ? { referenceWinterRegion: payload.referenceWinterRegion }
+      : {}),
+  });
+
+  const playStoryNarrationCue = (
+    cueId: MigrationActStoryNarrationCueId,
+    payload: MigrationActNarrationEventPayload,
+    options: {
+      awaitSpeech?: boolean;
+      behavior?: "replace" | "queue" | "skip-if-speaking";
+    } = {},
+  ) => {
+    const cue = resolveMigrationActStoryNarrationCue(cueId);
+    const eventId = `${runId}:${payload.cycleRunId ?? "act"}:${cue.id}`;
+    if (store.lastNarrationEventIds.includes(eventId)) {
+      return Promise.resolve(false);
+    }
+
+    const cuePayload = {
+      ...payload,
+      eventId,
+      cueId: cue.id,
+      cueRole: cue.role,
+    };
+    const params = getStoryCueParams(cuePayload);
+    const title = String(t(`${cue.textKey}.title`, params));
+    const text = String(t(`${cue.textKey}.text`, params));
+
+    store.recordNarrationEvent(cuePayload);
+    if (cue.display && !cue.speak) {
+      store.setStoryNarration({ eventId, title, text });
+    }
+    if (!cue.speak) return Promise.resolve(true);
+
+    let speechStarted = false;
+    let speechEnded = false;
+    authoredNarrationQueuedCount++;
+    const promise = narration.play(`${cue.textKey}.text`, {
+      params,
+      behavior: options.behavior ?? "queue",
+      onStart: () => {
+        speechStarted = true;
+        authoredNarrationQueuedCount = Math.max(
+          0,
+          authoredNarrationQueuedCount - 1,
+        );
+        authoredNarrationActiveEventId = eventId;
+        if (cue.display) {
+          store.setStoryNarration({ eventId, title, text });
+        }
+      },
+      onEnd: () => {
+        speechEnded = true;
+        authoredNarrationQueuedCount = Math.max(
+          0,
+          authoredNarrationQueuedCount - 1,
+        );
+        if (authoredNarrationActiveEventId === eventId) {
+          authoredNarrationActiveEventId = null;
+          lastAuthoredNarrationEndedTransportMs =
+            audioStore.getBaseRhythmTransportTimeMs();
+        }
+      },
+    });
+    const trackedPromise = promise.then((result) => {
+      if (!speechStarted || !speechEnded) {
+        authoredNarrationQueuedCount = Math.max(
+          0,
+          authoredNarrationQueuedCount - 1,
+        );
+      }
+
+      return result;
+    });
+
+    if (options.awaitSpeech) {
+      return trackedPromise.then(() => true);
+    }
+
+    void trackedPromise;
+    return Promise.resolve(true);
+  };
+
+  const isAuthoredNarrationBusy = () =>
+    authoredNarrationActiveEventId !== null || authoredNarrationQueuedCount > 0;
+
+  const resetAuthoredNarrationState = () => {
+    authoredNarrationActiveEventId = null;
+    authoredNarrationQueuedCount = 0;
+    lastAuthoredNarrationEndedTransportMs = null;
+  };
+
+  const getResidenceCueEventId = (
+    scheduledCue: MigrationActScheduledResidenceNarrationCue,
+  ) => `${store.activeCycleRun?.id ?? "none"}:${scheduledCue.cueId}`;
+
+  const getOneBarDurationMs = () =>
+    audioStore.getBeatDurationMs() *
+    MIGRATION_RECOGNITION_THRESHOLDS.beatsPerBar;
+
+  const hasQuietBarAfterAuthoredCue = () =>
+    lastAuthoredNarrationEndedTransportMs === null ||
+    audioStore.getBaseRhythmTransportTimeMs() -
+      lastAuthoredNarrationEndedTransportMs >=
+      getOneBarDurationMs();
+
+  const isAuthoredCueProtectedWindow = () => {
+    if (pendingStoryNarrationSequences.length > 0) return true;
+
+    const oneBarMs = getOneBarDurationMs();
+    return residenceNarrationSchedule.some(
+      (scheduledCue) =>
+        !handledResidenceNarrationCueIds.has(
+          getResidenceCueEventId(scheduledCue),
+        ) &&
+        scheduledCue.phase === store.currentPhase &&
+        store.currentElapsedMs >= scheduledCue.triggerElapsedMs - oneBarMs,
+    );
+  };
+
+  const canResidenceCueFit = (
+    scheduledCue: MigrationActScheduledResidenceNarrationCue,
+  ) => {
+    const cue = resolveMigrationActStoryNarrationCue(scheduledCue.cueId);
+    const params = getStoryCueParams(
+      getNarrationBasePayload(
+        scheduledCue.phase === "summer_rest"
+          ? "summerResidenceTiming"
+          : "winterResidenceTiming",
+        { cueId: cue.id, cueRole: cue.role },
+      ),
+    );
+    const text = String(t(`${cue.textKey}.text`, params));
+    const estimatedDurationMs =
+      estimateMigrationNarrationSpeechDurationSeconds(text) * 1_000;
+    const oneBarMs = getOneBarDurationMs();
+    const availableWindowMs =
+      scheduledCue.nextCountdownStartSecond * 1_000 - store.currentElapsedMs;
+
+    return availableWindowMs >= estimatedDurationMs + oneBarMs;
+  };
+
+  const playStoryNarrationSequence = async (
+    cueIds: readonly MigrationActStoryNarrationCueId[],
+    payload: MigrationActNarrationEventPayload,
+    currentRunId: number,
+    options: {
+      completeAfter?: boolean;
+    } = {},
+  ) => {
+    for (const cueId of cueIds) {
+      if (!isCurrentRun(currentRunId)) return;
+      await playStoryNarrationCue(cueId, payload, {
+        awaitSpeech: true,
+        behavior: "queue",
+      });
+    }
+
+    if (options.completeAfter && isCurrentRun(currentRunId)) {
+      if (act) storyRuntimeStore.completeAct();
+    }
+  };
+
+  const scheduleStoryNarrationSequence = (
+    cueIds: readonly MigrationActStoryNarrationCueId[],
+    payload: MigrationActNarrationEventPayload,
+    currentRunId: number,
+    delayTransportMs: number,
+  ) => {
+    pendingStoryNarrationSequences.push({
+      runId: currentRunId,
+      cueIds,
+      payload,
+      startTransportMs:
+        audioStore.getBaseRhythmTransportTimeMs() +
+        Math.max(0, delayTransportMs),
+    });
+  };
+
+  const playDueStoryNarrationSequences = () => {
+    if (!pendingStoryNarrationSequences.length) return;
+
+    const transportMs = audioStore.getBaseRhythmTransportTimeMs();
+    const due = pendingStoryNarrationSequences.filter(
+      (sequence) => transportMs >= sequence.startTransportMs,
+    );
+    pendingStoryNarrationSequences = pendingStoryNarrationSequences.filter(
+      (sequence) => transportMs < sequence.startTransportMs,
+    );
+
+    for (const sequence of due) {
+      void playStoryNarrationSequence(
+        sequence.cueIds,
+        sequence.payload,
+        sequence.runId,
+      );
+    }
+  };
+
+  const playScheduledResidenceNarration = (
+    previousElapsedMs: number,
+    currentElapsedMs: number,
+  ) => {
+    void previousElapsedMs;
+    void currentElapsedMs;
+    if (
+      store.isGestureActive ||
+      store.playbackState !== "playing" ||
+      store.temporaryMovementFeedbackId ||
+      isAuthoredNarrationBusy()
+    ) {
+      return;
+    }
+
+    for (const scheduledCue of residenceNarrationSchedule) {
+      const residenceEventId = getResidenceCueEventId(scheduledCue);
+      if (handledResidenceNarrationCueIds.has(residenceEventId)) continue;
+      if (
+        store.currentElapsedMs >= scheduledCue.triggerElapsedMs &&
+        store.currentPhase === scheduledCue.phase
+      ) {
+        if (!canResidenceCueFit(scheduledCue)) {
+          handledResidenceNarrationCueIds.add(residenceEventId);
+          continue;
+        }
+        if (!hasQuietBarAfterAuthoredCue()) continue;
+
+        const cue = resolveMigrationActStoryNarrationCue(scheduledCue.cueId);
+        const event =
+          scheduledCue.phase === "summer_rest"
+            ? "summerResidenceTiming"
+            : "winterResidenceTiming";
+        void playStoryNarrationCue(
+          scheduledCue.cueId,
+          getNarrationBasePayload(event, {
+            cueId: cue.id,
+            cueRole: cue.role,
+          }),
+        );
+        handledResidenceNarrationCueIds.add(residenceEventId);
+      }
+    }
+  };
+
+  const resetContinuousPhaseEngagement = () => {
+    const cycleRunId = store.activeCycleRun?.id ?? "none";
+    const phase = store.currentPhase;
+    const phaseKey = phase ? `${cycleRunId}:${phase}` : null;
+
+    if (store.engagementNudge.phaseKey !== phaseKey) {
+      store.resetEngagementNudge(phaseKey);
+    }
+  };
+
+  const startActiveCycleOrientation = (
+    options: { suppressNarration?: boolean; suppressOverlay?: boolean } = {},
+  ) => {
+    const cycleRun = store.activeCycleRun;
+    if (!cycleRun) return;
+
+    if (!options.suppressOverlay) {
+      store.showCycleOverlay({
+        cycleRunId: cycleRun.id,
+        title: getCycleLabel(cycleRun),
+        subtitleKey:
+          store.activeCycleIndex === 0
+            ? "story.acts.act4.overlay.reference"
+            : "story.acts.act4.overlay.cycle",
+        subtitleParams: {
+          step: store.activeCycleIndex + 1,
+          total: store.cycleRuns.length,
+        },
+        durationMs: audioStore.getBeatDurationMs() * 4,
+      });
+    }
+    const cueId = getMigrationActStoryCycleIntroCueId(cycleRun.cycleId);
+    if (cueId && !options.suppressNarration) {
+      void playStoryNarrationCue(cueId, getNarrationBasePayload("cycleIntro"));
+    }
+  };
+
+  const handleContinuousEngagementEvaluation = () => {
+    const evaluation = movementRecognition.lastBarEvaluation.value;
+    if (
+      !evaluation ||
+      evaluation.evaluationId === handledRecognitionBarEvaluationId ||
+      !store.currentPhase ||
+      store.isGestureActive
+    ) {
+      return;
+    }
+
+    handledRecognitionBarEvaluationId = evaluation.evaluationId;
+    resetContinuousPhaseEngagement();
+    store.recordEngagementEvaluation(evaluation.status);
+    if (
+      !store.engagementNudge.nudged &&
+      store.engagementNudge.consecutiveLowParticipationBars >= 3
+    ) {
+      if (isAuthoredNarrationBusy() || isAuthoredCueProtectedWindow()) {
+        store.markEngagementNudged();
+        return;
+      }
+
+      const text = String(t("story.migrationPanel.engagement.nudge"));
+      emitNarrationEvent(getNarrationBasePayload("engagementNudge"), {
+        displayTitle: String(t("story.migrationPanel.engagement.title")),
+        displayText: text,
+        cueKey: "story.migrationPanel.engagement.nudge",
+        speak: true,
+        behavior: "skip-if-speaking",
+      });
+      store.markEngagementNudged();
+    }
+  };
+
+  const getDebugTimingTable = () =>
+    store.cycleRuns.map((cycleRun) => {
+      const points = getMigrationStoryCyclePoints(cycleRun.cycleId);
+      const timeline = buildPreparedStoryTimeline(
+        points,
+        STORY_CYCLE_DURATION_MS,
+      );
+      const events = createMigrationActEvents(cycleRun, timeline);
+
+      return {
+        cycle: getCycleLabel(cycleRun),
+        cycleId: cycleRun.cycleId,
+        events: events.map((event) => ({
+          event: event.eventType,
+          realDate: event.boundaryDate,
+          experienceSecond: event.boundaryTimeMs / 1_000,
+        })),
+        narrationTiming: buildMigrationNarrationTimingAudit([cycleRun]),
+        durationSeconds: (timeline.at(-1)?.endMs ?? 0) / 1_000,
+      };
+    });
+
+  const installDebugUtility = () => {
+    if (!import.meta.dev || typeof window === "undefined") return;
+
+    Object.assign(window, {
+      __migrationActDebug: {
+        getSnapshot: () => debugSnapshot.value,
+        getTimelines: getDebugTimingTable,
+      },
+    });
+  };
 
   const cancelFrame = () => {
     if (!animationFrameId) return;
@@ -485,6 +1080,27 @@ export const useMigrationActRuntime = ({
     getCurrentPhaseElapsedMs() +
     (resolveCurrentPhaseMovement()?.playbackTiming.prerollMs ?? 0);
 
+  const shouldBarAlignContinuousMovementStart = () =>
+    getCurrentPhaseElapsedMs() <= 80;
+
+  const getContinuousMovementStartAnchorTransportMs = (
+    movement: ResolvedMigrationMovement,
+  ) => {
+    const transportMs = audioStore.getBaseRhythmTransportTimeMs();
+
+    if (!shouldBarAlignContinuousMovementStart()) {
+      return transportMs - getCurrentMovementElapsedMs();
+    }
+
+    const countOneTransportMs = resolveNextGuidedBarBoundary(
+      transportMs,
+      audioStore.getBeatDurationMs(),
+      true,
+    );
+
+    return countOneTransportMs - movement.playbackTiming.prerollMs;
+  };
+
   const getTransportMovementElapsedMs = () =>
     phaseMovementScheduledStartTransportMs === null
       ? getCurrentMovementElapsedMs()
@@ -496,17 +1112,29 @@ export const useMigrationActRuntime = ({
 
   const startMovementForCurrentPhase = async () => {
     const sessionId = store.playbackSessionId;
-    const resolved = selectMovementForCurrentPhase();
+    const resolved = resolveCurrentPhaseMovement();
 
     if (!resolved) return;
+    if (!movement.isMovementReady(resolved.movementId)) {
+      if (!(await movement.preload(resolved))) {
+        store.setError(
+          movement.movementLoadError.value ??
+            `Unable to preload ${resolved.movementId}.`,
+        );
+        return;
+      }
+      if (disposed || sessionId !== store.playbackSessionId) return;
+    }
 
+    resetContinuousPhaseEngagement();
+    movement.select(resolved);
     switchAvatarOwnerNow(
       getMovementOwner(resolved),
       `phase:${resolved.movementId}`,
     );
-    const phaseElapsedMs = getCurrentMovementElapsedMs();
     phaseMovementScheduledStartTransportMs =
-      audioStore.getBaseRhythmTransportTimeMs() - phaseElapsedMs;
+      getContinuousMovementStartAnchorTransportMs(resolved);
+    const phaseElapsedMs = getTransportMovementElapsedMs();
 
     movementRecognition.start(resolved.recognitionProfile, {
       transportTimeMs: audioStore.getBaseRhythmTransportTimeMs(),
@@ -514,7 +1142,13 @@ export const useMigrationActRuntime = ({
       prerollMs: resolved.playbackTiming.prerollMs,
       movementId: resolved.movementId,
     });
-    await movement.start(resolved, phaseElapsedMs);
+    if (!movement.activate(resolved, phaseElapsedMs)) {
+      store.setError(
+        movement.movementLoadError.value ??
+          `Unable to start ${resolved.movementId}.`,
+      );
+      return;
+    }
 
     if (
       disposed ||
@@ -526,7 +1160,7 @@ export const useMigrationActRuntime = ({
     }
   };
 
-  const prepareCycle = (index: number) => {
+  const prepareCycle = (index: number, options: PrepareCycleOptions = {}) => {
     const cycleRun = store.cycleRuns[index];
     if (!cycleRun) throw new Error(`Invalid migration cycle index ${index}.`);
 
@@ -537,11 +1171,82 @@ export const useMigrationActRuntime = ({
     );
     const events = createMigrationActEvents(cycleRun, timeline);
 
-    movement.stop();
+    if (!options.preserveMovement) movement.stop();
     store.prepareCycle({ activeCycleIndex: index, timeline, events });
+    residenceNarrationSchedule =
+      buildMigrationActResidenceNarrationSchedule(cycleRun);
+    handledResidenceNarrationCueIds = new Set();
+    store.setMapCameraMode(getMapCameraModeForPhase(store.currentPhase));
+    store.clearStoryNarration();
+    resetContinuousPhaseEngagement();
+    handledRecognitionBarEvaluationId = null;
     seasonAudio.prepare(store.currentDate);
     selectMovementForCurrentPhase();
     prepareRecognitionForCurrentPhase();
+  };
+
+  const areLatLngEqual = (
+    actual: MigrationActMapFrame["markerLatLng"] | null | undefined,
+    expected: MigrationActMapFrame["markerLatLng"] | null | undefined,
+  ) =>
+    Boolean(
+      actual &&
+      expected &&
+      Math.abs(actual.lat - expected.lat) < 1e-7 &&
+      Math.abs(actual.lng - expected.lng) < 1e-7,
+    );
+
+  const isCycleTransitionMapReady = () => {
+    const transition = store.cycleTransitionOverlay;
+    const expectedFrame = getCurrentMapFrame();
+    const reportedLatLng = transition.markerLatLng;
+    const expectedLatLng = expectedFrame?.markerLatLng;
+    const markerReady = areLatLngEqual(reportedLatLng, expectedLatLng);
+
+    return (
+      transition.visible &&
+      transition.mapReady &&
+      transition.state === "ready" &&
+      transition.targetCycleId === store.activeCycleId &&
+      transition.targetDate === store.currentDate &&
+      transition.targetPhase === store.currentPhase &&
+      transition.cameraReady &&
+      store.mapCameraMode === "residence" &&
+      expectedFrame?.cycleId === transition.targetCycleId &&
+      expectedFrame.date === transition.targetDate &&
+      expectedFrame.phase === transition.targetPhase &&
+      markerReady
+    );
+  };
+
+  const isCycleTransitionRevealBoundaryReady = (
+    transitionElapsedMs: number,
+  ) => {
+    const transition = store.cycleTransitionOverlay;
+    const coverStartedTransportMs = transition.coverStartedTransportMs;
+    const readyTransportMs = transition.mapReadyTransportMs;
+    const oneBarDurationMs = transition.oneBarDurationMs;
+
+    if (
+      coverStartedTransportMs === null ||
+      readyTransportMs === null ||
+      !isCycleTransitionMapReady()
+    ) {
+      return false;
+    }
+    if (transitionElapsedMs < oneBarDurationMs) return false;
+
+    const minimumRevealTransportMs = coverStartedTransportMs + oneBarDurationMs;
+    const revealTransportMs =
+      readyTransportMs <= minimumRevealTransportMs
+        ? minimumRevealTransportMs
+        : resolveNextGuidedBarBoundary(
+            readyTransportMs,
+            audioStore.getBeatDurationMs(),
+            true,
+          );
+
+    return audioStore.getBaseRhythmTransportTimeMs() >= revealTransportMs;
   };
 
   const synchronizeAudioForPauseReasons = async () => {
@@ -1019,44 +1724,20 @@ export const useMigrationActRuntime = ({
     }
   };
 
-  const startEventPreviewIfNeeded = () => {
-    if (previewEventId || gestures.store.isActive) return;
-    const event = store.events.find((item) => item.status === "pending");
-    if (!event) return;
-    if (event.gestureId === "arrival") return;
-    const remainingMs = event.boundaryTimeMs - store.currentElapsedMs;
-    const previewDurationMs =
-      audioStore.getBeatDurationMs() *
-      getMigrationGestureMovementDefinition(event.gestureId).feedbackBeats;
-    if (remainingMs <= 0 || remainingMs > previewDurationMs) return;
-
-    const boundaryTransportMs =
-      audioStore.getBaseRhythmTransportTimeMs() + remainingMs;
-    previewEventId = event.id;
-    movement.pause();
-    movementRecognition.pause();
-    clearMovementFeedback();
-    switchAvatarOwnerNow(event.gestureId, `gesture-preview:${event.gestureId}`);
-    previewResult = gestures.start(event.gestureId, {
-      countdownStartTransportMs: boundaryTransportMs - previewDurationMs,
-    });
-  };
-
   const completeGestureEvent = async (
     event: MigrationActEvent,
     currentRunId: number,
-    preparedResult?: ReturnType<MigrationActGestureService["start"]>,
+    resultPromise: ReturnType<MigrationActGestureService["start"]>,
   ) => {
     const loadTiming = gestures.loadTimings.get(event.gestureId);
+    let completed = false;
 
     try {
-      const result = await (preparedResult ?? gestures.start(event.gestureId));
+      const result = await resultPromise;
       if (!isCurrentRun(currentRunId)) return;
+      completed = result === "completed";
 
-      store.setEventStatus(
-        event.id,
-        result === "completed" ? "completed" : "skipped",
-      );
+      store.setEventStatus(event.id, completed ? "completed" : "skipped");
       store.updateDiagnostic(event.id, {
         movementLoadStart: loadTiming?.start ?? null,
         movementLoadEnd: loadTiming?.end ?? null,
@@ -1068,8 +1749,6 @@ export const useMigrationActRuntime = ({
       console.error("[MigrationAct] Gesture failed.", error);
     } finally {
       if (isCurrentRun(currentRunId)) {
-        previewEventId = null;
-        previewResult = null;
         store.setActiveEvent(null);
         store.removePauseReason("gesture");
         store.updateDiagnostic(event.id, {
@@ -1085,6 +1764,26 @@ export const useMigrationActRuntime = ({
         } else {
           store.setPlaybackState("playing");
           synchronizeSeasonForCurrentDate();
+          if (completed && event.gestureId === "arrival") {
+            store.setMapCameraMode("residence");
+            const cueIds = getMigrationActStoryArrivalCueIds(
+              event.cycleId,
+              event.eventType,
+            );
+            if (cueIds.length) {
+              scheduleStoryNarrationSequence(
+                cueIds,
+                getNarrationBasePayload(
+                  event.eventType === "autumn_arrival"
+                    ? "winterReflection"
+                    : "breedingReflection",
+                ),
+                currentRunId,
+                audioStore.getBeatDurationMs() *
+                  MIGRATION_RECOGNITION_THRESHOLDS.beatsPerBar,
+              );
+            }
+          }
           void startMovementForCurrentPhase();
           await synchronizeAudioForPauseReasons();
           lastFrameAtMs = null;
@@ -1107,6 +1806,34 @@ export const useMigrationActRuntime = ({
     store.setElapsedMs(event.boundaryTimeMs);
     selectMovementForCurrentPhase();
     prepareRecognitionForCurrentPhase();
+    if (event.gestureId === "departure") {
+      const arrivalEventType =
+        event.eventType === "autumn_departure"
+          ? "autumn_arrival"
+          : "spring_arrival";
+      const arrival =
+        store.events.find((item) => item.eventType === arrivalEventType) ??
+        null;
+
+      store.setMapCameraMode("migration");
+      const cueId = getMigrationActStoryDepartureCueId(
+        event.cycleId,
+        event.eventType,
+      );
+      if (cueId) {
+        const cue = resolveMigrationActStoryNarrationCue(cueId);
+        const payload = getMigrationEventPayload(
+          event.eventType === "autumn_departure"
+            ? "autumnDeparturePrepare"
+            : "springDeparturePrepare",
+          event,
+          arrival,
+          event.eventType === "autumn_departure" ? "south" : "north",
+          { cueId: cue.id, cueRole: cue.role },
+        );
+        void playStoryNarrationCue(cueId, payload, { behavior: "replace" });
+      }
+    }
     store.setEventStatus(event.id, "triggered");
     store.setActiveEvent(event.id);
     store.addPauseReason("gesture");
@@ -1133,12 +1860,21 @@ export const useMigrationActRuntime = ({
       storyResumed: null,
       selectedMapPointDate: store.lastMapFrame?.date ?? null,
     });
-    const preparedResult =
-      previewEventId === event.id ? (previewResult ?? undefined) : undefined;
-    void completeGestureEvent(event, currentRunId, preparedResult);
+    // UX invariant:
+    // Story-Time freezes at the real data event. Countdown starts only on the
+    // next global bar; do not run Story-Time through Departure or Arrival prep.
+    const resultPromise = gestures.start(event.gestureId, {
+      countdownStartTransportMs: resolveNextGuidedBarBoundary(
+        audioStore.getBaseRhythmTransportTimeMs(),
+        audioStore.getBeatDurationMs(),
+        true,
+      ),
+      autoProgressEnabled: isAutoProgressEnabled,
+    });
+    void completeGestureEvent(event, currentRunId, resultPromise);
   };
 
-  const enterCycleTransition = () => {
+  const enterCycleTransition = async () => {
     const cycleRun = store.activeCycleRun;
     if (!cycleRun) return;
 
@@ -1149,29 +1885,91 @@ export const useMigrationActRuntime = ({
       store.activeCycleIndex < store.cycleRuns.length - 1;
 
     if (!hasNextCycle) {
+      const currentRunId = runId;
       store.setPlaybackState("completed");
       movement.stop();
       movementRecognition.reset();
-      seasonAudio.reset();
-      audioStore.resetBaseRhythmLoop();
+      seasonAudio.fadeOutForCycle(2);
       cancelFrame();
+      await playStoryNarrationSequence(
+        migrationActStoryCompletionCueIds,
+        getNarrationBasePayload("actSummary"),
+        currentRunId,
+      );
+      if (!isCurrentRun(currentRunId)) return;
+      audioStore.fadeOutBaseRhythmLoop(
+        (audioStore.getBeatDurationMs() *
+          MIGRATION_RECOGNITION_THRESHOLDS.beatsPerBar *
+          2) /
+          1_000,
+      );
       if (act) storyRuntimeStore.completeAct();
       return;
     }
 
-    store.addPauseReason("cycle_transition");
+    const nextIndex = store.activeCycleIndex + 1;
+    const nextCycleRun = store.cycleRuns[nextIndex];
+    if (!nextCycleRun) return;
+    const transitionDurationMs =
+      audioStore.getBeatDurationMs() *
+      MIGRATION_RECOGNITION_THRESHOLDS.beatsPerBar;
+    const coverStartedTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+
+    movementRecognition.pause();
+    // UX invariant:
+    // The parent-owned map cover stays mounted for the complete transition bar,
+    // independent of how quickly the next dataset and marker become ready.
+    store.showCycleTransitionOverlay({
+      fromTitle: getCycleLabel(cycleRun),
+      toTitle: getCycleLabel(nextCycleRun),
+      sourceCycleId: cycleRun.cycleId,
+      targetCycleId: nextCycleRun.cycleId,
+      targetDate: `${nextCycleRun.cycleStartYear}-06-01`,
+      targetPhase: "summer_rest",
+      durationMs: transitionDurationMs,
+      coverStartedTransportMs,
+    });
+    store.hideCycleOverlay();
     store.setTransitionRemainingMs(transitionDurationMs);
     store.setPlaybackState("cycle_transition");
-    movement.stop();
-    movementRecognition.reset();
-    seasonAudio.fadeOutForCycle();
+    cycleTransitionStartedAtTransportMs = coverStartedTransportMs;
+    cycleTransitionTargetIndex = nextIndex;
+
+    store.setCycleTransitionState("swapping", coverStartedTransportMs);
+    prepareCycle(nextIndex, { preserveMovement: true });
+    suppressNextCycleIntro = true;
+    const cueId = getMigrationActStoryTransitionCueId(nextCycleRun.cycleId);
+    if (cueId) {
+      const cue = resolveMigrationActStoryNarrationCue(cueId);
+      void playStoryNarrationCue(
+        cueId,
+        getNarrationBasePayload("cycleTransition", {
+          cueId: cue.id,
+          cueRole: cue.role,
+        }),
+      );
+    }
+
+    if (hasBlockingPause(store.pauseReasons)) {
+      store.setPlaybackState("paused");
+      return;
+    }
+
+    await audioStore.resumeBaseRhythmLoop();
+    lastFrameAtMs = null;
+    scheduleFrame();
   };
 
   const finishCycleTransition = async () => {
-    const nextIndex = store.activeCycleIndex + 1;
+    if (cycleTransitionTargetIndex === null) return;
+    if (!isCycleTransitionMapReady()) return;
 
-    prepareCycle(nextIndex);
-    store.removePauseReason("cycle_transition");
+    const revealTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    store.setCycleTransitionState("revealing", revealTransportMs);
+    cycleTransitionStartedAtTransportMs = null;
+    cycleTransitionTargetIndex = null;
+    store.hideCycleTransitionOverlay(revealTransportMs);
+    store.setTransitionRemainingMs(0);
 
     if (hasBlockingPause(store.pauseReasons)) {
       store.setPlaybackState("paused");
@@ -1179,6 +1977,11 @@ export const useMigrationActRuntime = ({
     }
 
     store.setPlaybackState("playing");
+    startActiveCycleOrientation({
+      suppressNarration: suppressNextCycleIntro,
+      suppressOverlay: suppressNextCycleIntro,
+    });
+    suppressNextCycleIntro = false;
     void startMovementForCurrentPhase();
     await audioStore.resumeBaseRhythmLoop();
     await seasonAudio.start(store.currentDate);
@@ -1192,6 +1995,7 @@ export const useMigrationActRuntime = ({
     const deltaMs =
       lastFrameAtMs === null ? 0 : Math.max(0, nowMs - lastFrameAtMs);
     lastFrameAtMs = nowMs;
+    if (store.playbackState === "playing") store.tickCycleOverlay(deltaMs);
 
     if (
       movementFeedbackExpiresAtMs !== null &&
@@ -1199,6 +2003,7 @@ export const useMigrationActRuntime = ({
     ) {
       clearMovementFeedback();
     }
+    if (store.playbackState === "playing") playDueStoryNarrationSequences();
 
     if (guidedInterludeActive.value) {
       const transportTimeMs = audioStore.getBaseRhythmTransportTimeMs();
@@ -1339,6 +2144,7 @@ export const useMigrationActRuntime = ({
         store.setInitialCountdownNumber(null);
         store.setPlaybackState("playing");
         initialCountdownStartTransportMs = null;
+        startActiveCycleOrientation();
         void startMovementForCurrentPhase();
       }
     } else if (store.playbackState === "playing") {
@@ -1361,7 +2167,6 @@ export const useMigrationActRuntime = ({
           const previousDate = store.currentDate;
           const previousPhase = store.currentPhase;
           store.setElapsedMs(advance.elapsedMs);
-          startEventPreviewIfNeeded();
           if (store.currentDate !== previousDate) {
             synchronizeSeasonForCurrentDate();
           }
@@ -1370,15 +2175,47 @@ export const useMigrationActRuntime = ({
           } else {
             movement.tick(getTransportMovementElapsedMs());
           }
+          playScheduledResidenceNarration(
+            previousElapsedMs,
+            store.currentElapsedMs,
+          );
           if (advance.completed) {
-            enterCycleTransition();
+            void enterCycleTransition();
           }
+        }
+      }
+    } else if (store.playbackState === "cycle_transition") {
+      if (!hasBlockingPause(store.pauseReasons)) {
+        const transitionElapsedMs =
+          cycleTransitionStartedAtTransportMs === null
+            ? 0
+            : Math.max(
+                0,
+                audioStore.getBaseRhythmTransportTimeMs() -
+                  cycleTransitionStartedAtTransportMs,
+              );
+        const durationMs =
+          audioStore.getBeatDurationMs() *
+          MIGRATION_RECOGNITION_THRESHOLDS.beatsPerBar;
+        store.setTransitionRemainingMs(
+          Math.max(0, durationMs - transitionElapsedMs),
+        );
+        store.tickCycleTransitionOverlay(deltaMs);
+        movement.tick(getTransportMovementElapsedMs());
+        // UX invariant:
+        // Transition reveal is transport-owned. Fast map readiness cannot end
+        // the cover before one bar, and late readiness waits for Bar 1.
+        if (isCycleTransitionRevealBoundaryReady(transitionElapsedMs)) {
+          void finishCycleTransition();
         }
       }
     } else if (
       store.playbackState === "gesture_lead_in" ||
       store.playbackState === "gesture_playing"
     ) {
+      // UX invariant:
+      // Departure and Arrival gestures own avatar time only; Story-Time stays
+      // pinned to the exact data event until the gesture handoff completes.
       const frozenElapsedMs = store.currentElapsedMs;
       gestures.tick();
       const diagnostic = store.diagnostics.find(
@@ -1404,12 +2241,6 @@ export const useMigrationActRuntime = ({
         console.warn("[MigrationAct] Story advanced during a gesture.");
         store.setElapsedMs(frozenElapsedMs);
       }
-    } else if (store.playbackState === "cycle_transition") {
-      if (!hasBlockingPause(store.pauseReasons)) {
-        const remainingMs = Math.max(0, store.transitionRemainingMs - deltaMs);
-        store.setTransitionRemainingMs(remainingMs);
-        if (remainingMs === 0) void finishCycleTransition();
-      }
     }
 
     if (
@@ -1431,10 +2262,15 @@ export const useMigrationActRuntime = ({
     store.prepare({ actId: surfaceId, cycleRuns });
     prepareCycle(0);
     store.setPlaybackState("idle");
+    installDebugUtility();
     if (act) storyEngine.prepareAct(act.id);
 
     try {
-      await Promise.all([gestures.preload(), seasonAudio.preload()]);
+      await Promise.all([
+        gestures.preload(),
+        movement.preloadAll(),
+        seasonAudio.preload(),
+      ]);
       if (!isCurrentRun(currentRunId)) return;
       initialized = true;
     } catch (error) {
@@ -1452,12 +2288,18 @@ export const useMigrationActRuntime = ({
     cancelFrame();
     cancelGuidedInterlude();
     gestures.cancel();
-    previewEventId = null;
-    previewResult = null;
+    pendingStoryNarrationSequences = [];
+    cycleTransitionStartedAtTransportMs = null;
+    cycleTransitionTargetIndex = null;
+    suppressNextCycleIntro = false;
+    residenceNarrationSchedule = [];
+    handledResidenceNarrationCueIds = new Set();
+    resetAuthoredNarrationState();
     initialCountdownStartTransportMs = null;
     phaseMovementScheduledStartTransportMs = null;
     movement.reset();
     movementRecognition.reset();
+    narration.stop();
     clearMovementFeedback();
     handledMovementFeedbackId = null;
     seasonAudio.reset();
@@ -1473,11 +2315,24 @@ export const useMigrationActRuntime = ({
     index: number,
   ) => {
     if (!initialized) {
-      await Promise.all([gestures.preload(), seasonAudio.preload()]);
+      await Promise.all([
+        gestures.preload(),
+        movement.preloadAll(),
+        seasonAudio.preload(),
+      ]);
       initialized = true;
     }
     resetForMode(mode, index);
     if (act) storyEngine.startAct(act.id);
+    const currentRunId = runId;
+    if (mode === "story" && index === 0) {
+      await playStoryNarrationSequence(
+        migrationActStoryIntroCueIds,
+        getNarrationBasePayload("flowIntro"),
+        currentRunId,
+      );
+      if (!isCurrentRun(currentRunId)) return;
+    }
     await audioStore.startBaseRhythmLoop(0);
     await seasonAudio.start(store.currentDate);
     const resolved = selectMovementForCurrentPhase();
@@ -1497,6 +2352,14 @@ export const useMigrationActRuntime = ({
     const index = cycleRuns.findIndex((cycle) => cycle.id === cycleRunId);
     if (index < 0) throw new Error(`Unknown cycle run "${cycleRunId}".`);
     return startAtIndex("single_cycle", index);
+  };
+
+  const toggleDebug = () => {
+    store.setDebugEnabled(!store.debug.enabled);
+  };
+
+  const toggleAutoProgress = () => {
+    store.setAutoProgressEnabled(!store.debug.autoProgressEnabled);
   };
 
   const pause = () => {
@@ -1591,12 +2454,18 @@ export const useMigrationActRuntime = ({
     cancelFrame();
     cancelGuidedInterlude();
     gestures.cancel();
-    previewEventId = null;
-    previewResult = null;
+    pendingStoryNarrationSequences = [];
+    cycleTransitionStartedAtTransportMs = null;
+    cycleTransitionTargetIndex = null;
+    suppressNextCycleIntro = false;
+    residenceNarrationSchedule = [];
+    handledResidenceNarrationCueIds = new Set();
+    resetAuthoredNarrationState();
     initialCountdownStartTransportMs = null;
     phaseMovementScheduledStartTransportMs = null;
     movement.reset();
     movementRecognition.reset();
+    narration.stop();
     clearMovementFeedback();
     handledMovementFeedbackId = null;
     seasonAudio.reset();
@@ -1606,7 +2475,11 @@ export const useMigrationActRuntime = ({
     store.setPlaybackState("idle");
     if (act) storyEngine.prepareAct(act.id);
     try {
-      await Promise.all([gestures.preload(), seasonAudio.preload()]);
+      await Promise.all([
+        gestures.preload(),
+        movement.preloadAll(),
+        seasonAudio.preload(),
+      ]);
       initialized = true;
     } catch (error) {
       store.setError(getErrorMessage(error));
@@ -1618,13 +2491,19 @@ export const useMigrationActRuntime = ({
 
     nextRunId();
     gestures.cancel();
-    previewEventId = null;
-    previewResult = null;
+    pendingStoryNarrationSequences = [];
+    cycleTransitionStartedAtTransportMs = null;
+    cycleTransitionTargetIndex = null;
+    suppressNextCycleIntro = false;
+    handledResidenceNarrationCueIds = new Set();
+    resetAuthoredNarrationState();
     phaseMovementScheduledStartTransportMs = null;
     movementRecognition.pause();
     store.setActiveEvent(null);
     store.removePauseReason("gesture");
     store.setElapsedMs(elapsedMs);
+    store.setMapCameraMode(getMapCameraModeForPhase(store.currentPhase));
+    resetContinuousPhaseEngagement();
     store.replaceEvents(
       reconcileMigrationActEventsForSeek(store.events, store.currentElapsedMs),
     );
@@ -1676,6 +2555,7 @@ export const useMigrationActRuntime = ({
         landmarks,
         transportTimeMs: audioStore.getBaseRhythmTransportTimeMs(),
       });
+      handleContinuousEngagementEvaluation();
       const evaluationId = movementRecognition.lastSuccessfulEvaluationId.value;
       if (evaluationId) showMovementSuccessFeedback(evaluationId);
     }
@@ -1689,6 +2569,27 @@ export const useMigrationActRuntime = ({
 
   const reportMapFrame = (frame: MigrationActMapFrame) => {
     store.reportMapFrame(frame);
+    const transition = store.cycleTransitionOverlay;
+    const cameraReady = frame.cameraReady ?? true;
+    const expectedFrame = getCurrentMapFrame();
+    if (
+      transition.visible &&
+      transition.state === "swapping" &&
+      frame.cycleId === transition.targetCycleId &&
+      frame.date === transition.targetDate &&
+      frame.phase === transition.targetPhase &&
+      cameraReady &&
+      expectedFrame?.cycleId === transition.targetCycleId &&
+      expectedFrame.date === transition.targetDate &&
+      expectedFrame.phase === transition.targetPhase &&
+      areLatLngEqual(frame.markerLatLng, expectedFrame.markerLatLng)
+    ) {
+      store.markCycleTransitionMapReady({
+        markerLatLng: frame.markerLatLng ?? null,
+        cameraReady,
+        transportMs: audioStore.getBaseRhythmTransportTimeMs(),
+      });
+    }
     const event = activeEvent.value;
     if (event) {
       store.updateDiagnostic(event.id, { selectedMapPointDate: frame.date });
@@ -1737,12 +2638,18 @@ export const useMigrationActRuntime = ({
     cancelFrame();
     cancelGuidedInterlude();
     gestures.cleanup();
-    previewEventId = null;
-    previewResult = null;
+    pendingStoryNarrationSequences = [];
+    cycleTransitionStartedAtTransportMs = null;
+    cycleTransitionTargetIndex = null;
+    suppressNextCycleIntro = false;
+    residenceNarrationSchedule = [];
+    handledResidenceNarrationCueIds = new Set();
+    resetAuthoredNarrationState();
     initialCountdownStartTransportMs = null;
     phaseMovementScheduledStartTransportMs = null;
     movement.cleanup();
     movementRecognition.cleanup();
+    narration.stop();
     clearMovementFeedback();
     seasonAudio.dispose();
     audioStore.stopBaseRhythmLoop();
@@ -1775,9 +2682,12 @@ export const useMigrationActRuntime = ({
     activeEvent,
     movementPhaseTiming,
     migrationPhaseDurationSeconds,
+    debugSnapshot,
     initialize,
     startStory,
     startSingleCycle,
+    toggleDebug,
+    toggleAutoProgress,
     pause,
     resume,
     reset,

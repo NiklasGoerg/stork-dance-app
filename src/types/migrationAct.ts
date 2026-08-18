@@ -22,6 +22,64 @@ export type MigrationActPlaybackMode = "story" | "single_cycle";
 export type MigrationActPauseReason =
   "user" | "gesture" | "tutorial" | "cycle_transition" | "system";
 
+export type MigrationMapCameraMode = "residence" | "migration";
+
+export type CycleTransitionState =
+  "idle" | "covering" | "swapping" | "ready" | "revealing";
+
+export type MigrationActLatLng = {
+  lat: number;
+  lng: number;
+};
+
+export type MigrationCycleTransitionTraceEntry = {
+  state: CycleTransitionState;
+  transportMs: number;
+  sourceCycleId: string | null;
+  targetCycleId: string | null;
+  targetDate: string | null;
+  targetPhase: StorkMigrationPhase | null;
+  mapReady: boolean;
+  mapReadyTransportMs: number | null;
+  markerLatLng: MigrationActLatLng | null;
+  cameraReady: boolean;
+  oneBarDurationMs: number;
+};
+
+export type MigrationCycleOverlayState = {
+  visible: boolean;
+  cycleRunId: string | null;
+  title: string;
+  subtitleKey: string;
+  subtitleParams: Record<string, string | number>;
+  remainingMs: number;
+};
+
+export type MigrationCycleTransitionOverlayState = {
+  visible: boolean;
+  state: CycleTransitionState;
+  fromTitle: string;
+  toTitle: string;
+  sourceCycleId: string | null;
+  targetCycleId: string | null;
+  targetDate: string | null;
+  targetPhase: StorkMigrationPhase | null;
+  coverStartedTransportMs: number | null;
+  revealTransportMs: number | null;
+  oneBarDurationMs: number;
+  mapReady: boolean;
+  mapReadyTransportMs: number | null;
+  markerLatLng: MigrationActLatLng | null;
+  cameraReady: boolean;
+  remainingMs: number;
+};
+
+export type MigrationActStoryNarrationState = {
+  eventId: string | null;
+  title: string;
+  text: string;
+};
+
 export type MigrationActEventStatus =
   "pending" | "triggered" | "completed" | "skipped";
 
@@ -50,6 +108,77 @@ export type MigrationActMapFrame = {
   date: string;
   phase: StorkMigrationPhase;
   event: StorkMigrationEvent | null;
+  markerLatLng?: MigrationActLatLng | null;
+  cameraReady?: boolean;
+};
+
+export type MigrationActNarrationSemanticEvent =
+  | "flowIntro"
+  | "cycleIntro"
+  | "cycleTransition"
+  | "summerResidenceTiming"
+  | "autumnDeparturePrepare"
+  | "winterReflection"
+  | "winterResidenceTiming"
+  | "springDeparturePrepare"
+  | "breedingReflection"
+  | "cycleSummary"
+  | "engagementNudge"
+  | "actSummary"
+  | "transitionToClimate";
+
+export type MigrationActNarrationDirection = "south" | "north" | null;
+export type MigrationActNarrationCueRole =
+  | "actIntro"
+  | "cycleIntro"
+  | "cycleTransition"
+  | "summerTiming"
+  | "autumnPrepare"
+  | "winterReflection"
+  | "winterTiming"
+  | "springPrepare"
+  | "breedingReflection"
+  | "actCompletion";
+
+export type MigrationActNarrationEventPayload = {
+  event: MigrationActNarrationSemanticEvent;
+  eventId: string;
+  cueId?: string;
+  cueRole?: MigrationActNarrationCueRole;
+  cycleRunId: string | null;
+  cycleId: string | null;
+  step: number | null;
+  totalCycles: number;
+  startYear: number | null;
+  endYear: number | null;
+  currentPhase: StorkMigrationPhase | null;
+  realDepartureDate?: string;
+  realArrivalDate?: string;
+  realMigrationDurationDays?: number;
+  experienceMigrationDurationSeconds?: number;
+  experienceMigrationDurationSecondsExact?: number;
+  experienceMigrationDurationSecondsSpoken?: number;
+  direction?: MigrationActNarrationDirection;
+  winterRegion?: string | null;
+  previousWinterRegion?: string | null;
+  referenceWinterRegion?: string | null;
+};
+
+export type MigrationActDebugSnapshot = {
+  cycle: string;
+  currentStoryDate: string;
+  experienceTimeSeconds: number;
+  nextEvent: StorkMigrationEvent | null;
+  nextEventExperienceTimeSeconds: number | null;
+  phase: StorkMigrationPhase | null;
+  mapCameraMode: MigrationMapCameraMode;
+  overlayVisible: boolean;
+  cycleTransitionOverlayVisible: boolean;
+};
+
+export type MigrationActDebugState = {
+  enabled: boolean;
+  autoProgressEnabled: boolean;
 };
 
 export type MigrationActEventDiagnostic = {
@@ -321,6 +450,7 @@ export type MigrationInfoPanelMode =
   | "gestureInstruction"
   | "gestureFeedback"
   | "movementFeedback"
+  | "storyNarration"
   | "cycleTransition"
   | "completed"
   | "systemError";

@@ -9,6 +9,7 @@
         :single-story-cycle-mode="singleStoryCycleMode"
         :data-source="dataSource"
         :playback-source="playbackSource"
+        :camera-mode="cameraMode"
         @story-frame="$emit('story-frame', $event)"
       />
       <template #fallback>
@@ -20,7 +21,10 @@
 
 <script setup lang="ts">
 import LeafletMap from "~/components/map/LeafletMap.vue";
-import type { MigrationActMapFrame } from "~/types/migrationAct";
+import type {
+  MigrationActMapFrame,
+  MigrationMapCameraMode,
+} from "~/types/migrationAct";
 import type { StorkDataSource, StorkStoryCycleDefinition } from "~/types/stork";
 
 withDefaults(
@@ -32,6 +36,7 @@ withDefaults(
     singleStoryCycleMode?: boolean;
     dataSource?: StorkDataSource;
     playbackSource?: "story-playback" | "migration-runtime";
+    cameraMode?: MigrationMapCameraMode;
   }>(),
   {
     showControls: true,
@@ -41,6 +46,7 @@ withDefaults(
     singleStoryCycleMode: false,
     dataSource: "raw",
     playbackSource: "migration-runtime",
+    cameraMode: "migration",
   },
 );
 
