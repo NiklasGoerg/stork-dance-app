@@ -58,8 +58,8 @@ withDefaults(
 
 <style scoped>
 .migration-layout {
-  --migration-season-background: var(--act5-season-transition-background);
-  --migration-season-surface: var(--act5-season-transition-surface);
+  --migration-season-background: var(--act4-season-transition-background);
+  --migration-season-surface: var(--act4-season-transition-surface);
 
   width: 100vw;
   height: 100vh;
@@ -75,28 +75,28 @@ withDefaults(
     var(--migration-season-background) 28%,
     var(--migration-season-surface)
   );
-  color: var(--act5-color-text);
+  color: var(--act4-color-text);
   transition: background 400ms ease;
 }
 
 .migration-layout--winter {
-  --migration-season-background: var(--act5-season-winter-background);
-  --migration-season-surface: var(--act5-season-winter-surface);
+  --migration-season-background: var(--act4-season-winter-background);
+  --migration-season-surface: var(--act4-season-winter-surface);
 }
 
 .migration-layout--spring {
-  --migration-season-background: var(--act5-season-spring-background);
-  --migration-season-surface: var(--act5-season-spring-surface);
+  --migration-season-background: var(--act4-season-spring-background);
+  --migration-season-surface: var(--act4-season-spring-surface);
 }
 
 .migration-layout--summer {
-  --migration-season-background: var(--act5-season-summer-background);
-  --migration-season-surface: var(--act5-season-summer-surface);
+  --migration-season-background: var(--act4-season-summer-background);
+  --migration-season-surface: var(--act4-season-summer-surface);
 }
 
 .migration-layout--autumn {
-  --migration-season-background: var(--act5-season-autumn-background);
-  --migration-season-surface: var(--act5-season-autumn-surface);
+  --migration-season-background: var(--act4-season-autumn-background);
+  --migration-season-surface: var(--act4-season-autumn-surface);
 }
 
 .migration-layout__map,
@@ -110,10 +110,10 @@ withDefaults(
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  border: 1px solid var(--act5-color-border);
+  border: 1px solid var(--act4-color-border);
   border-radius: var(--radius-xl);
   background: #dce7dd;
-  box-shadow: var(--act5-shadow-panel);
+  box-shadow: var(--act4-shadow-panel);
 }
 
 .migration-layout__workspace {
@@ -136,21 +136,21 @@ withDefaults(
   display: grid;
   place-items: center;
   padding: var(--space-2);
-  border: 1px solid var(--act5-color-border);
+  border: 1px solid var(--act4-color-border);
   border-radius: var(--radius-md);
   background: color-mix(
     in srgb,
     var(--migration-season-surface) 24%,
-    var(--act5-color-card)
+    var(--act4-color-card)
   );
 }
 
 .migration-layout__cell--guidance {
   overflow: auto;
   padding: var(--space-5);
-  border: 1px solid var(--act5-color-border);
+  border: 1px solid var(--act4-color-border);
   border-radius: var(--radius-md);
-  background: var(--act5-color-card);
+  background: var(--act4-color-card);
 }
 
 .migration-layout__controls {
@@ -158,10 +158,10 @@ withDefaults(
   min-width: 0;
   min-height: 52px;
   padding: 7px var(--space-3);
-  border: 1px solid var(--act5-color-border);
+  border: 1px solid var(--act4-color-border);
   border-radius: var(--radius-md);
   background: rgba(248, 251, 247, 0.96);
-  box-shadow: var(--act5-shadow-bottom-bar);
+  box-shadow: var(--act4-shadow-bottom-bar);
   backdrop-filter: blur(12px);
 }
 

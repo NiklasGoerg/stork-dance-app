@@ -25,7 +25,7 @@
         <StoryProgressSidebar />
         <CycleTransitionCover
           v-if="cycleTransitionCoverMounted"
-          :label="t('story.acts.act4.transition.label')"
+          :label="t('story.acts.act3.transition.label')"
           :from-title="store.cycleTransitionOverlay.fromTitle"
           :to-title="store.cycleTransitionOverlay.toTitle"
           class="migration-map__cycle-cover"
@@ -110,7 +110,7 @@
     <template #controls>
       <MigrationActControls
         :cycle-runs="cycleRuns"
-        :allow-single-cycle="act.id === 'act-3' || act.id === 'act-4'"
+        :allow-single-cycle="act.id === 'act-3'"
         :show-story-action="showStoryAction"
         :show-reset-action="!guidedController.enabled"
         :show-debug-toggle="showDebugToggle"
@@ -197,9 +197,7 @@ const routeDebugEnabled = computed(
 );
 const showDebugToggle = computed(
   () =>
-    import.meta.dev &&
-    !guidedController.enabled &&
-    (props.act.id === "act-3" || props.act.id === "act-4"),
+    import.meta.dev && !guidedController.enabled && props.act.id === "act-3",
 );
 const activeCycleId = computed(() => store.activeCycleId);
 const cycleTransitionCoverMounted = computed(() =>

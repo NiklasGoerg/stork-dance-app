@@ -1,5 +1,5 @@
 import type { MovementRange } from "~/utils/movement/core/range";
-import type { Act5FeedbackSignal, Act5SelectedFeedback } from "~/types/act5";
+import type { Act4FeedbackSignal, Act4SelectedFeedback } from "~/types/act4";
 
 export type WinterBeat = 1 | 2 | 3 | 4;
 export type WinterValue = "100" | "50" | "20" | "-10";
@@ -122,7 +122,7 @@ export type WinterBeatEvaluation = {
   timestamp: number;
   expectedValue: WinterValue;
   feedbackCode?: WinterFeedbackCode;
-  feedbackSignals?: Act5FeedbackSignal<WinterFeedbackCode>[];
+  feedbackSignals?: Act4FeedbackSignal<WinterFeedbackCode>[];
   metrics: WinterRecognitionMetrics;
 };
 
@@ -133,7 +133,7 @@ export type WinterSequenceEvaluation = {
   beatEvaluations: WinterBeatEvaluation[];
   feedbackCode?: WinterFeedbackCode;
   primaryFeedbackCode?: WinterFeedbackCode;
-  selectedFeedback?: Act5SelectedFeedback<WinterFeedbackCode>;
+  selectedFeedback?: Act4SelectedFeedback<WinterFeedbackCode>;
 };
 
 export type WinterThresholds = {

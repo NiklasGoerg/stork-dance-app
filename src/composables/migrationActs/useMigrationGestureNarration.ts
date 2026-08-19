@@ -17,8 +17,8 @@ export const useMigrationGestureNarration = () => {
       if (result.status === "success") {
         const cue = resolveMigrationActNarrationCue(
           result.gestureId === "departure"
-            ? "act4.departure.success"
-            : "act4.arrival.success",
+            ? "act3.departure.success"
+            : "act3.arrival.success",
         );
         void narration.speakText(cue.text, { behavior: "replace" });
         return;

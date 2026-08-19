@@ -50,8 +50,8 @@ const cue = (
 const p = (...phases: MigrationActNarrationPhase[]) => phases;
 
 export const migrationActNarrationCatalog = {
-  "act4.departure.context": cue({
-    id: "act4.departure.context",
+  "act3.departure.context": cue({
+    id: "act3.departure.context",
     phases: p("summer_rest", "winter_rest"),
     trigger: { type: "event", eventType: "autumn_departure" },
     priority: MIGRATION_ACT_NARRATION_PRIORITY.eventContext,
@@ -59,8 +59,8 @@ export const migrationActNarrationCatalog = {
     title: "Departure",
     text: "Prepare for departure.",
   }),
-  "act4.departure.handover": cue({
-    id: "act4.departure.handover",
+  "act3.departure.handover": cue({
+    id: "act3.departure.handover",
     phases: p("departure-gesture"),
     trigger: { type: "gesture-handover", gesture: "departure" },
     priority: MIGRATION_ACT_NARRATION_PRIORITY.gestureHandover,
@@ -68,8 +68,8 @@ export const migrationActNarrationCatalog = {
     title: "Departure",
     text: "Depart with the stork.",
   }),
-  "act4.departure.success": cue({
-    id: "act4.departure.success",
+  "act3.departure.success": cue({
+    id: "act3.departure.success",
     phases: p("departure-gesture"),
     trigger: { type: "gesture-success", gesture: "departure" },
     priority: MIGRATION_ACT_NARRATION_PRIORITY.gestureFeedback,
@@ -78,8 +78,8 @@ export const migrationActNarrationCatalog = {
     text: "Bravo! Great take-off.",
     placeholder: false,
   }),
-  "act4.migration.context": cue({
-    id: "act4.migration.context",
+  "act3.migration.context": cue({
+    id: "act3.migration.context",
     phases: p("autumn_migration", "spring_migration"),
     trigger: { type: "phase-entry" },
     priority: MIGRATION_ACT_NARRATION_PRIORITY.phaseContext,
@@ -87,8 +87,8 @@ export const migrationActNarrationCatalog = {
     title: "Migration",
     text: "Migration begins.",
   }),
-  "act4.arrival.context": cue({
-    id: "act4.arrival.context",
+  "act3.arrival.context": cue({
+    id: "act3.arrival.context",
     phases: p("autumn_migration", "spring_migration"),
     trigger: { type: "event", eventType: "autumn_arrival" },
     priority: MIGRATION_ACT_NARRATION_PRIORITY.eventContext,
@@ -96,8 +96,8 @@ export const migrationActNarrationCatalog = {
     title: "Arrival",
     text: "Prepare to land.",
   }),
-  "act4.arrival.handover": cue({
-    id: "act4.arrival.handover",
+  "act3.arrival.handover": cue({
+    id: "act3.arrival.handover",
     phases: p("arrival-gesture"),
     trigger: { type: "gesture-handover", gesture: "arrival" },
     priority: MIGRATION_ACT_NARRATION_PRIORITY.gestureHandover,
@@ -105,8 +105,8 @@ export const migrationActNarrationCatalog = {
     title: "Arrival",
     text: "Land with the stork.",
   }),
-  "act4.arrival.success": cue({
-    id: "act4.arrival.success",
+  "act3.arrival.success": cue({
+    id: "act3.arrival.success",
     phases: p("arrival-gesture"),
     trigger: { type: "gesture-success", gesture: "arrival" },
     priority: MIGRATION_ACT_NARRATION_PRIORITY.gestureFeedback,
@@ -115,8 +115,8 @@ export const migrationActNarrationCatalog = {
     text: "Good! You landed successfully.",
     placeholder: false,
   }),
-  "act4.season.transition": cue({
-    id: "act4.season.transition",
+  "act3.season.transition": cue({
+    id: "act3.season.transition",
     phases: p("summer_rest", "winter_rest"),
     trigger: { type: "phase-entry" },
     priority: MIGRATION_ACT_NARRATION_PRIORITY.phaseContext,
@@ -124,8 +124,8 @@ export const migrationActNarrationCatalog = {
     title: "Season transition",
     text: "The season changes.",
   }),
-  "act4.cycle.complete": cue({
-    id: "act4.cycle.complete",
+  "act3.cycle.complete": cue({
+    id: "act3.cycle.complete",
     phases: p("cycle-complete"),
     trigger: { type: "cycle-complete" },
     priority: MIGRATION_ACT_NARRATION_PRIORITY.eventContext,
@@ -133,8 +133,8 @@ export const migrationActNarrationCatalog = {
     title: "Cycle complete",
     text: "Migration cycle complete.",
   }),
-  "act4.feedback.technical": cue({
-    id: "act4.feedback.technical",
+  "act3.feedback.technical": cue({
+    id: "act3.feedback.technical",
     phases: p(
       "summer_rest",
       "autumn_migration",
@@ -149,8 +149,8 @@ export const migrationActNarrationCatalog = {
     title: "Tracking",
     text: "Adjust your position.",
   }),
-  "act4.feedback.movement": cue({
-    id: "act4.feedback.movement",
+  "act3.feedback.movement": cue({
+    id: "act3.feedback.movement",
     phases: p(
       "summer_rest",
       "autumn_migration",

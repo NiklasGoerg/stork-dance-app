@@ -52,10 +52,17 @@ const median = (values: number[]) => {
 
   const sorted = [...values].sort((a, b) => a - b);
   const midpoint = Math.floor(sorted.length / 2);
+  const upperMiddle = sorted[midpoint];
 
-  if (sorted.length % 2 === 1) return sorted[midpoint];
+  if (upperMiddle === undefined) return null;
 
-  return (sorted[midpoint - 1] + sorted[midpoint]) / 2;
+  if (sorted.length % 2 === 1) return upperMiddle;
+
+  const lowerMiddle = sorted[midpoint - 1];
+
+  return lowerMiddle === undefined
+    ? upperMiddle
+    : (lowerMiddle + upperMiddle) / 2;
 };
 
 const createEvaluationRecord = (
@@ -191,7 +198,7 @@ export const usePoseComparison = ({
         );
         const stableResult = updateStablePoseMatch(
           evaluation,
-          stableStates[definition.id],
+          stableStates[definition.id] ?? createStablePoseState(definition.id),
           definition.stabilityMs,
         );
 

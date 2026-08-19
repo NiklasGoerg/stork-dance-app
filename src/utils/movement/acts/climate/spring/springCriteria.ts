@@ -5,9 +5,9 @@ import {
   springMovementConfig,
 } from "~/utils/movement/acts/climate/spring/springReference";
 import {
-  createAct5SeasonCriterionFactory,
+  createAct4SeasonCriterionFactory,
   getHighestPriorityFailedCriterion,
-} from "~/utils/act5/criteria";
+} from "~/utils/act4/criteria";
 import type {
   SpringBeat,
   SpringCriterionImportance,
@@ -17,7 +17,7 @@ import type {
   SpringValue,
 } from "~/utils/movement/acts/climate/spring/springTypes";
 
-const criterion = createAct5SeasonCriterionFactory<
+const criterion = createAct4SeasonCriterionFactory<
   SpringCriterionImportance,
   SpringFeedbackCode,
   SpringCriterionResult

@@ -5,7 +5,6 @@
       <NuxtLink to="/story/act-2">{{ t("home.nav.act2") }}</NuxtLink>
       <NuxtLink to="/story/act-3">{{ t("home.nav.act3") }}</NuxtLink>
       <NuxtLink to="/story/act-4">{{ t("home.nav.act4") }}</NuxtLink>
-      <NuxtLink to="/story/act-5">{{ t("home.nav.act5") }}</NuxtLink>
       <NuxtLink to="/story/epilogue">{{ t("home.nav.epilogue") }}</NuxtLink>
       <NuxtLink to="/story/stage">
         {{ t("home.nav.storyStageTest") }}

@@ -17,10 +17,10 @@ import {
   summerMovementConfig,
 } from "~/utils/movement/acts/climate/summer/summerReference";
 import {
-  type Act5SeasonCriterionInput,
-  createAct5SeasonCriterionFactory,
+  type Act4SeasonCriterionInput,
+  createAct4SeasonCriterionFactory,
   roundCriterionDebugValue,
-} from "~/utils/act5/criteria";
+} from "~/utils/act4/criteria";
 import type {
   SummerBeat,
   SummerCriterionDomain,
@@ -47,7 +47,7 @@ type BeatContext = {
   } | null;
 };
 
-type SummerCriterionInput = Act5SeasonCriterionInput<
+type SummerCriterionInput = Act4SeasonCriterionInput<
   SummerCriterionImportance,
   SummerFeedbackCode,
   number | string | null | undefined
@@ -56,7 +56,7 @@ type SummerCriterionInput = Act5SeasonCriterionInput<
   failureDirection?: "tooLow" | "tooHigh";
 };
 
-const criterion = createAct5SeasonCriterionFactory<
+const criterion = createAct4SeasonCriterionFactory<
   SummerCriterionImportance,
   SummerFeedbackCode,
   SummerCriterionResult,

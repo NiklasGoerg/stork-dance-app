@@ -1,5 +1,5 @@
 import type { MovementRange } from "~/utils/movement/core/range";
-import type { Act5FeedbackSignal, Act5SelectedFeedback } from "~/types/act5";
+import type { Act4FeedbackSignal, Act4SelectedFeedback } from "~/types/act4";
 
 export type AutumnBeat = 1 | 2 | 3 | 4;
 export type AutumnValueClass = "100" | "80" | "50" | "40" | "25";
@@ -138,7 +138,7 @@ export type AutumnBeatEvaluation = {
   expectedDirection: AutumnDirection;
   expectedValueClass: AutumnValueClass;
   feedbackCode?: AutumnFeedbackCode;
-  feedbackSignals?: Act5FeedbackSignal<AutumnFeedbackCode>[];
+  feedbackSignals?: Act4FeedbackSignal<AutumnFeedbackCode>[];
   metrics: AutumnRecognitionMetrics;
 };
 
@@ -149,7 +149,7 @@ export type AutumnSequenceEvaluation = {
   beatEvaluations: AutumnBeatEvaluation[];
   feedbackCode?: AutumnFeedbackCode;
   primaryFeedbackCode?: AutumnFeedbackCode;
-  selectedFeedback?: Act5SelectedFeedback<AutumnFeedbackCode>;
+  selectedFeedback?: Act4SelectedFeedback<AutumnFeedbackCode>;
 };
 
 export type AutumnThresholds = {

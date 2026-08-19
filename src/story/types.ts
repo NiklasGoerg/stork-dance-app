@@ -1,7 +1,6 @@
 import type { StorkStoryCycleDefinition } from "~/types/stork";
 
-export type StoryActId =
-  "prologue" | "act-2" | "act-3" | "act-4" | "act-5" | "epilogue";
+export type StoryActId = "prologue" | "act-2" | "act-3" | "act-4" | "epilogue";
 
 export type StoryLayoutType =
   "migration-stage" | "movement-only" | "climate-stage" | "fullscreen";

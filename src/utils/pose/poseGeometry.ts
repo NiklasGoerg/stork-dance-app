@@ -7,7 +7,9 @@ export type PosePoint = {
   z?: number;
 };
 
-export const isValidPosePoint = (point?: PoseLandmarkLike | null) =>
+export const isValidPosePoint = (
+  point?: PoseLandmarkLike | null,
+): point is PoseLandmarkLike =>
   !!point &&
   Number.isFinite(point.x) &&
   Number.isFinite(point.y) &&

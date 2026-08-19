@@ -342,7 +342,7 @@ export const resolveClimateMovementStep = (
 
   return {
     id: `${row.season}-${row.intervalOrder}-${row.interval}`,
-    movementDefinitionId: `act5-${row.season}-${movementValue}`,
+    movementDefinitionId: `act4-${row.season}-${movementValue}`,
     sourceRow: row,
     season: row.season,
     intervalOrder: row.intervalOrder,

@@ -31,7 +31,6 @@
       "act2": "Act 2",
       "act3": "Act 3",
       "act4": "Act 4",
-      "act5": "Act 5",
       "epilogue": "Epilogue",
       "storyStageTest": "Story Stage Test",
       "record": "Record",
@@ -293,18 +292,13 @@
       },
       "act3": {
         "label": "Act III",
-        "name": "Routes",
-        "title": "Act III - Comparing African Routes"
+        "name": "Changing Cycles",
+        "title": "Act III - Changing Cycles"
       },
       "act4": {
         "label": "Act IV",
-        "name": "Route Shift",
-        "title": "Act IV - Changing Cycles"
-      },
-      "act5": {
-        "label": "Act V",
         "name": "Climate",
-        "title": "Act V - Climate Data"
+        "title": "Act IV - Climate Data"
       },
       "epilogue": {
         "label": "Epilogue",
@@ -347,24 +341,7 @@
         }
       },
       "act3": {
-        "title": "Act 3 - Comparing African Routes",
-        "cycles": {
-          "standard": "Standard cycle",
-          "eastern": "Bird 3339, 2016-2017"
-        },
-        "scenes": {
-          "standardCycle": {
-            "title": "The familiar route",
-            "narration": "Begin with the familiar migration cycle before comparing it to a later African route."
-          },
-          "easternRoute": {
-            "title": "A later African route",
-            "narration": "Follow bird 3339 on the 2016-2017 route to Morocco."
-          }
-        }
-      },
-      "act4": {
-        "title": "Act 4 - Changing Cycles",
+        "title": "Act 3 - Changing Cycles",
         "cycleTitle": "Cycle {step}: {startYear}-{endYear}",
         "cycleNarration": "Follow the {startYear}-{endYear} {wintering} migration cycle.",
         "overlay": {
@@ -595,15 +572,15 @@
           }
         }
       },
-      "act5": {
-        "title": "Act 5 - Climate Act",
+      "act4": {
+        "title": "Act 4 - Climate Act",
         "periodEyebrow": "Reference period",
         "periodPlaceholder": "Reference Cycle",
         "contextPlaceholder": "100% seasonal movements",
         "currentDate": "Current date",
         "controls": {
-          "startAct5": "Start Act 5",
-          "startAct5WithoutTutorial": "Start without tutorial",
+          "startAct4": "Start Act 4",
+          "startAct4WithoutTutorial": "Start without tutorial",
           "play": "Play",
           "pause": "Pause",
           "reset": "Reset"
@@ -1002,8 +979,8 @@
           "periodShift": "Period shift",
           "vs": "vs {value}",
           "aria": {
-            "card": "Act 5 climate information",
-            "completion": "Act 5 completion",
+            "card": "Act 4 climate information",
+            "completion": "Act 4 completion",
             "periodTransition": "Climate period transition",
             "currentTarget": "Current movement target",
             "currentClimateData": "Current climate data",
@@ -1013,7 +990,7 @@
         "chart": {
           "legend": "Chart legend",
           "eyebrow": {
-            "inactive": "Act 5 climate",
+            "inactive": "Act 4 climate",
             "active": "Seasonal temperature"
           },
           "title": {
@@ -1039,7 +1016,7 @@
           },
           "empty": {
             "tutorial": "Movement tutorial first. Climate data stays hidden.",
-            "story": "The climate chart will begin with the real Act 5 story."
+            "story": "The climate chart will begin with the real Act 4 story."
           }
         },
         "autumnFeedback": {
@@ -1165,7 +1142,7 @@
         },
         "debug": {
           "toggle": "Debug",
-          "startAct5Tutorial": "Start Act 5 Tutorial",
+          "startAct4Tutorial": "Start Act 4 Tutorial",
           "startSeason": "Start {season}",
           "startSummerSequence": "Start Summer Sequence",
           "startAutumnSequence": "Start Autumn Sequence",

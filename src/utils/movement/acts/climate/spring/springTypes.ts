@@ -1,5 +1,5 @@
 import type { MovementRange } from "~/utils/movement/core/range";
-import type { Act5FeedbackSignal, Act5SelectedFeedback } from "~/types/act5";
+import type { Act4FeedbackSignal, Act4SelectedFeedback } from "~/types/act4";
 
 export type SpringBeat = 1 | 2 | 3 | 4;
 export type SpringValue = "100" | "40" | "30" | "20";
@@ -103,7 +103,7 @@ export type SpringBeatEvaluation = {
   expectedValue: SpringValue;
   expectedKneeSide: SpringKneeSide;
   feedbackCode?: SpringFeedbackCode;
-  feedbackSignals?: Act5FeedbackSignal<SpringFeedbackCode>[];
+  feedbackSignals?: Act4FeedbackSignal<SpringFeedbackCode>[];
   metrics: SpringRecognitionMetrics;
 };
 
@@ -114,7 +114,7 @@ export type SpringSequenceEvaluation = {
   beatEvaluations: SpringBeatEvaluation[];
   feedbackCode?: SpringFeedbackCode;
   primaryFeedbackCode?: SpringFeedbackCode;
-  selectedFeedback?: Act5SelectedFeedback<SpringFeedbackCode>;
+  selectedFeedback?: Act4SelectedFeedback<SpringFeedbackCode>;
 };
 
 export type SpringThresholds = {

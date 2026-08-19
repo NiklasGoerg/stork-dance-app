@@ -34,12 +34,13 @@ const storyPoseIds: StoryPoseId[] = [
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
-const isNumber = (value: unknown) =>
+const isNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
-const isBoolean = (value: unknown) => typeof value === "boolean";
+const isBoolean = (value: unknown): value is boolean =>
+  typeof value === "boolean";
 
-const isString = (value: unknown) => typeof value === "string";
+const isString = (value: unknown): value is string => typeof value === "string";
 
 // Validates one JSON condition before it reaches the live pose evaluator.
 const readConditionDefinition = (

@@ -1,47 +1,40 @@
 import type { StoryAct } from "~/story/types";
-import { act2 } from "~/story/acts/act2";
 import { migrationStoryCycleDefinitions as storyCycleDefinitions } from "~/utils/migrationStoryData";
-
-const comparisonCycle = storyCycleDefinitions[1]!;
 
 export const act3 = {
   id: "act-3",
-  title: "Act 3 - Comparing African Routes",
+  title: "Act 3 - Changing Cycles",
   titleKey: "story.acts.act3.title",
   layout: "migration-stage",
   instructorMovementId: "test-dance",
-  scenes: [
-    {
-      id: "standard-cycle",
-      title: "The familiar route",
-      titleKey: "story.acts.act3.scenes.standardCycle.title",
-      narration:
-        "Begin with the familiar migration cycle before comparing it to a later African route.",
-      narrationKey: "story.acts.act3.scenes.standardCycle.narration",
+  scenes: storyCycleDefinitions.map((cycle) => ({
+    id: cycle.label,
+    title: `Cycle ${cycle.step}: ${cycle.targetYear}-${cycle.targetYear + 1}`,
+    titleKey: "story.acts.act3.cycleTitle",
+    narration: `Follow the ${cycle.targetYear}-${cycle.targetYear + 1} ${cycle.wintering} migration cycle.`,
+    narrationKey: "story.acts.act3.cycleNarration",
+    titleParams: {
+      step: cycle.step,
+      startYear: cycle.targetYear,
+      endYear: cycle.targetYear + 1,
     },
-    {
-      id: "comparison-route",
-      title: "A later African route",
-      titleKey: "story.acts.act3.scenes.easternRoute.title",
-      narration: "Follow bird 3339 on the 2016-2017 route to Morocco.",
-      narrationKey: "story.acts.act3.scenes.easternRoute.narration",
+    narrationParams: {
+      startYear: cycle.targetYear,
+      endYear: cycle.targetYear + 1,
+      wintering: cycle.wintering,
     },
-  ],
-  migrationCycles: [
-    {
-      id: "standard-cycle",
-      cycleId: act2.cycleId,
-      cycleStartYear: act2.cycleStartYear,
-      title: "Standard cycle",
-      titleKey: "story.acts.act3.cycles.standard",
+  })),
+  migrationCycles: storyCycleDefinitions.map((cycle) => ({
+    id: cycle.label,
+    cycleId: cycle.label,
+    cycleStartYear: cycle.targetYear,
+    title: `Cycle ${cycle.step}: ${cycle.targetYear}-${cycle.targetYear + 1}`,
+    titleKey: "story.acts.act3.cycleTitle",
+    titleParams: {
+      step: cycle.step,
+      startYear: cycle.targetYear,
+      endYear: cycle.targetYear + 1,
     },
-    {
-      id: "comparison-route-3339",
-      cycleId: comparisonCycle.label,
-      cycleStartYear: comparisonCycle.targetYear,
-      title: "Bird 3339, 2016-2017",
-      titleKey: "story.acts.act3.cycles.eastern",
-    },
-  ],
+  })),
   nextActId: "act-4",
 } satisfies StoryAct;

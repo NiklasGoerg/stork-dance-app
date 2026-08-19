@@ -6,9 +6,9 @@ import {
 import {
   springCriterionFeedbackMetadata,
   springFeedbackMetadata,
-} from "~/utils/act5/feedback/catalog";
-import { buildAct5BeatFeedbackSignals } from "~/utils/act5/feedback/signals";
-import { selectAct5FinalFeedback } from "~/utils/act5/feedback/selectFinalFeedback";
+} from "~/utils/act4/feedback/catalog";
+import { buildAct4BeatFeedbackSignals } from "~/utils/act4/feedback/signals";
+import { selectAct4FinalFeedback } from "~/utils/act4/feedback/selectFinalFeedback";
 import { extractNormalizedBodyMetrics } from "~/utils/movement/core/bodyMetrics";
 import { evaluateHandsGatheredAtCenter } from "~/utils/movement/core/predicates/handPoses";
 import {
@@ -354,7 +354,7 @@ export const evaluateSpringBeat = (
       expectedValue,
       expectedKneeSide,
       feedbackCode: "FULL_BODY_NOT_VISIBLE",
-      feedbackSignals: buildAct5BeatFeedbackSignals<SpringFeedbackCode>({
+      feedbackSignals: buildAct4BeatFeedbackSignals<SpringFeedbackCode>({
         season: "spring",
         beat,
         measureIndex: context.measureIndex ?? null,
@@ -389,7 +389,7 @@ export const evaluateSpringBeat = (
     expectedValue,
     expectedKneeSide,
     feedbackCode: passed ? undefined : getSpringBeatFeedbackCode(criteria),
-    feedbackSignals: buildAct5BeatFeedbackSignals<SpringFeedbackCode>({
+    feedbackSignals: buildAct4BeatFeedbackSignals<SpringFeedbackCode>({
       season: "spring",
       beat,
       measureIndex: context.measureIndex ?? null,
@@ -475,7 +475,7 @@ export const evaluateSpringSequence = (
   const hasCentralFailure = beatEvaluations.some(
     (evaluation) => !evaluation.passed,
   );
-  const selectedFeedback = selectAct5FinalFeedback<SpringFeedbackCode>({
+  const selectedFeedback = selectAct4FinalFeedback<SpringFeedbackCode>({
     season: "spring",
     beatEvaluations,
     codeMetadata: springFeedbackMetadata,

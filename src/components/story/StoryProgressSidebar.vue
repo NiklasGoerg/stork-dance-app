@@ -33,7 +33,6 @@ import {
   mdiBird,
   mdiCheck,
   mdiHomeOutline,
-  mdiLeaf,
   mdiMapMarkerPath,
   mdiThermometerLines,
   mdiTransitConnectionVariant,
@@ -86,14 +85,6 @@ const progressActs: ProgressAct[] = [
     nameKey: "story.progress.act4.name",
     titleKey: "story.progress.act4.title",
     path: "/story/act-4",
-    icon: mdiLeaf,
-  },
-  {
-    id: "act-5",
-    labelKey: "story.progress.act5.label",
-    nameKey: "story.progress.act5.name",
-    titleKey: "story.progress.act5.title",
-    path: "/story/act-5",
     icon: mdiThermometerLines,
   },
   {
@@ -113,7 +104,6 @@ const routeActId = computed<StoryActId | null>(() => {
   if (path.includes("/story/act-2")) return "act-2";
   if (path.includes("/story/act-3")) return "act-3";
   if (path.includes("/story/act-4")) return "act-4";
-  if (path.includes("/story/act-5")) return "act-5";
   if (path.includes("/story/epilogue")) return "epilogue";
 
   return null;

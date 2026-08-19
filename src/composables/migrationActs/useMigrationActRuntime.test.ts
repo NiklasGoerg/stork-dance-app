@@ -467,12 +467,12 @@ describe("migration act runtime", () => {
     await controller.startStory();
     expect(narration.calls.play.slice(0, 2)).toEqual([
       {
-        key: "story.acts.act4.narration.intro.part1.text",
+        key: "story.acts.act3.narration.intro.part1.text",
         params: expect.objectContaining({ startYear: 2013, endYear: 2014 }),
         behavior: "queue",
       },
       {
-        key: "story.acts.act4.narration.intro.part2.text",
+        key: "story.acts.act3.narration.intro.part2.text",
         params: expect.objectContaining({ startYear: 2013, endYear: 2014 }),
         behavior: "queue",
       },
@@ -496,17 +496,17 @@ describe("migration act runtime", () => {
     expect(controller.store.cycleOverlay).toMatchObject({
       visible: true,
       title: "2013-2014",
-      subtitleKey: "story.acts.act4.overlay.reference",
+      subtitleKey: "story.acts.act3.overlay.reference",
     });
     expect(controller.store.latestNarrationEvent).toMatchObject({
       event: "cycleIntro",
       cycleId: "individual_3031_2013_2014",
       startYear: 2013,
       endYear: 2014,
-      cueId: "act4.story.2013_2014.intro",
+      cueId: "act3.story.2013_2014.intro",
     });
     expect(narration.calls.play).toContainEqual({
-      key: "story.acts.act4.narration.cycles.2013_2014.intro.text",
+      key: "story.acts.act3.narration.cycles.2013_2014.intro.text",
       params: expect.objectContaining({ startYear: 2013, endYear: 2014 }),
       behavior: "queue",
     });
@@ -515,7 +515,7 @@ describe("migration act runtime", () => {
   });
 
   it("updates visible authored narration only when queued speech actually starts", async () => {
-    const heldCueKey = "story.acts.act4.narration.cycles.2013_2014.intro.text";
+    const heldCueKey = "story.acts.act3.narration.cycles.2013_2014.intro.text";
     const { controller, raf, narration } = createHarness({
       narrationOptions: { holdKeys: [heldCueKey] },
     });
@@ -525,7 +525,7 @@ describe("migration act runtime", () => {
     await finishInitialCountdown(raf);
 
     const queuedTitleKey =
-      "story.acts.act4.narration.cycles.2013_2014.intro.title";
+      "story.acts.act3.narration.cycles.2013_2014.intro.title";
     expect(narration.calls.play.some((call) => call.key === heldCueKey)).toBe(
       true,
     );
@@ -605,11 +605,11 @@ describe("migration act runtime", () => {
       realArrivalDate: "2013-10-06",
       realMigrationDurationDays: 55,
       direction: "south",
-      cueId: "act4.story.2013_2014.autumnPrepare",
+      cueId: "act3.story.2013_2014.autumnPrepare",
       experienceMigrationDurationSecondsSpoken: 20,
     });
     expect(narration.calls.play).toContainEqual({
-      key: "story.acts.act4.narration.cycles.2013_2014.autumnPrepare.text",
+      key: "story.acts.act3.narration.cycles.2013_2014.autumnPrepare.text",
       params: expect.objectContaining({
         direction: "south",
         experienceMigrationDurationSecondsSpoken: 20,
@@ -740,10 +740,10 @@ describe("migration act runtime", () => {
       event: "winterReflection",
       cycleId: "individual_3031_2013_2014",
       winterRegion: "Morocco",
-      cueId: "act4.story.2013_2014.winterReflection1",
+      cueId: "act3.story.2013_2014.winterReflection1",
     });
     expect(narration.calls.play).toContainEqual({
-      key: "story.acts.act4.narration.cycles.2013_2014.winterReflection1.text",
+      key: "story.acts.act3.narration.cycles.2013_2014.winterReflection1.text",
       params: expect.objectContaining({
         startYear: 2013,
         endYear: 2014,
@@ -783,7 +783,7 @@ describe("migration act runtime", () => {
     raf.step(4_000);
     await flushPromises();
     expect(narration.calls.play).toContainEqual({
-      key: "story.acts.act4.narration.cycles.2018_2019.winterReflection1.text",
+      key: "story.acts.act3.narration.cycles.2018_2019.winterReflection1.text",
       params: expect.objectContaining({
         winterRegion: "Spain / Iberia",
       }),
@@ -822,7 +822,7 @@ describe("migration act runtime", () => {
     raf.step(4_000);
     await flushPromises();
     expect(narration.calls.play).toContainEqual({
-      key: "story.acts.act4.narration.cycles.2022_2023.breedingReflection2.text",
+      key: "story.acts.act3.narration.cycles.2022_2023.breedingReflection2.text",
       params: expect.objectContaining({
         startYear: 2022,
         endYear: 2023,
@@ -858,18 +858,18 @@ describe("migration act runtime", () => {
 
     const storyCueKeys = narration.calls.play.map((call) => call.key);
     expect(storyCueKeys).toContain(
-      "story.acts.act4.narration.cycles.2013_2014.breedingReflection1.text",
+      "story.acts.act3.narration.cycles.2013_2014.breedingReflection1.text",
     );
     expect(storyCueKeys).not.toContain(
-      "story.acts.act4.narration.cycles.2013_2014.breedingReflection2.text",
+      "story.acts.act3.narration.cycles.2013_2014.breedingReflection2.text",
     );
     expect(storyCueKeys).toContain(
-      "story.acts.act4.narration.transitions.2016_2017.text",
+      "story.acts.act3.narration.transitions.2016_2017.text",
     );
     expect(
       storyCueKeys.filter(
         (key) =>
-          key === "story.acts.act4.narration.cycles.2016_2017.intro.text",
+          key === "story.acts.act3.narration.cycles.2016_2017.intro.text",
       ),
     ).toHaveLength(0);
     expect(
@@ -895,7 +895,7 @@ describe("migration act runtime", () => {
     await finishInitialCountdown(raf);
 
     expect(narration.calls.play).toContainEqual({
-      key: "story.acts.act4.narration.cycles.2018_2019.intro.text",
+      key: "story.acts.act3.narration.cycles.2018_2019.intro.text",
       params: expect.objectContaining({
         startYear: 2018,
         endYear: 2019,
@@ -934,7 +934,7 @@ describe("migration act runtime", () => {
         narration.calls.play.some(
           (call) =>
             call.key ===
-            `story.acts.act4.narration.cycles.${cycleKey}.summerTiming.text`,
+            `story.acts.act3.narration.cycles.${cycleKey}.summerTiming.text`,
         ),
       ).toBe(false);
       raf.step(1_000);
@@ -944,7 +944,7 @@ describe("migration act runtime", () => {
         narration.calls.play.filter(
           (call) =>
             call.key ===
-            `story.acts.act4.narration.cycles.${cycleKey}.summerTiming.text`,
+            `story.acts.act3.narration.cycles.${cycleKey}.summerTiming.text`,
         ),
       ).toHaveLength(0);
 
@@ -957,12 +957,12 @@ describe("migration act runtime", () => {
       const winterCueCalls = narration.calls.play.filter(
         (call) =>
           call.key ===
-          `story.acts.act4.narration.cycles.${cycleKey}.winterTiming.text`,
+          `story.acts.act3.narration.cycles.${cycleKey}.winterTiming.text`,
       );
       if (winterFits) {
         expect(winterCueCalls).toEqual([
           {
-            key: `story.acts.act4.narration.cycles.${cycleKey}.winterTiming.text`,
+            key: `story.acts.act3.narration.cycles.${cycleKey}.winterTiming.text`,
             params: expect.objectContaining({ currentPhase: "winter_rest" }),
             behavior: "queue",
           },
@@ -977,7 +977,7 @@ describe("migration act runtime", () => {
         narration.calls.play.filter(
           (call) =>
             call.key ===
-            `story.acts.act4.narration.cycles.${cycleKey}.winterTiming.text`,
+            `story.acts.act3.narration.cycles.${cycleKey}.winterTiming.text`,
         ),
       ).toHaveLength(winterFits ? 1 : 0);
     }
@@ -1094,7 +1094,7 @@ describe("migration act runtime", () => {
         transportBeforeTransition,
       );
       expect(narration.calls.play).toContainEqual({
-        key: `story.acts.act4.narration.transitions.${cueKey}.text`,
+        key: `story.acts.act3.narration.transitions.${cueKey}.text`,
         params: expect.objectContaining({
           startYear: Number(toTitle.slice(0, 4)),
           endYear: Number(toTitle.slice(5)),
@@ -1209,7 +1209,7 @@ describe("migration act runtime", () => {
         narration.calls.play.filter(
           (call) =>
             call.key ===
-            `story.acts.act4.narration.cycles.${cueKey}.intro.text`,
+            `story.acts.act3.narration.cycles.${cueKey}.intro.text`,
         ),
       ).toHaveLength(0);
     }
@@ -1439,7 +1439,7 @@ describe("migration act runtime", () => {
     await vi.waitFor(() => {
       expect(
         narration.calls.play.filter((call) =>
-          call.key.includes("story.acts.act4.narration.completed"),
+          call.key.includes("story.acts.act3.narration.completed"),
         ),
       ).toHaveLength(5);
     });
@@ -1450,15 +1450,15 @@ describe("migration act runtime", () => {
     expect(
       narration.calls.play
         .filter((call) =>
-          call.key.includes("story.acts.act4.narration.completed"),
+          call.key.includes("story.acts.act3.narration.completed"),
         )
         .map((call) => call.key),
     ).toEqual([
-      "story.acts.act4.narration.completed.structure.text",
-      "story.acts.act4.narration.completed.pattern.text",
-      "story.acts.act4.narration.completed.qualification.text",
-      "story.acts.act4.narration.completed.question.text",
-      "story.acts.act4.narration.completed.climateTransition.text",
+      "story.acts.act3.narration.completed.structure.text",
+      "story.acts.act3.narration.completed.pattern.text",
+      "story.acts.act3.narration.completed.qualification.text",
+      "story.acts.act3.narration.completed.question.text",
+      "story.acts.act3.narration.completed.climateTransition.text",
     ]);
 
     controller.dispose();

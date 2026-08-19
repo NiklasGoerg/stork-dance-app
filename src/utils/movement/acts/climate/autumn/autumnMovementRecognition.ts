@@ -2,9 +2,9 @@ import type { PoseLandmarkLike } from "~/types/pose";
 import {
   autumnCriterionFeedbackMetadata,
   autumnFeedbackMetadata,
-} from "~/utils/act5/feedback/catalog";
-import { buildAct5BeatFeedbackSignals } from "~/utils/act5/feedback/signals";
-import { selectAct5FinalFeedback } from "~/utils/act5/feedback/selectFinalFeedback";
+} from "~/utils/act4/feedback/catalog";
+import { buildAct4BeatFeedbackSignals } from "~/utils/act4/feedback/signals";
+import { selectAct4FinalFeedback } from "~/utils/act4/feedback/selectFinalFeedback";
 import {
   getBeatPassState,
   getWeightedBeatEvaluationScore,
@@ -616,7 +616,7 @@ export const evaluateAutumnBeat = (
       expectedDirection,
       expectedValueClass,
       feedbackCode: "FULL_BODY_NOT_VISIBLE",
-      feedbackSignals: buildAct5BeatFeedbackSignals<AutumnFeedbackCode>({
+      feedbackSignals: buildAct4BeatFeedbackSignals<AutumnFeedbackCode>({
         season: "autumn",
         beat,
         measureIndex: context.measureIndex ?? null,
@@ -654,7 +654,7 @@ export const evaluateAutumnBeat = (
     expectedDirection,
     expectedValueClass,
     feedbackCode: passed ? undefined : getAutumnBeatFeedbackCode(criteria),
-    feedbackSignals: buildAct5BeatFeedbackSignals<AutumnFeedbackCode>({
+    feedbackSignals: buildAct4BeatFeedbackSignals<AutumnFeedbackCode>({
       season: "autumn",
       beat,
       measureIndex: context.measureIndex ?? null,
@@ -743,7 +743,7 @@ export const evaluateAutumnSequence = (
         evaluation.beat === 4) &&
       !evaluation.passed,
   );
-  const selectedFeedback = selectAct5FinalFeedback<AutumnFeedbackCode>({
+  const selectedFeedback = selectAct4FinalFeedback<AutumnFeedbackCode>({
     season: "autumn",
     beatEvaluations,
     codeMetadata: autumnFeedbackMetadata,

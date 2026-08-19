@@ -22,7 +22,9 @@ type NormalizeOptions = {
   paddingRatio?: number;
 };
 
-const isUsableLandmark = (landmark: MovementStageLandmark | undefined) =>
+const isUsableLandmark = (
+  landmark: MovementStageLandmark | undefined,
+): landmark is MovementStageLandmark =>
   !!landmark &&
   Number.isFinite(landmark.x) &&
   Number.isFinite(landmark.y) &&
@@ -172,6 +174,9 @@ export const getInterpolatedMovementFrame = (
 
   const firstFrame = frames[0];
   const lastFrame = frames[frames.length - 1];
+
+  if (!firstFrame || !lastFrame) return null;
+
   const sourceFrameTime = (firstFrame.time ?? 0) + Math.max(0, sourceTimeMs);
 
   if (sourceFrameTime <= firstFrame.time) {
@@ -196,6 +201,9 @@ export const getInterpolatedMovementFrame = (
 
   const previousFrame = frames[nextFrameIndex - 1];
   const nextFrame = frames[nextFrameIndex];
+
+  if (!previousFrame || !nextFrame) return firstFrame;
+
   const frameDuration = Math.max(nextFrame.time - previousFrame.time, 1);
   const progress = (sourceFrameTime - previousFrame.time) / frameDuration;
   const landmarkCount = Math.max(

@@ -1,6 +1,8 @@
 import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
 
-type SmoothingLandmark = NormalizedLandmark;
+type SmoothingLandmark = NormalizedLandmark & {
+  presence?: number;
+};
 
 type LandmarkSmoothingOptions = {
   alpha: number;

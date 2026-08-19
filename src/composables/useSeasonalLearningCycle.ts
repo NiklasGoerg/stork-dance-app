@@ -283,7 +283,7 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
       if (import.meta.dev && !warnedMovementIds.has(movementKey)) {
         warnedMovementIds.add(movementKey);
         console.warn(
-          `[Act5] Movement "${season.configuredMovementId ?? movementKey}" could not be loaded from ${season.movementUrl}; Act 5 will continue without the instructor clip.`,
+          `[Act4] Movement "${season.configuredMovementId ?? movementKey}" could not be loaded from ${season.movementUrl}; Act 4 will continue without the instructor clip.`,
           error,
         );
       }

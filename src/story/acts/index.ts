@@ -1,7 +1,6 @@
 import { act2 } from "~/story/acts/act2";
 import { act3 } from "~/story/acts/act3";
 import { act4 } from "~/story/acts/act4";
-import { act5 } from "~/story/acts/act5";
 import { epilogue } from "~/story/acts/epilogue";
 import { prologue } from "~/story/acts/prologue";
 import type { StoryAct, StoryActId } from "~/story/types";
@@ -11,7 +10,6 @@ export const storyActs = [
   act2,
   act3,
   act4,
-  act5,
   epilogue,
 ] satisfies StoryAct[];
 
@@ -20,7 +18,6 @@ export const storyActsById: Record<StoryActId, StoryAct> = {
   "act-2": act2,
   "act-3": act3,
   "act-4": act4,
-  "act-5": act5,
   epilogue,
 };
 

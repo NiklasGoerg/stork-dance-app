@@ -6,6 +6,7 @@ import {
   getMigrationActStoryArrivalCueIds,
   getMigrationActStoryCycleIntroCueId,
   getMigrationActStoryDepartureCueId,
+  getMigrationActStoryTransitionCueId,
   migrationActStoryCompletionCueIds,
   migrationActStoryIntroCueIds,
   migrationActStoryNarrationCatalog,
@@ -56,6 +57,96 @@ describe("migration act story narration", () => {
         expect.any(String),
       );
     }
+  });
+
+  it("keeps the flow-backed cue resolvers on the legacy Act 4 cue ids", () => {
+    expect(migrationActStoryIntroCueIds).toEqual([
+      "act3.story.intro.part1",
+      "act3.story.intro.part2",
+    ]);
+    expect(migrationActStoryCompletionCueIds).toEqual([
+      "act3.story.completed.structure",
+      "act3.story.completed.pattern",
+      "act3.story.completed.qualification",
+      "act3.story.completed.question",
+      "act3.story.completed.climateTransition",
+    ]);
+
+    expect(
+      migrationStoryCycleDefinitions.map((cycle) => ({
+        intro: getMigrationActStoryCycleIntroCueId(cycle.label),
+        autumnDeparture: getMigrationActStoryDepartureCueId(
+          cycle.label,
+          "autumn_departure",
+        ),
+        springDeparture: getMigrationActStoryDepartureCueId(
+          cycle.label,
+          "spring_departure",
+        ),
+        autumnArrival: getMigrationActStoryArrivalCueIds(
+          cycle.label,
+          "autumn_arrival",
+        ),
+        springArrival: getMigrationActStoryArrivalCueIds(
+          cycle.label,
+          "spring_arrival",
+        ),
+        transition: getMigrationActStoryTransitionCueId(cycle.label),
+      })),
+    ).toEqual([
+      {
+        intro: "act3.story.2013_2014.intro",
+        autumnDeparture: "act3.story.2013_2014.autumnPrepare",
+        springDeparture: "act3.story.2013_2014.springPrepare",
+        autumnArrival: ["act3.story.2013_2014.winterReflection1"],
+        springArrival: ["act3.story.2013_2014.breedingReflection1"],
+        transition: null,
+      },
+      {
+        intro: "act3.story.2016_2017.intro",
+        autumnDeparture: "act3.story.2016_2017.autumnPrepare",
+        springDeparture: "act3.story.2016_2017.springPrepare",
+        autumnArrival: ["act3.story.2016_2017.winterReflection1"],
+        springArrival: ["act3.story.2016_2017.breedingReflection1"],
+        transition: "act3.story.transition.2016_2017",
+      },
+      {
+        intro: "act3.story.2018_2019.intro",
+        autumnDeparture: "act3.story.2018_2019.autumnPrepare",
+        springDeparture: "act3.story.2018_2019.springPrepare",
+        autumnArrival: [
+          "act3.story.2018_2019.winterReflection1",
+          "act3.story.2018_2019.winterReflection2",
+        ],
+        springArrival: ["act3.story.2018_2019.breedingReflection1"],
+        transition: "act3.story.transition.2018_2019",
+      },
+      {
+        intro: "act3.story.2020_2021.intro",
+        autumnDeparture: "act3.story.2020_2021.autumnPrepare",
+        springDeparture: "act3.story.2020_2021.springPrepare",
+        autumnArrival: [
+          "act3.story.2020_2021.winterReflection1",
+          "act3.story.2020_2021.winterReflection2",
+        ],
+        springArrival: [
+          "act3.story.2020_2021.breedingReflection1",
+          "act3.story.2020_2021.breedingReflection2",
+        ],
+        transition: "act3.story.transition.2020_2021",
+      },
+      {
+        intro: "act3.story.2022_2023.intro",
+        autumnDeparture: "act3.story.2022_2023.autumnPrepare",
+        springDeparture: "act3.story.2022_2023.springPrepare",
+        autumnArrival: ["act3.story.2022_2023.winterReflection1"],
+        springArrival: [
+          "act3.story.2022_2023.breedingReflection1",
+          "act3.story.2022_2023.breedingReflection2",
+        ],
+        transition: "act3.story.transition.2022_2023",
+      },
+    ]);
   });
 
   it("derives pacing seconds from the runtime calendar transform", () => {
@@ -191,31 +282,31 @@ describe("migration act story narration", () => {
     expect(
       getValueAtPath(
         en,
-        "story.acts.act4.narration.cycles.2013_2014.breedingReflection1.text",
+        "story.acts.act3.narration.cycles.2013_2014.breedingReflection1.text",
       ),
     ).toContain("May 27");
     expect(
       getValueAtPath(
         en,
-        "story.acts.act4.narration.cycles.2016_2017.breedingReflection1.text",
+        "story.acts.act3.narration.cycles.2016_2017.breedingReflection1.text",
       ),
     ).toContain("March 26");
     expect(
       getValueAtPath(
         en,
-        "story.acts.act4.narration.cycles.2018_2019.breedingReflection1.text",
+        "story.acts.act3.narration.cycles.2018_2019.breedingReflection1.text",
       ),
     ).toContain("March 13");
     expect(
       getValueAtPath(
         en,
-        "story.acts.act4.narration.cycles.2020_2021.breedingReflection1.text",
+        "story.acts.act3.narration.cycles.2020_2021.breedingReflection1.text",
       ),
     ).toContain("February 23");
     expect(
       getValueAtPath(
         en,
-        "story.acts.act4.narration.cycles.2022_2023.breedingReflection1.text",
+        "story.acts.act3.narration.cycles.2022_2023.breedingReflection1.text",
       ),
     ).toContain("February 15");
   });

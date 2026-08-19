@@ -2,6 +2,16 @@ import type {
   MigrationActCycleRun,
   MigrationActNarrationCueRole,
 } from "~/types/migrationAct";
+import {
+  getMigrationChangeFlowArrivalCueIds,
+  getMigrationChangeFlowCycleByCycleId,
+  getMigrationChangeFlowCycleIntroCueId,
+  getMigrationChangeFlowCompletionCueIds,
+  getMigrationChangeFlowDepartureCueId,
+  getMigrationChangeFlowIntroCueIds,
+  getMigrationChangeFlowTransitionCueId,
+  type MigrationChangeFlowCycleKey,
+} from "~/story/acts/migrationChangeFlow";
 import type { StorkMigrationEvent } from "~/types/stork";
 import { createMigrationActEvents } from "~/utils/migrationActs/events";
 import {
@@ -13,8 +23,7 @@ import {
   migrationStoryCycleDefinitions,
 } from "~/utils/migrationStoryData";
 
-export type MigrationActStoryCycleKey =
-  "2013_2014" | "2016_2017" | "2018_2019" | "2020_2021" | "2022_2023";
+export type MigrationActStoryCycleKey = MigrationChangeFlowCycleKey;
 
 export type MigrationActStoryCycleCueKey =
   | "intro"
@@ -70,25 +79,17 @@ export type MigrationActScheduledResidenceNarrationCue = {
   textKey: string;
 };
 
-const cycleKeyByCycleId: Record<string, MigrationActStoryCycleKey> = {
-  individual_3031_2013_2014: "2013_2014",
-  individual_3339_2016_2017: "2016_2017",
-  individual_3042_2018_2019: "2018_2019",
-  individual_3042_2020_2021: "2020_2021",
-  individual_4004_2022_2023: "2022_2023",
-};
-
 const cycleCue = (
   cycleKey: MigrationActStoryCycleKey,
   cueKey: MigrationActStoryCycleCueKey,
   role: MigrationActNarrationCueRole,
 ): MigrationActStoryNarrationCue => {
   const id =
-    `act4.story.${cycleKey}.${cueKey}` as MigrationActStoryNarrationCueId;
+    `act3.story.${cycleKey}.${cueKey}` as MigrationActStoryNarrationCueId;
 
   return {
     id,
-    textKey: `story.acts.act4.narration.cycles.${cycleKey}.${cueKey}`,
+    textKey: `story.acts.act3.narration.cycles.${cycleKey}.${cueKey}`,
     role,
     speak: true,
     display: true,
@@ -100,11 +101,11 @@ const completionCue = (
   cueKey: MigrationActStoryCompletionCueKey,
 ): MigrationActStoryNarrationCue => {
   const id =
-    `act4.story.completed.${cueKey}` as MigrationActStoryNarrationCueId;
+    `act3.story.completed.${cueKey}` as MigrationActStoryNarrationCueId;
 
   return {
     id,
-    textKey: `story.acts.act4.narration.completed.${cueKey}`,
+    textKey: `story.acts.act3.narration.completed.${cueKey}`,
     role: "actCompletion",
     speak: true,
     display: true,
@@ -116,11 +117,11 @@ const transitionCue = (
   cueKey: MigrationActStoryTransitionCueKey,
 ): MigrationActStoryNarrationCue => {
   const id =
-    `act4.story.transition.${cueKey}` as MigrationActStoryNarrationCueId;
+    `act3.story.transition.${cueKey}` as MigrationActStoryNarrationCueId;
 
   return {
     id,
-    textKey: `story.acts.act4.narration.transitions.${cueKey}`,
+    textKey: `story.acts.act3.narration.transitions.${cueKey}`,
     role: "cycleTransition",
     speak: true,
     display: true,
@@ -129,281 +130,248 @@ const transitionCue = (
 };
 
 export const migrationActStoryNarrationCatalog = {
-  "act4.story.intro.part1": {
-    id: "act4.story.intro.part1",
-    textKey: "story.acts.act4.narration.intro.part1",
+  "act3.story.intro.part1": {
+    id: "act3.story.intro.part1",
+    textKey: "story.acts.act3.narration.intro.part1",
     role: "actIntro",
     speak: true,
     display: true,
     priority: 55,
   },
-  "act4.story.intro.part2": {
-    id: "act4.story.intro.part2",
-    textKey: "story.acts.act4.narration.intro.part2",
+  "act3.story.intro.part2": {
+    id: "act3.story.intro.part2",
+    textKey: "story.acts.act3.narration.intro.part2",
     role: "actIntro",
     speak: true,
     display: true,
     priority: 55,
   },
-  "act4.story.2013_2014.intro": cycleCue("2013_2014", "intro", "cycleIntro"),
-  "act4.story.2013_2014.summerTiming": cycleCue(
+  "act3.story.2013_2014.intro": cycleCue("2013_2014", "intro", "cycleIntro"),
+  "act3.story.2013_2014.summerTiming": cycleCue(
     "2013_2014",
     "summerTiming",
     "summerTiming",
   ),
-  "act4.story.2013_2014.autumnPrepare": cycleCue(
+  "act3.story.2013_2014.autumnPrepare": cycleCue(
     "2013_2014",
     "autumnPrepare",
     "autumnPrepare",
   ),
-  "act4.story.2013_2014.winterReflection1": cycleCue(
+  "act3.story.2013_2014.winterReflection1": cycleCue(
     "2013_2014",
     "winterReflection1",
     "winterReflection",
   ),
-  "act4.story.2013_2014.winterTiming": cycleCue(
+  "act3.story.2013_2014.winterTiming": cycleCue(
     "2013_2014",
     "winterTiming",
     "winterTiming",
   ),
-  "act4.story.2013_2014.springPrepare": cycleCue(
+  "act3.story.2013_2014.springPrepare": cycleCue(
     "2013_2014",
     "springPrepare",
     "springPrepare",
   ),
-  "act4.story.2013_2014.breedingReflection1": cycleCue(
+  "act3.story.2013_2014.breedingReflection1": cycleCue(
     "2013_2014",
     "breedingReflection1",
     "breedingReflection",
   ),
-  "act4.story.2016_2017.intro": cycleCue("2016_2017", "intro", "cycleIntro"),
-  "act4.story.2016_2017.summerTiming": cycleCue(
+  "act3.story.2016_2017.intro": cycleCue("2016_2017", "intro", "cycleIntro"),
+  "act3.story.2016_2017.summerTiming": cycleCue(
     "2016_2017",
     "summerTiming",
     "summerTiming",
   ),
-  "act4.story.2016_2017.autumnPrepare": cycleCue(
+  "act3.story.2016_2017.autumnPrepare": cycleCue(
     "2016_2017",
     "autumnPrepare",
     "autumnPrepare",
   ),
-  "act4.story.2016_2017.winterReflection1": cycleCue(
+  "act3.story.2016_2017.winterReflection1": cycleCue(
     "2016_2017",
     "winterReflection1",
     "winterReflection",
   ),
-  "act4.story.2016_2017.winterTiming": cycleCue(
+  "act3.story.2016_2017.winterTiming": cycleCue(
     "2016_2017",
     "winterTiming",
     "winterTiming",
   ),
-  "act4.story.2016_2017.springPrepare": cycleCue(
+  "act3.story.2016_2017.springPrepare": cycleCue(
     "2016_2017",
     "springPrepare",
     "springPrepare",
   ),
-  "act4.story.2016_2017.breedingReflection1": cycleCue(
+  "act3.story.2016_2017.breedingReflection1": cycleCue(
     "2016_2017",
     "breedingReflection1",
     "breedingReflection",
   ),
-  "act4.story.2018_2019.intro": cycleCue("2018_2019", "intro", "cycleIntro"),
-  "act4.story.2018_2019.summerTiming": cycleCue(
+  "act3.story.2018_2019.intro": cycleCue("2018_2019", "intro", "cycleIntro"),
+  "act3.story.2018_2019.summerTiming": cycleCue(
     "2018_2019",
     "summerTiming",
     "summerTiming",
   ),
-  "act4.story.2018_2019.autumnPrepare": cycleCue(
+  "act3.story.2018_2019.autumnPrepare": cycleCue(
     "2018_2019",
     "autumnPrepare",
     "autumnPrepare",
   ),
-  "act4.story.2018_2019.winterReflection1": cycleCue(
+  "act3.story.2018_2019.winterReflection1": cycleCue(
     "2018_2019",
     "winterReflection1",
     "winterReflection",
   ),
-  "act4.story.2018_2019.winterReflection2": cycleCue(
+  "act3.story.2018_2019.winterReflection2": cycleCue(
     "2018_2019",
     "winterReflection2",
     "winterReflection",
   ),
-  "act4.story.2018_2019.winterTiming": cycleCue(
+  "act3.story.2018_2019.winterTiming": cycleCue(
     "2018_2019",
     "winterTiming",
     "winterTiming",
   ),
-  "act4.story.2018_2019.springPrepare": cycleCue(
+  "act3.story.2018_2019.springPrepare": cycleCue(
     "2018_2019",
     "springPrepare",
     "springPrepare",
   ),
-  "act4.story.2018_2019.breedingReflection1": cycleCue(
+  "act3.story.2018_2019.breedingReflection1": cycleCue(
     "2018_2019",
     "breedingReflection1",
     "breedingReflection",
   ),
-  "act4.story.2020_2021.intro": cycleCue("2020_2021", "intro", "cycleIntro"),
-  "act4.story.2020_2021.summerTiming": cycleCue(
+  "act3.story.2020_2021.intro": cycleCue("2020_2021", "intro", "cycleIntro"),
+  "act3.story.2020_2021.summerTiming": cycleCue(
     "2020_2021",
     "summerTiming",
     "summerTiming",
   ),
-  "act4.story.2020_2021.autumnPrepare": cycleCue(
+  "act3.story.2020_2021.autumnPrepare": cycleCue(
     "2020_2021",
     "autumnPrepare",
     "autumnPrepare",
   ),
-  "act4.story.2020_2021.winterReflection1": cycleCue(
+  "act3.story.2020_2021.winterReflection1": cycleCue(
     "2020_2021",
     "winterReflection1",
     "winterReflection",
   ),
-  "act4.story.2020_2021.winterReflection2": cycleCue(
+  "act3.story.2020_2021.winterReflection2": cycleCue(
     "2020_2021",
     "winterReflection2",
     "winterReflection",
   ),
-  "act4.story.2020_2021.winterTiming": cycleCue(
+  "act3.story.2020_2021.winterTiming": cycleCue(
     "2020_2021",
     "winterTiming",
     "winterTiming",
   ),
-  "act4.story.2020_2021.springPrepare": cycleCue(
+  "act3.story.2020_2021.springPrepare": cycleCue(
     "2020_2021",
     "springPrepare",
     "springPrepare",
   ),
-  "act4.story.2020_2021.breedingReflection1": cycleCue(
+  "act3.story.2020_2021.breedingReflection1": cycleCue(
     "2020_2021",
     "breedingReflection1",
     "breedingReflection",
   ),
-  "act4.story.2020_2021.breedingReflection2": cycleCue(
+  "act3.story.2020_2021.breedingReflection2": cycleCue(
     "2020_2021",
     "breedingReflection2",
     "breedingReflection",
   ),
-  "act4.story.2022_2023.intro": cycleCue("2022_2023", "intro", "cycleIntro"),
-  "act4.story.2022_2023.summerTiming": cycleCue(
+  "act3.story.2022_2023.intro": cycleCue("2022_2023", "intro", "cycleIntro"),
+  "act3.story.2022_2023.summerTiming": cycleCue(
     "2022_2023",
     "summerTiming",
     "summerTiming",
   ),
-  "act4.story.2022_2023.autumnPrepare": cycleCue(
+  "act3.story.2022_2023.autumnPrepare": cycleCue(
     "2022_2023",
     "autumnPrepare",
     "autumnPrepare",
   ),
-  "act4.story.2022_2023.winterReflection1": cycleCue(
+  "act3.story.2022_2023.winterReflection1": cycleCue(
     "2022_2023",
     "winterReflection1",
     "winterReflection",
   ),
-  "act4.story.2022_2023.winterTiming": cycleCue(
+  "act3.story.2022_2023.winterTiming": cycleCue(
     "2022_2023",
     "winterTiming",
     "winterTiming",
   ),
-  "act4.story.2022_2023.springPrepare": cycleCue(
+  "act3.story.2022_2023.springPrepare": cycleCue(
     "2022_2023",
     "springPrepare",
     "springPrepare",
   ),
-  "act4.story.2022_2023.breedingReflection1": cycleCue(
+  "act3.story.2022_2023.breedingReflection1": cycleCue(
     "2022_2023",
     "breedingReflection1",
     "breedingReflection",
   ),
-  "act4.story.2022_2023.breedingReflection2": cycleCue(
+  "act3.story.2022_2023.breedingReflection2": cycleCue(
     "2022_2023",
     "breedingReflection2",
     "breedingReflection",
   ),
-  "act4.story.transition.2016_2017": transitionCue("2016_2017"),
-  "act4.story.transition.2018_2019": transitionCue("2018_2019"),
-  "act4.story.transition.2020_2021": transitionCue("2020_2021"),
-  "act4.story.transition.2022_2023": transitionCue("2022_2023"),
-  "act4.story.completed.structure": completionCue("structure"),
-  "act4.story.completed.pattern": completionCue("pattern"),
-  "act4.story.completed.qualification": completionCue("qualification"),
-  "act4.story.completed.question": completionCue("question"),
-  "act4.story.completed.climateTransition": completionCue("climateTransition"),
+  "act3.story.transition.2016_2017": transitionCue("2016_2017"),
+  "act3.story.transition.2018_2019": transitionCue("2018_2019"),
+  "act3.story.transition.2020_2021": transitionCue("2020_2021"),
+  "act3.story.transition.2022_2023": transitionCue("2022_2023"),
+  "act3.story.completed.structure": completionCue("structure"),
+  "act3.story.completed.pattern": completionCue("pattern"),
+  "act3.story.completed.qualification": completionCue("qualification"),
+  "act3.story.completed.question": completionCue("question"),
+  "act3.story.completed.climateTransition": completionCue("climateTransition"),
 } as const satisfies Record<string, MigrationActStoryNarrationCue>;
 
 export type MigrationActStoryNarrationCueId =
   keyof typeof migrationActStoryNarrationCatalog;
 
-export const migrationActStoryIntroCueIds = [
-  "act4.story.intro.part1",
-  "act4.story.intro.part2",
-] as const satisfies readonly MigrationActStoryNarrationCueId[];
+const toStoryCueId = (cueId: string) =>
+  cueId as MigrationActStoryNarrationCueId;
 
-export const migrationActStoryCompletionCueIds = [
-  "act4.story.completed.structure",
-  "act4.story.completed.pattern",
-  "act4.story.completed.qualification",
-  "act4.story.completed.question",
-  "act4.story.completed.climateTransition",
-] as const satisfies readonly MigrationActStoryNarrationCueId[];
+export const migrationActStoryIntroCueIds =
+  getMigrationChangeFlowIntroCueIds().map(toStoryCueId);
 
-const getCycleKey = (cycleId: string) => cycleKeyByCycleId[cycleId] ?? null;
+export const migrationActStoryCompletionCueIds =
+  getMigrationChangeFlowCompletionCueIds().map(toStoryCueId);
 
 export const getMigrationActStoryCycleIntroCueId = (cycleId: string) => {
-  const cycleKey = getCycleKey(cycleId);
+  const cueId = getMigrationChangeFlowCycleIntroCueId(cycleId);
 
-  return cycleKey
-    ? (`act4.story.${cycleKey}.intro` as MigrationActStoryNarrationCueId)
-    : null;
+  return cueId ? toStoryCueId(cueId) : null;
 };
 
 export const getMigrationActStoryTransitionCueId = (cycleId: string) => {
-  const cycleKey = getCycleKey(cycleId);
-  if (!cycleKey || cycleKey === "2013_2014") return null;
+  const cueId = getMigrationChangeFlowTransitionCueId(cycleId);
 
-  return `act4.story.transition.${cycleKey}` as MigrationActStoryNarrationCueId;
+  return cueId ? toStoryCueId(cueId) : null;
 };
 
 export const getMigrationActStoryDepartureCueId = (
   cycleId: string,
   eventType: StorkMigrationEvent,
 ) => {
-  const cycleKey = getCycleKey(cycleId);
-  if (!cycleKey) return null;
-  if (eventType === "autumn_departure") {
-    return `act4.story.${cycleKey}.autumnPrepare` as MigrationActStoryNarrationCueId;
-  }
-  if (eventType === "spring_departure") {
-    return `act4.story.${cycleKey}.springPrepare` as MigrationActStoryNarrationCueId;
-  }
+  const cueId = getMigrationChangeFlowDepartureCueId(cycleId, eventType);
 
-  return null;
+  return cueId ? toStoryCueId(cueId) : null;
 };
 
 export const getMigrationActStoryArrivalCueIds = (
   cycleId: string,
   eventType: StorkMigrationEvent,
 ) => {
-  const cycleKey = getCycleKey(cycleId);
-  if (!cycleKey) return [];
-  if (eventType === "autumn_arrival") {
-    return [
-      `act4.story.${cycleKey}.winterReflection1`,
-      `act4.story.${cycleKey}.winterReflection2`,
-    ].filter(
-      (cueId) => cueId in migrationActStoryNarrationCatalog,
-    ) as MigrationActStoryNarrationCueId[];
-  }
-  if (eventType === "spring_arrival") {
-    return [
-      `act4.story.${cycleKey}.breedingReflection1`,
-      `act4.story.${cycleKey}.breedingReflection2`,
-    ].filter(
-      (cueId) => cueId in migrationActStoryNarrationCatalog,
-    ) as MigrationActStoryNarrationCueId[];
-  }
-
-  return [];
+  return getMigrationChangeFlowArrivalCueIds(cycleId, eventType).map(
+    toStoryCueId,
+  );
 };
 
 export const resolveMigrationActStoryNarrationCue = (
@@ -525,8 +493,8 @@ export const buildMigrationNarrationTimingAudit = (
 export const buildMigrationActResidenceNarrationSchedule = (
   cycleRun: MigrationActCycleRun,
 ): MigrationActScheduledResidenceNarrationCue[] => {
-  const cycleKey = getCycleKey(cycleRun.cycleId);
-  if (!cycleKey) return [];
+  const flowCycleRun = getMigrationChangeFlowCycleByCycleId(cycleRun.cycleId);
+  if (!flowCycleRun) return [];
 
   const timeline = buildPreparedStoryTimeline(
     getMigrationStoryCyclePoints(cycleRun.cycleId),
@@ -537,10 +505,16 @@ export const buildMigrationActResidenceNarrationSchedule = (
   const autumnDeparture = byType.get("autumn_departure")!;
   const autumnArrival = byType.get("autumn_arrival")!;
   const springDeparture = byType.get("spring_departure")!;
-  const summerCueId =
-    `act4.story.${cycleKey}.summerTiming` as MigrationActStoryNarrationCueId;
-  const winterCueId =
-    `act4.story.${cycleKey}.winterTiming` as MigrationActStoryNarrationCueId;
+  const summerCue = flowCycleRun.residenceTimingCues.find(
+    (cue) => cue.phase === "summer_rest",
+  );
+  const winterCue = flowCycleRun.residenceTimingCues.find(
+    (cue) => cue.phase === "winter_rest",
+  );
+  if (!summerCue || !winterCue) return [];
+
+  const summerCueId = toStoryCueId(summerCue.cueId);
+  const winterCueId = toStoryCueId(winterCue.cueId);
   const winterPrimaryStartMs = autumnArrival.boundaryTimeMs + barDurationMs;
   const winterTriggerMs = getNextBarMs(
     autumnArrival.boundaryTimeMs + 3 * barDurationMs,
@@ -552,8 +526,8 @@ export const buildMigrationActResidenceNarrationSchedule = (
       cycle: getCycleLabel(cycleRun),
       cycleId: cycleRun.cycleId,
       phase: "summer_rest",
-      triggerElapsedMs: summerTimingTriggerMsByCycleKey[cycleKey],
-      triggerSecond: summerTimingTriggerMsByCycleKey[cycleKey] / 1_000,
+      triggerElapsedMs: summerTimingTriggerMsByCycleKey[flowCycleRun.key],
+      triggerSecond: summerTimingTriggerMsByCycleKey[flowCycleRun.key] / 1_000,
       nextEventType: "autumn_departure",
       nextEventSecond: autumnDeparture.boundaryTimeMs / 1_000,
       nextCountdownStartSecond:
@@ -561,7 +535,7 @@ export const buildMigrationActResidenceNarrationSchedule = (
       quietSecondsAfterPrimaryCue: null,
       availableSecondsBeforeCountdown:
         (getPreviousBarMs(autumnDeparture.boundaryTimeMs) -
-          summerTimingTriggerMsByCycleKey[cycleKey]) /
+          summerTimingTriggerMsByCycleKey[flowCycleRun.key]) /
         1_000,
       textKey: migrationActStoryNarrationCatalog[summerCueId].textKey,
     },

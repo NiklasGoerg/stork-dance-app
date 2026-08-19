@@ -7,11 +7,11 @@ describe("useMigrationActNarration", () => {
     const stop = vi.fn();
     const narration = useMigrationActNarration({ stop });
 
-    await expect(narration.present("act4.arrival.context")).resolves.toEqual({
+    await expect(narration.present("act3.arrival.context")).resolves.toEqual({
       status: "disabled",
     });
     expect(narration.panelContent.value).toEqual({
-      id: "act4.arrival.context",
+      id: "act3.arrival.context",
       title: "Arrival",
       text: "Prepare to land.",
     });
@@ -28,7 +28,7 @@ describe("useMigrationActNarration", () => {
       stop: vi.fn(),
     });
 
-    await expect(narration.present("act4.departure.success")).resolves.toBe(
+    await expect(narration.present("act3.departure.success")).resolves.toBe(
       result,
     );
     expect(speakText).toHaveBeenCalledWith("Bravo! Great take-off.", {

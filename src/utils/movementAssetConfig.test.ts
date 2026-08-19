@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  ACT5_MOVEMENT_TIMING_DEFAULTS,
-  act5SeasonMovementConfig,
-} from "~/story/act5IntroCycle";
+  ACT4_MOVEMENT_TIMING_DEFAULTS,
+  act4SeasonMovementConfig,
+} from "~/story/act4IntroCycle";
 import type { MovementRecording } from "~/types/movement";
 import { migrationMovementConfig } from "~/utils/migrationActs/migrationMovementConfig";
 import {
@@ -71,8 +71,8 @@ describe("movement asset configuration", () => {
     });
   });
 
-  it("loads every Act 5 intensity without a 100-percent fallback", () => {
-    const configs = Object.values(act5SeasonMovementConfig).flatMap((season) =>
+  it("loads every Act 4 intensity without a 100-percent fallback", () => {
+    const configs = Object.values(act4SeasonMovementConfig).flatMap((season) =>
       Object.values(season),
     );
 
@@ -96,7 +96,7 @@ describe("movement asset configuration", () => {
   });
 
   it("uses the new full-length Winter recordings", () => {
-    Object.values(act5SeasonMovementConfig.winter).forEach((config) => {
+    Object.values(act4SeasonMovementConfig.winter).forEach((config) => {
       const movementId = config.configuredMovementId;
       if (!movementId) throw new Error("Winter movement ID is required.");
       const recording = readMovement("seasons", movementId);
@@ -106,12 +106,12 @@ describe("movement asset configuration", () => {
     });
   });
 
-  it("keeps Act 5 full-intensity seasonal recordings aligned to the shared Count-1 timing", () => {
+  it("keeps Act 4 full-intensity seasonal recordings aligned to the shared Count-1 timing", () => {
     const fullIntensityConfigs = [
-      act5SeasonMovementConfig.winter[100],
-      act5SeasonMovementConfig.spring[100],
-      act5SeasonMovementConfig.summer[100],
-      act5SeasonMovementConfig.autumn[100],
+      act4SeasonMovementConfig.winter[100],
+      act4SeasonMovementConfig.spring[100],
+      act4SeasonMovementConfig.summer[100],
+      act4SeasonMovementConfig.autumn[100],
     ];
 
     fullIntensityConfigs.forEach((config) => {
@@ -124,7 +124,7 @@ describe("movement asset configuration", () => {
 
       expect(Number.isFinite(firstFrameTime)).toBe(true);
       expect(Number.isFinite(lastFrameTime)).toBe(true);
-      expect(config.movementTiming).toEqual(ACT5_MOVEMENT_TIMING_DEFAULTS);
+      expect(config.movementTiming).toEqual(ACT4_MOVEMENT_TIMING_DEFAULTS);
       expect(config.movementPrerollMs).toBe(1_000);
       expect(config.movementLoopDurationMs).toBe(8_000);
       expect(getMovementRecordingDurationMs(recording)).toBeGreaterThan(8_500);

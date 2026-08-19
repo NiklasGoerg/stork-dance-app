@@ -124,7 +124,7 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
   width: 100%;
   min-width: 0;
   min-height: 100%;
-  color: var(--act5-color-text-strong);
+  color: var(--act4-color-text-strong);
 }
 
 .migration-info-panel__primary {
@@ -141,7 +141,7 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
 }
 
 .migration-info-panel__status {
-  color: var(--act5-color-text-muted);
+  color: var(--act4-color-text-muted);
   font-size: 0.78rem;
   font-weight: 850;
   letter-spacing: 0.05em;
@@ -156,14 +156,14 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
 }
 
 .migration-info-panel__instruction {
-  color: var(--act5-color-text-strong);
+  color: var(--act4-color-text-strong);
   font-size: clamp(1.05rem, 1.3vw, 1.55rem);
   font-weight: 800;
   line-height: 1.15;
 }
 
 .migration-info-panel__detail {
-  color: var(--act5-color-text-soft);
+  color: var(--act4-color-text-soft);
   font-size: clamp(0.92rem, 1vw, 1.18rem);
   font-weight: 650;
   line-height: 1.3;
@@ -174,10 +174,10 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
   gap: 6px;
   margin-top: var(--space-1);
   padding: clamp(13px, 1.4vw, 20px);
-  border: 1px solid var(--act5-feedback-neutral-border);
+  border: 1px solid var(--act4-feedback-neutral-border);
   border-radius: 16px;
-  background: var(--act5-feedback-neutral-background);
-  color: var(--act5-feedback-neutral-text);
+  background: var(--act4-feedback-neutral-background);
+  color: var(--act4-feedback-neutral-text);
 }
 
 .migration-info-panel__feedback strong {
@@ -201,7 +201,7 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
 .migration-info-panel__progress-dot {
   width: 18px;
   height: 18px;
-  border: 2px solid var(--act5-color-text-muted);
+  border: 2px solid var(--act4-color-text-muted);
   border-radius: 50%;
 }
 
@@ -212,21 +212,21 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
 
 .migration-info-panel__progress-label {
   flex-basis: 100%;
-  color: var(--act5-color-text-soft);
+  color: var(--act4-color-text-soft);
   font-weight: 750;
 }
 
 .migration-info-panel--success .migration-info-panel__feedback {
-  border-color: var(--act5-feedback-success-border);
-  background: var(--act5-feedback-success-background);
-  color: var(--act5-feedback-success-text);
+  border-color: var(--act4-feedback-success-border);
+  background: var(--act4-feedback-success-background);
+  color: var(--act4-feedback-success-text);
 }
 
 .migration-info-panel--warning .migration-info-panel__feedback,
 .migration-info-panel--error .migration-info-panel__feedback {
-  border-color: var(--act5-feedback-warning-border);
-  background: var(--act5-feedback-warning-background);
-  color: var(--act5-feedback-warning-text);
+  border-color: var(--act4-feedback-warning-border);
+  background: var(--act4-feedback-warning-background);
+  color: var(--act4-feedback-warning-text);
 }
 
 .migration-info-panel__movements {
@@ -237,7 +237,7 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
   margin: 0;
   overflow: auto;
   padding: var(--space-2) 0 0;
-  border-top: 1px solid var(--act5-color-border);
+  border-top: 1px solid var(--act4-color-border);
   list-style: none;
 }
 
@@ -249,14 +249,14 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
   padding: clamp(10px, 1.2dvh, 16px) clamp(12px, 1.1vw, 18px);
   border: 1px solid transparent;
   border-radius: 10px;
-  color: var(--act5-color-text-muted);
+  color: var(--act4-color-text-muted);
 }
 
 .migration-info-panel__movement--current {
-  border-color: var(--act5-instruction-active-border);
-  background: var(--act5-instruction-active-background);
-  color: var(--act5-color-text-strong);
-  box-shadow: var(--act5-shadow-instruction);
+  border-color: var(--act4-instruction-active-border);
+  background: var(--act4-instruction-active-background);
+  color: var(--act4-color-text-strong);
+  box-shadow: var(--act4-shadow-instruction);
   transform: translateX(2px);
 }
 
@@ -285,7 +285,7 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
   flex-wrap: wrap;
   gap: var(--space-2);
   padding-top: var(--space-2);
-  border-top: 1px solid var(--act5-color-border);
+  border-top: 1px solid var(--act4-color-border);
 }
 
 .migration-info-panel--gestureFeedback .migration-info-panel__title,

@@ -1,5 +1,5 @@
 import type { MovementRange } from "~/utils/movement/core/range";
-import type { Act5FeedbackSignal, Act5SelectedFeedback } from "~/types/act5";
+import type { Act4FeedbackSignal, Act4SelectedFeedback } from "~/types/act4";
 
 export type SummerBeat = 1 | 2 | 3 | 4;
 export type SummerIntensity = "100" | "60" | "30" | "10";
@@ -87,7 +87,7 @@ export type SummerBeatEvaluation = {
   detectedStepSide: SummerStepSide;
   detectedIntensityClass: SummerDetectedIntensityClass;
   feedbackCode?: SummerFeedbackCode;
-  feedbackSignals?: Act5FeedbackSignal<SummerFeedbackCode>[];
+  feedbackSignals?: Act4FeedbackSignal<SummerFeedbackCode>[];
   metrics: SummerRecognitionMetrics;
 };
 
@@ -99,7 +99,7 @@ export type SummerSequenceEvaluation = {
   detectedStepSides: SummerStepSide[];
   feedbackCode?: SummerFeedbackCode;
   primaryFeedbackCode?: SummerFeedbackCode;
-  selectedFeedback?: Act5SelectedFeedback<SummerFeedbackCode>;
+  selectedFeedback?: Act4SelectedFeedback<SummerFeedbackCode>;
 };
 
 export type SummerThresholds = {

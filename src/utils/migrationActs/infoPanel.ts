@@ -340,7 +340,7 @@ export const buildMigrationActInfoPanelModel = ({
   if (movementFeedbackVisible) {
     return {
       mode: "movementFeedback",
-      title: translate("story.acts.act5.movementText.good"),
+      title: translate("story.acts.act4.movementText.good"),
       instruction: translate(metadata.instructionKey),
       tone: "success",
       movements,
@@ -366,7 +366,7 @@ export const buildMigrationActInfoPanelModel = ({
     detail: metadata.detailKey ? translate(metadata.detailKey) : undefined,
     status:
       playbackState === "paused"
-        ? translate("story.acts.act5.instructions.paused")
+        ? translate("story.acts.act4.instructions.paused")
         : undefined,
     tone: "neutral",
     movements,

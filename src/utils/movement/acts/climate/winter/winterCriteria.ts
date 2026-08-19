@@ -8,9 +8,9 @@ import {
   winterMovementConfig,
 } from "~/utils/movement/acts/climate/winter/winterReference";
 import {
-  createAct5SeasonCriterionFactory,
+  createAct4SeasonCriterionFactory,
   getHighestPriorityFailedCriterion,
-} from "~/utils/act5/criteria";
+} from "~/utils/act4/criteria";
 import type {
   WinterBeat,
   WinterCriterionImportance,
@@ -20,7 +20,7 @@ import type {
   WinterValue,
 } from "~/utils/movement/acts/climate/winter/winterTypes";
 
-const criterion = createAct5SeasonCriterionFactory<
+const criterion = createAct4SeasonCriterionFactory<
   WinterCriterionImportance,
   WinterFeedbackCode,
   WinterCriterionResult

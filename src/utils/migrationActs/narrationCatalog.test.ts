@@ -7,21 +7,21 @@ import {
 
 describe("migration act narration catalog", () => {
   const requiredCueIds = [
-    "act4.departure.context",
-    "act4.departure.handover",
-    "act4.departure.success",
-    "act4.migration.context",
-    "act4.arrival.context",
-    "act4.arrival.handover",
-    "act4.arrival.success",
-    "act4.cycle.complete",
+    "act3.departure.context",
+    "act3.departure.handover",
+    "act3.departure.success",
+    "act3.migration.context",
+    "act3.arrival.context",
+    "act3.arrival.handover",
+    "act3.arrival.success",
+    "act3.cycle.complete",
   ] as const satisfies readonly MigrationActNarrationId[];
 
-  it("contains the required stable Act 4 cue ids", () => {
+  it("contains the required stable Act 3 cue ids", () => {
     const ids = Object.keys(migrationActNarrationCatalog);
 
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.every((id) => id.startsWith("act4."))).toBe(true);
+    expect(ids.every((id) => id.startsWith("act3."))).toBe(true);
     requiredCueIds.forEach((id) => {
       expect(resolveMigrationActNarrationCue(id).id).toBe(id);
     });
@@ -29,21 +29,21 @@ describe("migration act narration catalog", () => {
 
   it("separates placeholders from final positive feedback cues", () => {
     expect(
-      resolveMigrationActNarrationCue("act4.departure.success"),
+      resolveMigrationActNarrationCue("act3.departure.success"),
     ).toMatchObject({
       trigger: { type: "gesture-success", gesture: "departure" },
       placeholder: false,
       speak: true,
     });
     expect(
-      resolveMigrationActNarrationCue("act4.arrival.success"),
+      resolveMigrationActNarrationCue("act3.arrival.success"),
     ).toMatchObject({
       trigger: { type: "gesture-success", gesture: "arrival" },
       placeholder: false,
       speak: true,
     });
     expect(
-      resolveMigrationActNarrationCue("act4.arrival.context"),
+      resolveMigrationActNarrationCue("act3.arrival.context"),
     ).toMatchObject({
       trigger: { type: "event", eventType: "autumn_arrival" },
       placeholder: true,

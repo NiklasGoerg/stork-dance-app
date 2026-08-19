@@ -8,8 +8,8 @@ export type ClimateMovementFamilyId = Extract<
 >;
 
 export type ClimateMovementFlowId =
-  | "act5Full"
-  | "act5TutorialDebug"
+  | "act4Full"
+  | "act4TutorialDebug"
   | "springSingleDebug"
   | "springSequenceDebug"
   | "summerSingleDebug"
@@ -18,7 +18,7 @@ export type ClimateMovementFlowId =
   | "autumnSequenceDebug"
   | "winterSingleDebug"
   | "winterSequenceDebug"
-  | "act5Story";
+  | "act4Story";
 
 export type ClimateMovementFlowKind =
   "full-act" | "tutorial" | "single-baseline" | "season-timeline" | "story";
@@ -62,17 +62,17 @@ const createFlow = ({
 });
 
 export const climateMovementFlowRegistry = {
-  act5Full: createFlow({
-    id: "act5Full",
+  act4Full: createFlow({
+    id: "act4Full",
     familyId: "summer",
-    label: "Act 5",
+    label: "Act 4",
     kind: "full-act",
     recognitionEnabled: true,
   }),
-  act5TutorialDebug: createFlow({
-    id: "act5TutorialDebug",
+  act4TutorialDebug: createFlow({
+    id: "act4TutorialDebug",
     familyId: "summer",
-    label: "Act 5 tutorial",
+    label: "Act 4 tutorial",
     kind: "tutorial",
     recognitionEnabled: true,
   }),
@@ -132,10 +132,10 @@ export const climateMovementFlowRegistry = {
     kind: "season-timeline",
     recognitionEnabled: true,
   }),
-  act5Story: createFlow({
-    id: "act5Story",
+  act4Story: createFlow({
+    id: "act4Story",
     familyId: "summer",
-    label: "Act 5 story",
+    label: "Act 4 story",
     kind: "story",
     recognitionEnabled: false,
   }),

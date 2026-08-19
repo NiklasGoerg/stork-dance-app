@@ -6,9 +6,9 @@ import {
   autumnMovementConfig,
 } from "~/utils/movement/acts/climate/autumn/autumnReference";
 import {
-  createAct5SeasonCriterionFactory,
+  createAct4SeasonCriterionFactory,
   getHighestPriorityFailedCriterion,
-} from "~/utils/act5/criteria";
+} from "~/utils/act4/criteria";
 import type {
   AutumnBeat,
   AutumnCriterionImportance,
@@ -24,7 +24,7 @@ type BeatContext = {
   expectedValueClass: AutumnValueClass;
 };
 
-const criterion = createAct5SeasonCriterionFactory<
+const criterion = createAct4SeasonCriterionFactory<
   AutumnCriterionImportance,
   AutumnFeedbackCode,
   AutumnCriterionResult

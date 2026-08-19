@@ -180,9 +180,9 @@ export const useGuidedMigrationController = ({
     phase.startsWith("spring-migration-");
 
   const showPassivePositiveFeedback = () => {
-    const goodText = translateText("story.acts.act5.movementText.good");
+    const goodText = translateText("story.acts.act4.movementText.good");
     passivePositiveFeedbackText.value =
-      goodText === "story.acts.act5.movementText.good" ? "Good!" : goodText;
+      goodText === "story.acts.act4.movementText.good" ? "Good!" : goodText;
     if (passiveFeedbackTimer) clearTimeout(passiveFeedbackTimer);
     passiveFeedbackTimer = setTimeout(() => {
       passivePositiveFeedbackText.value = null;

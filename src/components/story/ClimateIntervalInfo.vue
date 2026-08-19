@@ -1,14 +1,14 @@
 <template>
   <article class="climate-interval-info">
     <p class="climate-interval-info__eyebrow">
-      {{ t("story.acts.act5.climateInfo.eyebrow") }}
+      {{ t("story.acts.act4.climateInfo.eyebrow") }}
     </p>
     <p class="climate-interval-info__interval">{{ step.interval }}</p>
     <p class="climate-interval-info__value">{{ temperatureLabel }}</p>
     <p class="climate-interval-info__context">{{ contextLabel }}</p>
     <p class="climate-interval-info__progress">
       {{
-        t("story.acts.act5.climateInfo.periodProgress", {
+        t("story.acts.act4.climateInfo.periodProgress", {
           current: stepIndex + 1,
           total: totalSteps,
         })
@@ -39,8 +39,8 @@ const temperatureLabel = computed(() =>
 );
 const contextLabel = computed(() =>
   props.step.isBaseline
-    ? t("story.acts.act5.climateInfo.referencePeriod")
-    : t("story.acts.act5.climateInfo.vsBaseline"),
+    ? t("story.acts.act4.climateInfo.referencePeriod")
+    : t("story.acts.act4.climateInfo.vsBaseline"),
 );
 </script>
 

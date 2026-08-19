@@ -118,7 +118,9 @@ const getCameraFrame = (): StageRect => {
   };
 };
 
-const isVisible = (landmark: MovementStageLandmark | undefined) =>
+const isVisible = (
+  landmark: MovementStageLandmark | undefined,
+): landmark is MovementStageLandmark =>
   !!landmark &&
   Number.isFinite(landmark.x) &&
   Number.isFinite(landmark.y) &&

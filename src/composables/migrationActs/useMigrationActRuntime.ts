@@ -29,6 +29,14 @@ import type {
   MigrationMapCameraMode,
   ResolvedMigrationMovement,
 } from "~/types/migrationAct";
+import {
+  getMigrationChangeFlowArrivalCueIds,
+  getMigrationChangeFlowCompletionCueIds,
+  getMigrationChangeFlowCycleIntroCueId,
+  getMigrationChangeFlowDepartureCueId,
+  getMigrationChangeFlowIntroCueIds,
+  getMigrationChangeFlowTransitionCueId,
+} from "~/story/acts/migrationChangeFlow";
 import type { PoseLandmarkLike } from "~/types/pose";
 import {
   createMigrationActEvents,
@@ -60,12 +68,6 @@ import {
   buildMigrationNarrationTimingAudit,
   buildMigrationActResidenceNarrationSchedule,
   estimateMigrationNarrationSpeechDurationSeconds,
-  getMigrationActStoryArrivalCueIds,
-  getMigrationActStoryCycleIntroCueId,
-  getMigrationActStoryDepartureCueId,
-  getMigrationActStoryTransitionCueId,
-  migrationActStoryCompletionCueIds,
-  migrationActStoryIntroCueIds,
   resolveMigrationActStoryNarrationCue,
   type MigrationActScheduledResidenceNarrationCue,
   type MigrationActStoryNarrationCueId,
@@ -111,6 +113,12 @@ type PendingStoryNarrationSequence = {
 type PrepareCycleOptions = {
   preserveMovement?: boolean;
 };
+
+const toStoryNarrationCueId = (cueId: string) =>
+  cueId as MigrationActStoryNarrationCueId;
+
+const toStoryNarrationCueIds = (cueIds: readonly string[]) =>
+  cueIds.map(toStoryNarrationCueId);
 
 export type MigrationActRuntimeDriver = {
   requestFrame: (callback: FrameRequestCallback) => number;
@@ -884,8 +892,8 @@ export const useMigrationActRuntime = ({
         title: getCycleLabel(cycleRun),
         subtitleKey:
           store.activeCycleIndex === 0
-            ? "story.acts.act4.overlay.reference"
-            : "story.acts.act4.overlay.cycle",
+            ? "story.acts.act3.overlay.reference"
+            : "story.acts.act3.overlay.cycle",
         subtitleParams: {
           step: store.activeCycleIndex + 1,
           total: store.cycleRuns.length,
@@ -893,9 +901,12 @@ export const useMigrationActRuntime = ({
         durationMs: audioStore.getBeatDurationMs() * 4,
       });
     }
-    const cueId = getMigrationActStoryCycleIntroCueId(cycleRun.cycleId);
+    const cueId = getMigrationChangeFlowCycleIntroCueId(cycleRun.cycleId);
     if (cueId && !options.suppressNarration) {
-      void playStoryNarrationCue(cueId, getNarrationBasePayload("cycleIntro"));
+      void playStoryNarrationCue(
+        toStoryNarrationCueId(cueId),
+        getNarrationBasePayload("cycleIntro"),
+      );
     }
   };
 
@@ -1766,13 +1777,13 @@ export const useMigrationActRuntime = ({
           synchronizeSeasonForCurrentDate();
           if (completed && event.gestureId === "arrival") {
             store.setMapCameraMode("residence");
-            const cueIds = getMigrationActStoryArrivalCueIds(
+            const cueIds = getMigrationChangeFlowArrivalCueIds(
               event.cycleId,
               event.eventType,
             );
             if (cueIds.length) {
               scheduleStoryNarrationSequence(
-                cueIds,
+                toStoryNarrationCueIds(cueIds),
                 getNarrationBasePayload(
                   event.eventType === "autumn_arrival"
                     ? "winterReflection"
@@ -1816,12 +1827,13 @@ export const useMigrationActRuntime = ({
         null;
 
       store.setMapCameraMode("migration");
-      const cueId = getMigrationActStoryDepartureCueId(
+      const cueId = getMigrationChangeFlowDepartureCueId(
         event.cycleId,
         event.eventType,
       );
       if (cueId) {
-        const cue = resolveMigrationActStoryNarrationCue(cueId);
+        const storyCueId = toStoryNarrationCueId(cueId);
+        const cue = resolveMigrationActStoryNarrationCue(storyCueId);
         const payload = getMigrationEventPayload(
           event.eventType === "autumn_departure"
             ? "autumnDeparturePrepare"
@@ -1831,7 +1843,9 @@ export const useMigrationActRuntime = ({
           event.eventType === "autumn_departure" ? "south" : "north",
           { cueId: cue.id, cueRole: cue.role },
         );
-        void playStoryNarrationCue(cueId, payload, { behavior: "replace" });
+        void playStoryNarrationCue(storyCueId, payload, {
+          behavior: "replace",
+        });
       }
     }
     store.setEventStatus(event.id, "triggered");
@@ -1892,7 +1906,7 @@ export const useMigrationActRuntime = ({
       seasonAudio.fadeOutForCycle(2);
       cancelFrame();
       await playStoryNarrationSequence(
-        migrationActStoryCompletionCueIds,
+        toStoryNarrationCueIds(getMigrationChangeFlowCompletionCueIds()),
         getNarrationBasePayload("actSummary"),
         currentRunId,
       );
@@ -1938,11 +1952,12 @@ export const useMigrationActRuntime = ({
     store.setCycleTransitionState("swapping", coverStartedTransportMs);
     prepareCycle(nextIndex, { preserveMovement: true });
     suppressNextCycleIntro = true;
-    const cueId = getMigrationActStoryTransitionCueId(nextCycleRun.cycleId);
+    const cueId = getMigrationChangeFlowTransitionCueId(nextCycleRun.cycleId);
     if (cueId) {
-      const cue = resolveMigrationActStoryNarrationCue(cueId);
+      const storyCueId = toStoryNarrationCueId(cueId);
+      const cue = resolveMigrationActStoryNarrationCue(storyCueId);
       void playStoryNarrationCue(
-        cueId,
+        storyCueId,
         getNarrationBasePayload("cycleTransition", {
           cueId: cue.id,
           cueRole: cue.role,
@@ -2327,7 +2342,7 @@ export const useMigrationActRuntime = ({
     const currentRunId = runId;
     if (mode === "story" && index === 0) {
       await playStoryNarrationSequence(
-        migrationActStoryIntroCueIds,
+        toStoryNarrationCueIds(getMigrationChangeFlowIntroCueIds()),
         getNarrationBasePayload("flowIntro"),
         currentRunId,
       );

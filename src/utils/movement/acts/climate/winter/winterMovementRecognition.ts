@@ -2,9 +2,9 @@ import type { PoseLandmarkLike } from "~/types/pose";
 import {
   winterCriterionFeedbackMetadata,
   winterFeedbackMetadata,
-} from "~/utils/act5/feedback/catalog";
-import { buildAct5BeatFeedbackSignals } from "~/utils/act5/feedback/signals";
-import { selectAct5FinalFeedback } from "~/utils/act5/feedback/selectFinalFeedback";
+} from "~/utils/act4/feedback/catalog";
+import { buildAct4BeatFeedbackSignals } from "~/utils/act4/feedback/signals";
+import { selectAct4FinalFeedback } from "~/utils/act4/feedback/selectFinalFeedback";
 import {
   getBeatPassState,
   getWeightedBeatEvaluationScore,
@@ -334,14 +334,18 @@ export const extractWinterRecognitionMetrics = (
           winterMovementConfig.thresholds.selfHugHeightMin &&
         rightHandHeightFromShoulders <=
           winterMovementConfig.thresholds.selfHugHeightMax;
+  const leftHandToRightShoulderDistance =
+    leftWrist && rightShoulder ? distance2D(leftWrist, rightShoulder) : null;
+  const rightHandToLeftShoulderDistance =
+    rightWrist && leftShoulder ? distance2D(rightWrist, leftShoulder) : null;
   const leftHandToRightShoulder =
-    leftWrist && rightShoulder
-      ? distance2D(leftWrist, rightShoulder) / shoulderWidth
-      : null;
+    leftHandToRightShoulderDistance === null
+      ? null
+      : leftHandToRightShoulderDistance / shoulderWidth;
   const rightHandToLeftShoulder =
-    rightWrist && leftShoulder
-      ? distance2D(rightWrist, leftShoulder) / shoulderWidth
-      : null;
+    rightHandToLeftShoulderDistance === null
+      ? null
+      : rightHandToLeftShoulderDistance / shoulderWidth;
   const handsNearOppositeShoulders =
     leftHandToRightShoulder === null || rightHandToLeftShoulder === null
       ? null
@@ -357,14 +361,18 @@ export const extractWinterRecognitionMetrics = (
           handsNearOppositeShoulders === true ||
           leftHandOnRightSide === true ||
           rightHandOnLeftSide === true);
+  const leftHandToHeadDistance =
+    leftWrist && headPoint ? distance2D(leftWrist, headPoint) : null;
+  const rightHandToHeadDistance =
+    rightWrist && headPoint ? distance2D(rightWrist, headPoint) : null;
   const leftHandToHead =
-    leftWrist && headPoint
-      ? distance2D(leftWrist, headPoint) / shoulderWidth
-      : null;
+    leftHandToHeadDistance === null
+      ? null
+      : leftHandToHeadDistance / shoulderWidth;
   const rightHandToHead =
-    rightWrist && headPoint
-      ? distance2D(rightWrist, headPoint) / shoulderWidth
-      : null;
+    rightHandToHeadDistance === null
+      ? null
+      : rightHandToHeadDistance / shoulderWidth;
   const handsNearHead =
     leftHandToHead === null || rightHandToHead === null
       ? null
@@ -474,7 +482,7 @@ export const evaluateWinterBeat = (
       timestamp,
       expectedValue,
       feedbackCode: "FULL_BODY_NOT_VISIBLE",
-      feedbackSignals: buildAct5BeatFeedbackSignals<WinterFeedbackCode>({
+      feedbackSignals: buildAct4BeatFeedbackSignals<WinterFeedbackCode>({
         season: "winter",
         beat,
         measureIndex: context.measureIndex ?? null,
@@ -508,7 +516,7 @@ export const evaluateWinterBeat = (
     timestamp,
     expectedValue,
     feedbackCode: passed ? undefined : getWinterBeatFeedbackCode(criteria),
-    feedbackSignals: buildAct5BeatFeedbackSignals<WinterFeedbackCode>({
+    feedbackSignals: buildAct4BeatFeedbackSignals<WinterFeedbackCode>({
       season: "winter",
       beat,
       measureIndex: context.measureIndex ?? null,
@@ -589,7 +597,7 @@ export const evaluateWinterSequence = (
   const hasCentralFailure = beatEvaluations.some(
     (evaluation) => !evaluation.passed,
   );
-  const selectedFeedback = selectAct5FinalFeedback<WinterFeedbackCode>({
+  const selectedFeedback = selectAct4FinalFeedback<WinterFeedbackCode>({
     season: "winter",
     beatEvaluations,
     codeMetadata: winterFeedbackMetadata,

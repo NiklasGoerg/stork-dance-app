@@ -2,9 +2,9 @@ import type { PoseLandmarkLike } from "~/types/pose";
 import {
   summerCriterionFeedbackMetadata,
   summerFeedbackMetadata,
-} from "~/utils/act5/feedback/catalog";
-import { buildAct5BeatFeedbackSignals } from "~/utils/act5/feedback/signals";
-import { selectAct5FinalFeedback } from "~/utils/act5/feedback/selectFinalFeedback";
+} from "~/utils/act4/feedback/catalog";
+import { buildAct4BeatFeedbackSignals } from "~/utils/act4/feedback/signals";
+import { selectAct4FinalFeedback } from "~/utils/act4/feedback/selectFinalFeedback";
 import { getWeightedBeatEvaluationScore } from "~/utils/movement/core/criteria";
 import { extractNormalizedBodyMetrics } from "~/utils/movement/core/bodyMetrics";
 import { getMovementRangeFitScore } from "~/utils/movement/core/range";
@@ -289,7 +289,7 @@ export const evaluateSummerBeat = (
       detectedStepSide: "unknown",
       detectedIntensityClass: "unknown",
       feedbackCode: "FULL_BODY_NOT_VISIBLE",
-      feedbackSignals: buildAct5BeatFeedbackSignals<SummerFeedbackCode>({
+      feedbackSignals: buildAct4BeatFeedbackSignals<SummerFeedbackCode>({
         season: "summer",
         beat,
         measureIndex: context.measureIndex ?? null,
@@ -357,7 +357,7 @@ export const evaluateSummerBeat = (
     feedbackCode: passed
       ? undefined
       : getSummerBeatFeedbackCode(beat, criteria),
-    feedbackSignals: buildAct5BeatFeedbackSignals<SummerFeedbackCode>({
+    feedbackSignals: buildAct4BeatFeedbackSignals<SummerFeedbackCode>({
       season: "summer",
       beat,
       measureIndex: context.measureIndex ?? null,
@@ -385,7 +385,7 @@ export const evaluateSummerSequence = (
     (evaluation) =>
       (evaluation.beat === 2 || evaluation.beat === 4) && !evaluation.passed,
   );
-  const selectedFeedback = selectAct5FinalFeedback<SummerFeedbackCode>({
+  const selectedFeedback = selectAct4FinalFeedback<SummerFeedbackCode>({
     season: "summer",
     beatEvaluations,
     codeMetadata: summerFeedbackMetadata,

@@ -77,7 +77,7 @@ export const resolveWinterValue = (
     }))
     .sort((a, b) => a.distance - b.distance)[0];
 
-  return closest?.distance <= 0.04 ? closest.winterValue : "100";
+  return closest && closest.distance <= 0.04 ? closest.winterValue : "100";
 };
 
 export const winterMovementConfig = {

@@ -1,12 +1,12 @@
 <template>
   <section
     class="seasonal-temperature-chart"
-    aria-labelledby="act5-chart-title"
+    aria-labelledby="act4-chart-title"
   >
     <div class="seasonal-temperature-chart__header">
       <div>
         <p class="seasonal-temperature-chart__eyebrow">Seasonal temperature</p>
-        <h2 id="act5-chart-title">Difference from each season baseline</h2>
+        <h2 id="act4-chart-title">Difference from each season baseline</h2>
       </div>
 
       <ul class="seasonal-temperature-chart__legend" aria-label="Chart legend">
@@ -15,7 +15,7 @@
           :key="season.season"
           :style="{ '--season-color': season.color }"
         >
-          <span aria-hidden="true"></span>
+          <span aria-hidden="true" />
           {{ season.label }}
         </li>
       </ul>
@@ -166,10 +166,10 @@ const seasonSeries: Array<{
   label: string;
   color: string;
 }> = [
-  { season: "winter", label: "Winter", color: "var(--act5-chart-winter)" },
-  { season: "spring", label: "Spring", color: "var(--act5-chart-spring)" },
-  { season: "summer", label: "Summer", color: "var(--act5-chart-summer)" },
-  { season: "autumn", label: "Autumn", color: "var(--act5-chart-autumn)" },
+  { season: "winter", label: "Winter", color: "var(--act4-chart-winter)" },
+  { season: "spring", label: "Spring", color: "var(--act4-chart-spring)" },
+  { season: "summer", label: "Summer", color: "var(--act4-chart-summer)" },
+  { season: "autumn", label: "Autumn", color: "var(--act4-chart-autumn)" },
 ];
 
 const climateRows = computed(() =>
@@ -270,10 +270,10 @@ const formatAxisValue = (value: number) => {
   min-width: 0;
   min-height: 0;
   padding: clamp(10px, 1.2vw, 16px) clamp(14px, 1.8vw, 24px);
-  border: 1px solid var(--act5-color-border);
+  border: 1px solid var(--act4-color-border);
   border-radius: 12px;
-  background: var(--act5-color-surface);
-  color: var(--act5-color-text);
+  background: var(--act4-color-surface);
+  color: var(--act4-color-text);
 }
 
 .seasonal-temperature-chart__header {
@@ -290,7 +290,7 @@ const formatAxisValue = (value: number) => {
 }
 
 .seasonal-temperature-chart__eyebrow {
-  color: var(--act5-color-text-muted);
+  color: var(--act4-color-text-muted);
   font-size: 0.66rem;
   font-weight: 850;
   text-transform: uppercase;
@@ -298,7 +298,7 @@ const formatAxisValue = (value: number) => {
 
 .seasonal-temperature-chart h2 {
   margin-top: 2px;
-  color: var(--act5-color-text-strong);
+  color: var(--act4-color-text-strong);
   font-size: clamp(0.92rem, 1.25vw, 1.18rem);
   line-height: 1.05;
 }
@@ -310,7 +310,7 @@ const formatAxisValue = (value: number) => {
   gap: 8px 12px;
   margin: 0;
   padding: 0;
-  color: var(--act5-color-text-muted);
+  color: var(--act4-color-text-muted);
   font-size: 0.68rem;
   font-weight: 800;
   list-style: none;
@@ -343,30 +343,30 @@ const formatAxisValue = (value: number) => {
 }
 
 .seasonal-temperature-chart__grid line {
-  stroke: var(--act5-color-border);
+  stroke: var(--act4-color-border);
   stroke-width: 1;
 }
 
 .seasonal-temperature-chart__baseline {
-  stroke: var(--act5-color-text-muted);
+  stroke: var(--act4-color-text-muted);
   stroke-dasharray: 5 5;
   stroke-width: 1.25;
 }
 
 .seasonal-temperature-chart__axis line {
-  stroke: var(--act5-color-border-strong);
+  stroke: var(--act4-color-border-strong);
   stroke-width: 1;
 }
 
 .seasonal-temperature-chart__axis text {
   dominant-baseline: middle;
-  fill: var(--act5-color-text-muted);
+  fill: var(--act4-color-text-muted);
   font-size: 11px;
   font-weight: 750;
 }
 
 .seasonal-temperature-chart__axis .seasonal-temperature-chart__axis-label {
-  fill: var(--act5-color-text-muted);
+  fill: var(--act4-color-text-muted);
   font-size: 12px;
   font-weight: 850;
 }
@@ -379,7 +379,7 @@ const formatAxisValue = (value: number) => {
 }
 
 .seasonal-temperature-chart__points circle {
-  stroke: var(--act5-color-surface-strong);
+  stroke: var(--act4-color-surface-strong);
   stroke-width: 2;
 }
 
@@ -387,7 +387,7 @@ const formatAxisValue = (value: number) => {
   display: grid;
   place-items: center;
   margin: 0;
-  color: var(--act5-color-text-muted);
+  color: var(--act4-color-text-muted);
   font-size: 0.82rem;
   font-weight: 800;
 }
