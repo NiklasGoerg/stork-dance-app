@@ -101,7 +101,7 @@ export type Act4Phase = "tutorial" | "climateStory" | "completed";
 export type Act4DisplayPhase = Act4Phase | "idle";
 export type Act4FlowId = "act4Full" | "act4Story" | "act4TutorialDebug";
 export type Act4FlowContext = "tutorial" | "climateStory";
-export type Act4TutorialTarget = "maximum" | "minimum";
+export type Act4TutorialTarget = "example" | "maximum" | "minimum";
 export type Act4EncodingId =
   "circleRadius" | "horizontalArcExtent" | "bodyHeight" | "verticalArcExtent";
 

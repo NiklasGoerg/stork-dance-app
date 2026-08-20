@@ -569,28 +569,59 @@ export const calculateWingState = (
     landmarks,
     POSE_LANDMARK.RIGHT_ELBOW,
   );
+  const leftWrist = getMigrationMovementVisiblePoint(
+    landmarks,
+    POSE_LANDMARK.LEFT_WRIST,
+  );
+  const rightWrist = getMigrationMovementVisiblePoint(
+    landmarks,
+    POSE_LANDMARK.RIGHT_WRIST,
+  );
+  const leftHip = getMigrationMovementVisiblePoint(
+    landmarks,
+    POSE_LANDMARK.LEFT_HIP,
+  );
+  const rightHip = getMigrationMovementVisiblePoint(
+    landmarks,
+    POSE_LANDMARK.RIGHT_HIP,
+  );
   const torsoScale = calculateTorsoScale(landmarks);
+  const leftArmPoint = leftWrist ?? leftElbow;
+  const rightArmPoint = rightWrist ?? rightElbow;
+  const shoulderCenter = calculateShoulderCenter(landmarks);
   if (
     !leftShoulder ||
     !rightShoulder ||
-    !leftElbow ||
-    !rightElbow ||
-    !calculateShoulderCenter(landmarks) ||
+    !leftArmPoint ||
+    !rightArmPoint ||
+    !leftHip ||
+    !rightHip ||
+    !shoulderCenter ||
     !torsoScale
   ) {
     return "not_evaluable";
   }
-  const leftOffset = (leftElbow.y - leftShoulder.y) / torsoScale;
-  const rightOffset = (rightElbow.y - rightShoulder.y) / torsoScale;
-  if (
-    leftOffset <= MIGRATION_RECOGNITION_THRESHOLDS.wingsUpTolerance &&
-    rightOffset <= MIGRATION_RECOGNITION_THRESHOLDS.wingsUpTolerance
-  ) {
+  const leftArmAboveHip = (leftHip.y - leftArmPoint.y) / torsoScale;
+  const rightArmAboveHip = (rightHip.y - rightArmPoint.y) / torsoScale;
+  const shoulderSpan = Math.abs(rightShoulder.x - leftShoulder.x) / torsoScale;
+  const armSpan = Math.abs(rightArmPoint.x - leftArmPoint.x) / torsoScale;
+  const armsOpenedLaterally =
+    armSpan - shoulderSpan >=
+    MIGRATION_RECOGNITION_THRESHOLDS.flightArmLateralOffset;
+  const leftBelowShoulder = (leftArmPoint.y - leftShoulder.y) / torsoScale;
+  const rightBelowShoulder = (rightArmPoint.y - rightShoulder.y) / torsoScale;
+  const leftClearlyAboveHip =
+    leftArmAboveHip >= MIGRATION_RECOGNITION_THRESHOLDS.flightArmAboveHip;
+  const rightClearlyAboveHip =
+    rightArmAboveHip >= MIGRATION_RECOGNITION_THRESHOLDS.flightArmAboveHip;
+  if (leftClearlyAboveHip && rightClearlyAboveHip && armsOpenedLaterally) {
     return "up";
   }
   if (
-    leftOffset >= MIGRATION_RECOGNITION_THRESHOLDS.wingsDownTolerance &&
-    rightOffset >= MIGRATION_RECOGNITION_THRESHOLDS.wingsDownTolerance
+    !leftClearlyAboveHip &&
+    !rightClearlyAboveHip &&
+    leftBelowShoulder >= MIGRATION_RECOGNITION_THRESHOLDS.wingsDownTolerance &&
+    rightBelowShoulder >= MIGRATION_RECOGNITION_THRESHOLDS.wingsDownTolerance
   ) {
     return "down";
   }

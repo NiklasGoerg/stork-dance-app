@@ -310,6 +310,7 @@ export interface MigrationMovementBarEvaluation {
 }
 
 export type MigrationMovementBeatIndex = 1 | 2 | 3 | 4;
+export type MigrationMovementPhraseIndex = 1 | 2;
 
 export interface MigrationMovementBeatEvaluation {
   evaluationId: string;
@@ -348,6 +349,18 @@ export interface MigrationMovementBeatEvaluation {
     directionScore: number | null;
     expectedDirection: MigrationMovementDirection | null;
   };
+  evaluatedAtMs: number;
+}
+
+export interface MigrationMovementPhraseEvaluation {
+  evaluationId: string;
+  sessionId: number;
+  profile: MigrationMovementRecognitionProfile;
+  movementId: string;
+  barIndex: number;
+  phraseIndex: MigrationMovementPhraseIndex;
+  status: Exclude<MigrationMovementEvaluationStatus, "idle">;
+  beatResults: MigrationMovementBeatEvaluation[];
   evaluatedAtMs: number;
 }
 

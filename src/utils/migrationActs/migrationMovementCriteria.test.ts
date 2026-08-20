@@ -3,6 +3,7 @@ import { useMigrationActMovementRecognition } from "~/composables/migrationActs/
 import type { PoseLandmarkLike } from "~/types/pose";
 import { POSE_LANDMARK } from "~/utils/pose/poseLandmarks";
 import {
+  calculateWingState,
   evaluateMigrationMovementWindow,
   evaluateMigrationMovementBeat,
   evaluateSummerRestBeat,
@@ -23,11 +24,17 @@ const createLandmarks = ({
   rightAnkleX = 0.65,
   hipY = 0.55,
   elbowY = 0.3,
+  leftWristX = elbowY <= 0.32 ? 0.3 : 0.42,
+  rightWristX = elbowY <= 0.32 ? 0.7 : 0.58,
+  wristY = elbowY <= 0.32 ? 0.38 : 0.64,
 }: {
   leftAnkleX?: number;
   rightAnkleX?: number;
   hipY?: number;
   elbowY?: number;
+  leftWristX?: number;
+  rightWristX?: number;
+  wristY?: number;
 } = {}): PoseLandmarkLike[] => {
   const landmarks = Array.from({ length: 33 }, () => ({
     x: 0.5,
@@ -63,6 +70,16 @@ const createLandmarks = ({
   landmarks[POSE_LANDMARK.RIGHT_ELBOW] = {
     x: 0.65,
     y: elbowY,
+    visibility: 1,
+  };
+  landmarks[POSE_LANDMARK.LEFT_WRIST] = {
+    x: leftWristX,
+    y: wristY,
+    visibility: 1,
+  };
+  landmarks[POSE_LANDMARK.RIGHT_WRIST] = {
+    x: rightWristX,
+    y: wristY,
     visibility: 1,
   };
   landmarks[POSE_LANDMARK.LEFT_ANKLE] = {
@@ -275,6 +292,85 @@ describe("migration movement metrics and criteria", () => {
     expect(calculateAnkleMovement(start, moved)).toBeGreaterThan(0.16);
     expect(calculateVerticalHipMovement(start, moved)).toBeGreaterThan(0.08);
     expect(calculateLateralLean(start)).toBeCloseTo(0);
+  });
+
+  it("accepts flight arms below shoulder height when wrists are above hips and opened outward", () => {
+    expect(
+      calculateWingState(
+        createLandmarks({
+          elbowY: 0.42,
+          leftWristX: 0.28,
+          rightWristX: 0.72,
+          wristY: 0.45,
+        }),
+      ),
+    ).toBe("up");
+  });
+
+  it("accepts opened flight arms regardless of left/right image ordering", () => {
+    expect(
+      calculateWingState(
+        createLandmarks({
+          elbowY: 0.42,
+          leftWristX: 0.72,
+          rightWristX: 0.28,
+          wristY: 0.45,
+        }),
+      ),
+    ).toBe("up");
+  });
+
+  it("falls back to elbows when wrist landmarks are not reliable", () => {
+    const landmarks = createLandmarks({
+      elbowY: 0.44,
+      leftWristX: 0.28,
+      rightWristX: 0.72,
+      wristY: 0.45,
+    });
+    landmarks[POSE_LANDMARK.LEFT_WRIST] = {
+      ...landmarks[POSE_LANDMARK.LEFT_WRIST]!,
+      visibility: 0,
+    };
+    landmarks[POSE_LANDMARK.RIGHT_WRIST] = {
+      ...landmarks[POSE_LANDMARK.RIGHT_WRIST]!,
+      visibility: 0,
+    };
+    landmarks[POSE_LANDMARK.LEFT_ELBOW] = {
+      ...landmarks[POSE_LANDMARK.LEFT_ELBOW]!,
+      x: 0.3,
+    };
+    landmarks[POSE_LANDMARK.RIGHT_ELBOW] = {
+      ...landmarks[POSE_LANDMARK.RIGHT_ELBOW]!,
+      x: 0.7,
+    };
+
+    expect(calculateWingState(landmarks)).toBe("up");
+  });
+
+  it("keeps neutral hanging arms from passing as flight arms", () => {
+    expect(
+      calculateWingState(
+        createLandmarks({
+          elbowY: 0.5,
+          leftWristX: 0.42,
+          rightWristX: 0.58,
+          wristY: 0.65,
+        }),
+      ),
+    ).toBe("down");
+  });
+
+  it("rejects raised arms that are not laterally opened", () => {
+    expect(
+      calculateWingState(
+        createLandmarks({
+          elbowY: 0.44,
+          leftWristX: 0.42,
+          rightWristX: 0.58,
+          wristY: 0.45,
+        }),
+      ),
+    ).toBe("neutral");
   });
 
   it("recognizes a summer step-touch", () => {

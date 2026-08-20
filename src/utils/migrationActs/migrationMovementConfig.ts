@@ -32,6 +32,8 @@ export const MIGRATION_RECOGNITION_THRESHOLDS = {
   migrationDirectionIsRequired: false,
   wingsUpTolerance: 0.12,
   wingsDownTolerance: 0.2,
+  flightArmAboveHip: 0.12,
+  flightArmLateralOffset: 0.18,
   verticalBounce: 0.08,
   smoothingWindowMs: 500,
   sampleIntervalMs: 80,

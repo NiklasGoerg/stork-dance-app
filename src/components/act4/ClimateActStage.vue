@@ -1,5 +1,22 @@
 <template>
-  <main class="climate-act-page" :style="climateActThemeStyle">
+  <ActEntryScreen
+    v-if="isClimateEntryVisible"
+    :title="t('story.acts.act4.entry.title')"
+    :subtitle="t('story.acts.act4.entry.subtitle')"
+    :description="t('story.acts.act4.entry.description')"
+    :back-label="t('story.acts.act4.entry.back')"
+    :continue-label="t('story.acts.act4.entry.continue')"
+    :locked="climateStageMode === 'starting'"
+    @back="handleEntryBack"
+    @continue="handleEntryContinue"
+  />
+
+  <main
+    v-else
+    class="climate-act-page"
+    :class="{ 'climate-act-page--debug-open': isDebugMode }"
+    :style="climateActThemeStyle"
+  >
     <StoryProgressSidebar />
 
     <div class="climate-act-main">
@@ -52,7 +69,18 @@
       />
     </div>
 
+    <button
+      class="climate-act-debug-button"
+      type="button"
+      :class="{ 'climate-act-debug-button--active': isDebugMode }"
+      :aria-pressed="isDebugMode"
+      @click="controller.toggleDebug"
+    >
+      {{ t("story.debug.toggle") }}
+    </button>
+
     <section
+      v-if="isDebugMode"
       class="climate-act-bottom-bar"
       :aria-label="t('story.aria.runtimeMetadata')"
     >
@@ -81,57 +109,51 @@
         >
           {{ t("common.continue") }}
         </button>
-        <template v-if="isDebugMode">
-          <button
-            class="btn"
-            type="button"
-            @click="controller.startTutorialFlow"
-          >
-            {{ t("story.acts.act4.debug.startAct4Tutorial") }}
-          </button>
-          <button
-            class="climate-act-auto-toggle"
-            type="button"
-            :class="{
-              'climate-act-auto-toggle--active': isAct4AutoProgressEnabled,
-            }"
-            :aria-pressed="isAct4AutoProgressEnabled"
-            @click="controller.toggleAutoProgress"
-          >
-            <span class="climate-act-auto-toggle__track" aria-hidden="true">
-              <span class="climate-act-auto-toggle__thumb" />
-            </span>
-            <span>{{ t("story.acts.act4.debug.autoProgress") }}</span>
-          </button>
-          <button class="btn" type="button" @click="triggerSkeletonPulseTest">
-            {{ t("story.acts.act4.debug.testSkeletonPulse") }}
-          </button>
-          <button class="btn" type="button" @click="controller.playDebugOutro">
-            {{ t("story.acts.act4.debug.playOutro") }}
-          </button>
-          <button
-            v-for="season in debugSeasonConfigs"
-            :key="`debug-start-${season.id}`"
-            class="btn"
-            type="button"
-            @click="controller.startDebugSeason(season.id)"
-          >
-            {{
-              t("story.acts.act4.debug.startSeason", {
-                season: season.labelKey ? t(season.labelKey) : season.label,
-              })
-            }}
-          </button>
-          <button
-            v-for="season in debugSeasonConfigs"
-            :key="`debug-sequence-${season.id}`"
-            class="btn"
-            type="button"
-            @click="controller.startDebugSeasonSequence(season.id)"
-          >
-            {{ getDebugSeasonSequenceLabel(season.id) }}
-          </button>
-        </template>
+        <button class="btn" type="button" @click="controller.startTutorialFlow">
+          {{ t("story.acts.act4.debug.startAct4Tutorial") }}
+        </button>
+        <button
+          class="climate-act-auto-toggle"
+          type="button"
+          :class="{
+            'climate-act-auto-toggle--active': isAct4AutoProgressEnabled,
+          }"
+          :aria-pressed="isAct4AutoProgressEnabled"
+          @click="controller.toggleAutoProgress"
+        >
+          <span class="climate-act-auto-toggle__track" aria-hidden="true">
+            <span class="climate-act-auto-toggle__thumb" />
+          </span>
+          <span>{{ t("story.acts.act4.debug.autoProgress") }}</span>
+        </button>
+        <button class="btn" type="button" @click="triggerSkeletonPulseTest">
+          {{ t("story.acts.act4.debug.testSkeletonPulse") }}
+        </button>
+        <button class="btn" type="button" @click="controller.playDebugOutro">
+          {{ t("story.acts.act4.debug.playOutro") }}
+        </button>
+        <button
+          v-for="season in debugSeasonConfigs"
+          :key="`debug-start-${season.id}`"
+          class="btn"
+          type="button"
+          @click="controller.startDebugSeason(season.id)"
+        >
+          {{
+            t("story.acts.act4.debug.startSeason", {
+              season: season.labelKey ? t(season.labelKey) : season.label,
+            })
+          }}
+        </button>
+        <button
+          v-for="season in debugSeasonConfigs"
+          :key="`debug-sequence-${season.id}`"
+          class="btn"
+          type="button"
+          @click="controller.startDebugSeasonSequence(season.id)"
+        >
+          {{ getDebugSeasonSequenceLabel(season.id) }}
+        </button>
       </div>
 
       <dl class="climate-act-bottom-bar__meta">
@@ -152,26 +174,17 @@
           <dd>{{ timeLabel }}</dd>
         </div>
       </dl>
-
-      <button
-        class="climate-act-debug-toggle"
-        type="button"
-        :class="{ 'climate-act-debug-toggle--active': isDebugMode }"
-        :aria-pressed="isDebugMode"
-        @click="controller.toggleDebug"
-      >
-        {{ t("story.acts.act4.debug.toggle") }}
-      </button>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import MovementCamera from "~/components/movement/MovementCamera.vue";
 import MovementStage from "~/components/movement/MovementStage.vue";
 import Act4ClimateProgressChart from "~/components/act4/ClimateProgressChart.vue";
 import Act4InfoCard from "~/components/act4/InfoCard.vue";
+import ActEntryScreen from "~/components/story/ActEntryScreen.vue";
 import StoryProgressSidebar from "~/components/story/StoryProgressSidebar.vue";
 import { useAct4Controller } from "~/composables/act4/useAct4Controller";
 import { useAct4ChartModel } from "~/composables/act4/useAct4ChartModel";
@@ -181,6 +194,7 @@ import { useAct4SkeletonFeedback } from "~/composables/act4/useAct4SkeletonFeedb
 import { useAct4ViewModel } from "~/composables/act4/useAct4ViewModel";
 import { useClimateSeasonData } from "~/composables/useClimateSeasonData";
 import { useSeasonalLearningCycle } from "~/composables/useSeasonalLearningCycle";
+import { useStoryAutoAdvance } from "~/composables/useStoryAutoAdvance";
 import { useStoryEngine } from "~/composables/useStoryEngine";
 import { useAct4Store } from "~/store/act4";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
@@ -198,6 +212,7 @@ const props = defineProps<{
 const { t } = useStoryTranslations();
 const route = useRoute();
 const storyEngine = useStoryEngine();
+const { advanceToNextAct } = useStoryAutoAdvance();
 const runtimeStore = useStoryRuntimeStore();
 const act4Store = useAct4Store();
 const climateData = useClimateSeasonData();
@@ -229,6 +244,12 @@ const {
 } = cycle;
 
 const routeDebugEnabled = computed(() => route.query.debug === "true");
+type ClimateStageMode = "entry" | "starting" | "running";
+
+const climateStageMode = ref<ClimateStageMode>("entry");
+const isClimateEntryVisible = computed(
+  () => climateStageMode.value !== "running",
+);
 let forwardRecognitionResult: (
   target: Act4SequenceTarget,
   evaluation: Act4RecognitionSequenceEvaluation,
@@ -361,10 +382,34 @@ const continueToNextAct = async () => {
   await navigateTo(`/story/${nextActId}`);
 };
 
-onMounted(() => {
+const startClimateStage = async () => {
+  if (climateStageMode.value !== "entry") return;
+
+  climateStageMode.value = "starting";
   act4Store.setDebugEnabled(routeDebugEnabled.value);
-  void controller.initialize();
-});
+  await controller.initialize();
+  climateStageMode.value = "running";
+  await controller.startFullFlow();
+};
+
+const handleEntryContinue = () => {
+  void startClimateStage();
+};
+
+const handleEntryBack = async () => {
+  if (climateStageMode.value === "starting") return;
+
+  await navigateTo("/story/act-3");
+};
+
+watch(
+  () => runtimeStore.showContinueGate,
+  (showContinueGate) => {
+    if (showContinueGate && climateStageMode.value === "running") {
+      void advanceToNextAct();
+    }
+  },
+);
 
 onBeforeUnmount(() => {
   disposeSkeletonFeedback();
@@ -386,10 +431,14 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   display: grid;
   grid-template-columns: var(--climate-act-sidebar-width) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) var(--climate-act-bottom-bar-height);
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   background-color: var(--act4-season-background);
   transition: background-color 500ms ease;
+}
+
+.climate-act-page--debug-open {
+  grid-template-rows: minmax(0, 1fr) var(--climate-act-bottom-bar-height);
 }
 
 .climate-act-page::before {
@@ -408,7 +457,7 @@ onBeforeUnmount(() => {
     linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.24));
 }
 
-.climate-act-page > :not(.story-progress) {
+.climate-act-page > :not(.story-progress):not(.climate-act-debug-button) {
   position: relative;
   z-index: 1;
 }
@@ -498,6 +547,36 @@ onBeforeUnmount(() => {
 
 .climate-act-main > .climate-act-temperature-chart {
   grid-column: 2 / -1;
+}
+
+.climate-act-debug-button {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 30;
+  height: 30px;
+  padding: 5px 10px;
+  border: 1px solid rgba(31, 49, 39, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(31, 49, 39, 0.7);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.climate-act-page--debug-open .climate-act-debug-button {
+  bottom: calc(var(--climate-act-bottom-bar-height) + 12px);
+}
+
+.climate-act-debug-button--active {
+  border-color: rgba(31, 49, 39, 0.36);
+  background: rgba(31, 49, 39, 0.92);
+  color: #ffffff;
 }
 
 .climate-act-bottom-bar {
@@ -606,26 +685,6 @@ onBeforeUnmount(() => {
   font-size: 0.72rem;
 }
 
-.climate-act-debug-toggle {
-  justify-self: end;
-  min-height: 30px;
-  padding: 5px 10px;
-  border: 1px solid rgba(31, 49, 39, 0.18);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.66);
-  color: rgba(31, 49, 39, 0.68);
-  font-size: 0.72rem;
-  font-weight: 850;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.climate-act-debug-toggle--active {
-  border-color: rgba(31, 49, 39, 0.36);
-  background: rgba(31, 49, 39, 0.92);
-  color: #ffffff;
-}
-
 .climate-act-bottom-bar__meta div {
   flex: 0 0 auto;
   min-width: 0;
@@ -684,11 +743,6 @@ onBeforeUnmount(() => {
 
   .climate-act-bottom-bar__meta {
     display: none;
-  }
-
-  .climate-act-debug-toggle {
-    grid-column: 2;
-    grid-row: 1;
   }
 }
 </style>

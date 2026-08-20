@@ -26,7 +26,6 @@ import type {
   MigrationActNarrationSemanticEvent,
   MigrationActPauseReason,
   MigrationActSurfaceId,
-  MigrationMapCameraMode,
   ResolvedMigrationMovement,
 } from "~/types/migrationAct";
 import {
@@ -47,6 +46,12 @@ import { MIGRATION_RECOGNITION_THRESHOLDS } from "~/utils/migrationActs/migratio
 import { getMigrationMapFrame } from "~/utils/migrationActs/timeline";
 import { getMigrationPlaybackAdvance } from "~/utils/migrationActs/transitions";
 import {
+  getMigrationMapCameraModeForEvent,
+  getMigrationMapCameraModeForGesture,
+  getMigrationMapCameraModeForMovement,
+  getMigrationMapCameraModeForPhase,
+} from "~/utils/migrationActs/mapCameraMode";
+import {
   getMigrationMovementDirection,
   getMigrationMovementPhaseTiming,
   resolveMigrationMovement,
@@ -55,6 +60,7 @@ import {
   resolveGuidedMovementSourceTime,
   resolveGuidedTransportPosition,
   resolveNextGuidedBarBoundary,
+  resolvePreviousGuidedBarBoundary,
 } from "~/utils/act2/guidedTiming";
 import {
   buildPreparedStoryTimeline,
@@ -108,6 +114,7 @@ type PendingStoryNarrationSequence = {
   cueIds: readonly MigrationActStoryNarrationCueId[];
   payload: MigrationActNarrationEventPayload;
   startTransportMs: number;
+  onComplete?: () => void;
 };
 
 type PrepareCycleOptions = {
@@ -229,6 +236,8 @@ export const useMigrationActRuntime = ({
   let handledMovementFeedbackId: string | null = null;
   let initialCountdownStartTransportMs: number | null = null;
   let pendingStoryNarrationSequences: PendingStoryNarrationSequence[] = [];
+  let finalResidenceSummaryPromise: Promise<void> | null = null;
+  let resolveFinalResidenceSummary: (() => void) | null = null;
   let pausedFromState: "initial_countdown" | "playing" | null = null;
   let phaseMovementScheduledStartTransportMs: number | null = null;
   let cycleTransitionStartedAtTransportMs: number | null = null;
@@ -289,12 +298,6 @@ export const useMigrationActRuntime = ({
       (cycle) => cycle.label === store.activeCycleId,
     ),
   );
-  const getMapCameraModeForPhase = (
-    phase: typeof store.currentPhase,
-  ): MigrationMapCameraMode =>
-    phase === "autumn_migration" || phase === "spring_migration"
-      ? "migration"
-      : "residence";
   const debugSnapshot = computed((): MigrationActDebugSnapshot => {
     const nextEvent =
       store.events.find((event) => event.status === "pending") ?? null;
@@ -794,6 +797,7 @@ export const useMigrationActRuntime = ({
     payload: MigrationActNarrationEventPayload,
     currentRunId: number,
     delayTransportMs: number,
+    onComplete?: () => void,
   ) => {
     pendingStoryNarrationSequences.push({
       runId: currentRunId,
@@ -802,6 +806,7 @@ export const useMigrationActRuntime = ({
       startTransportMs:
         audioStore.getBaseRhythmTransportTimeMs() +
         Math.max(0, delayTransportMs),
+      onComplete,
     });
   };
 
@@ -821,8 +826,45 @@ export const useMigrationActRuntime = ({
         sequence.cueIds,
         sequence.payload,
         sequence.runId,
-      );
+      ).finally(() => sequence.onComplete?.());
     }
+  };
+
+  const resetFinalResidenceSummaryState = () => {
+    resolveFinalResidenceSummary?.();
+    finalResidenceSummaryPromise = null;
+    resolveFinalResidenceSummary = null;
+  };
+
+  const shouldUseFinalResidenceSummary = () =>
+    store.playbackMode === "story" &&
+    store.activeCycleIndex === store.cycleRuns.length - 1;
+
+  const scheduleFinalResidenceSummary = (
+    currentRunId: number,
+    leadingCueIds: readonly MigrationActStoryNarrationCueId[],
+  ) => {
+    if (finalResidenceSummaryPromise || !shouldUseFinalResidenceSummary()) {
+      return;
+    }
+
+    finalResidenceSummaryPromise = new Promise<void>((resolve) => {
+      resolveFinalResidenceSummary = resolve;
+    });
+
+    scheduleStoryNarrationSequence(
+      [
+        ...leadingCueIds,
+        ...toStoryNarrationCueIds(getMigrationChangeFlowCompletionCueIds()),
+      ],
+      getNarrationBasePayload("actSummary"),
+      currentRunId,
+      getOneBarDurationMs(),
+      () => {
+        resolveFinalResidenceSummary?.();
+        resolveFinalResidenceSummary = null;
+      },
+    );
   };
 
   const playScheduledResidenceNarration = (
@@ -1091,19 +1133,16 @@ export const useMigrationActRuntime = ({
     getCurrentPhaseElapsedMs() +
     (resolveCurrentPhaseMovement()?.playbackTiming.prerollMs ?? 0);
 
-  const shouldBarAlignContinuousMovementStart = () =>
-    getCurrentPhaseElapsedMs() <= 80;
-
   const getContinuousMovementStartAnchorTransportMs = (
     movement: ResolvedMigrationMovement,
   ) => {
     const transportMs = audioStore.getBaseRhythmTransportTimeMs();
 
-    if (!shouldBarAlignContinuousMovementStart()) {
+    if (getCurrentPhaseElapsedMs() > 80) {
       return transportMs - getCurrentMovementElapsedMs();
     }
 
-    const countOneTransportMs = resolveNextGuidedBarBoundary(
+    const countOneTransportMs = resolvePreviousGuidedBarBoundary(
       transportMs,
       audioStore.getBeatDurationMs(),
       true,
@@ -1171,6 +1210,21 @@ export const useMigrationActRuntime = ({
     }
   };
 
+  const getUpcomingGestureEvent = () =>
+    store.events.find((event) => event.status === "pending") ?? null;
+
+  const updateUpcomingGestureCameraWindow = () => {
+    const event = getUpcomingGestureEvent();
+    if (!event) return;
+
+    const distanceToEventMs = event.boundaryTimeMs - store.currentElapsedMs;
+    if (distanceToEventMs < 0 || distanceToEventMs > getOneBarDurationMs()) {
+      return;
+    }
+
+    store.setMapCameraMode(getMigrationMapCameraModeForEvent(event.eventType));
+  };
+
   const prepareCycle = (index: number, options: PrepareCycleOptions = {}) => {
     const cycleRun = store.cycleRuns[index];
     if (!cycleRun) throw new Error(`Invalid migration cycle index ${index}.`);
@@ -1187,7 +1241,9 @@ export const useMigrationActRuntime = ({
     residenceNarrationSchedule =
       buildMigrationActResidenceNarrationSchedule(cycleRun);
     handledResidenceNarrationCueIds = new Set();
-    store.setMapCameraMode(getMapCameraModeForPhase(store.currentPhase));
+    store.setMapCameraMode(
+      getMigrationMapCameraModeForPhase(store.currentPhase),
+    );
     store.clearStoryNarration();
     resetContinuousPhaseEngagement();
     handledRecognitionBarEvaluationId = null;
@@ -1529,6 +1585,7 @@ export const useMigrationActRuntime = ({
     onAttemptStart,
   }: GuidedGesturePreparationOptions): Promise<StoryGestureResult> => {
     pauseGuidedMovementRecognition();
+    store.setMapCameraMode(getMigrationMapCameraModeForGesture(gestureId));
     const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
     const countdownStartTransportMs = resolveNextGuidedBarBoundary(
       currentTransportMs,
@@ -1557,6 +1614,7 @@ export const useMigrationActRuntime = ({
     options: GuidedGesturePracticeOptions = {},
   ): Promise<StoryGestureResult> => {
     pauseGuidedMovementRecognition();
+    store.setMapCameraMode(getMigrationMapCameraModeForGesture(gestureId));
     const currentTransportMs = audioStore.getBaseRhythmTransportTimeMs();
     const countdownStartTransportMs = resolveNextGuidedBarBoundary(
       currentTransportMs,
@@ -1589,6 +1647,9 @@ export const useMigrationActRuntime = ({
     onBar?: (index: number) => void;
   }) => {
     cancelGuidedStoryTransition();
+    store.setMapCameraMode(
+      getMigrationMapCameraModeForMovement(transitionMovement),
+    );
     if (
       transitionMovement &&
       tutorialMovement?.movementId !== transitionMovement.movementId
@@ -1781,9 +1842,15 @@ export const useMigrationActRuntime = ({
               event.cycleId,
               event.eventType,
             );
-            if (cueIds.length) {
+            const storyCueIds = toStoryNarrationCueIds(cueIds);
+            if (
+              event.eventType === "spring_arrival" &&
+              shouldUseFinalResidenceSummary()
+            ) {
+              scheduleFinalResidenceSummary(currentRunId, storyCueIds);
+            } else if (storyCueIds.length) {
               scheduleStoryNarrationSequence(
-                toStoryNarrationCueIds(cueIds),
+                storyCueIds,
                 getNarrationBasePayload(
                   event.eventType === "autumn_arrival"
                     ? "winterReflection"
@@ -1817,6 +1884,7 @@ export const useMigrationActRuntime = ({
     store.setElapsedMs(event.boundaryTimeMs);
     selectMovementForCurrentPhase();
     prepareRecognitionForCurrentPhase();
+    store.setMapCameraMode(getMigrationMapCameraModeForEvent(event.eventType));
     if (event.gestureId === "departure") {
       const arrivalEventType =
         event.eventType === "autumn_departure"
@@ -1826,7 +1894,6 @@ export const useMigrationActRuntime = ({
         store.events.find((item) => item.eventType === arrivalEventType) ??
         null;
 
-      store.setMapCameraMode("migration");
       const cueId = getMigrationChangeFlowDepartureCueId(
         event.cycleId,
         event.eventType,
@@ -1905,11 +1972,15 @@ export const useMigrationActRuntime = ({
       movementRecognition.reset();
       seasonAudio.fadeOutForCycle(2);
       cancelFrame();
-      await playStoryNarrationSequence(
-        toStoryNarrationCueIds(getMigrationChangeFlowCompletionCueIds()),
-        getNarrationBasePayload("actSummary"),
-        currentRunId,
-      );
+      if (finalResidenceSummaryPromise) {
+        await finalResidenceSummaryPromise;
+      } else {
+        await playStoryNarrationSequence(
+          toStoryNarrationCueIds(getMigrationChangeFlowCompletionCueIds()),
+          getNarrationBasePayload("actSummary"),
+          currentRunId,
+        );
+      }
       if (!isCurrentRun(currentRunId)) return;
       audioStore.fadeOutBaseRhythmLoop(
         (audioStore.getBeatDurationMs() *
@@ -2190,6 +2261,7 @@ export const useMigrationActRuntime = ({
           } else {
             movement.tick(getTransportMovementElapsedMs());
           }
+          updateUpcomingGestureCameraWindow();
           playScheduledResidenceNarration(
             previousElapsedMs,
             store.currentElapsedMs,
@@ -2304,6 +2376,7 @@ export const useMigrationActRuntime = ({
     cancelGuidedInterlude();
     gestures.cancel();
     pendingStoryNarrationSequences = [];
+    resetFinalResidenceSummaryState();
     cycleTransitionStartedAtTransportMs = null;
     cycleTransitionTargetIndex = null;
     suppressNextCycleIntro = false;
@@ -2470,6 +2543,7 @@ export const useMigrationActRuntime = ({
     cancelGuidedInterlude();
     gestures.cancel();
     pendingStoryNarrationSequences = [];
+    resetFinalResidenceSummaryState();
     cycleTransitionStartedAtTransportMs = null;
     cycleTransitionTargetIndex = null;
     suppressNextCycleIntro = false;
@@ -2507,6 +2581,7 @@ export const useMigrationActRuntime = ({
     nextRunId();
     gestures.cancel();
     pendingStoryNarrationSequences = [];
+    resetFinalResidenceSummaryState();
     cycleTransitionStartedAtTransportMs = null;
     cycleTransitionTargetIndex = null;
     suppressNextCycleIntro = false;
@@ -2517,7 +2592,9 @@ export const useMigrationActRuntime = ({
     store.setActiveEvent(null);
     store.removePauseReason("gesture");
     store.setElapsedMs(elapsedMs);
-    store.setMapCameraMode(getMapCameraModeForPhase(store.currentPhase));
+    store.setMapCameraMode(
+      getMigrationMapCameraModeForPhase(store.currentPhase),
+    );
     resetContinuousPhaseEngagement();
     store.replaceEvents(
       reconcileMigrationActEventsForSeek(store.events, store.currentElapsedMs),
@@ -2654,6 +2731,7 @@ export const useMigrationActRuntime = ({
     cancelGuidedInterlude();
     gestures.cleanup();
     pendingStoryNarrationSequences = [];
+    resetFinalResidenceSummaryState();
     cycleTransitionStartedAtTransportMs = null;
     cycleTransitionTargetIndex = null;
     suppressNextCycleIntro = false;

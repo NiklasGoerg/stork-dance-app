@@ -9,6 +9,7 @@ import type {
   MigrationActEvent,
   MigrationGestureEvaluationResult,
   MigrationMovementBarEvaluation,
+  MigrationMovementPhraseEvaluation,
   MigrationMovementRecognitionProfile,
 } from "~/types/migrationAct";
 import type { StoryTimelineDay } from "~/utils/storyCycle";
@@ -160,6 +161,8 @@ const createHarness = () => {
   const lastBarEvaluation = shallowRef<MigrationMovementBarEvaluation | null>(
     null,
   );
+  const lastPhraseEvaluation =
+    shallowRef<MigrationMovementPhraseEvaluation | null>(null);
   const calls = {
     movementDemonstrations: [] as string[],
     gestureDemonstrations: [] as string[],
@@ -178,7 +181,7 @@ const createHarness = () => {
   });
   const runtime = {
     store,
-    movementRecognition: { lastBarEvaluation },
+    movementRecognition: { lastBarEvaluation, lastPhraseEvaluation },
     gestures: { store: gestureStore },
     enterGuidedInterlude: vi.fn(async () => {
       store.setPlaybackState("playing");
@@ -271,8 +274,38 @@ const createHarness = () => {
     await nextTick();
     await flushFlow();
   };
+  const publishPhrase = async (
+    movementId: string,
+    id: string,
+    status: MigrationMovementPhraseEvaluation["status"],
+    phraseIndex: MigrationMovementPhraseEvaluation["phraseIndex"] = 1,
+  ) => {
+    lastPhraseEvaluation.value = {
+      evaluationId: id,
+      sessionId: 1,
+      profile: "migration-guided",
+      movementId,
+      barIndex: Number(id.replace(/\D/g, "")) || 0,
+      phraseIndex,
+      status,
+      beatResults: [],
+      evaluatedAtMs: 0,
+    };
+    await nextTick();
+    await flushFlow();
+  };
 
   const completeMovement = async (movementId: string, prefix: string) => {
+    if (movementId.includes("migration")) {
+      await publishPhrase(movementId, `${prefix}-failure`, "failed");
+      await publishPhrase(movementId, `${prefix}-tracking`, "not_evaluable");
+      await publishPhrase(movementId, `${prefix}-1`, "success");
+      await publishPhrase(movementId, `${prefix}-1`, "success");
+      await publishPhrase(movementId, `${prefix}-2`, "success", 2);
+      await publishPhrase(movementId, `${prefix}-3`, "success");
+      return;
+    }
+
     await publish(movementId, `${prefix}-failure`, "failed");
     await publish(movementId, `${prefix}-tracking`, "not_evaluable");
     await publish(movementId, `${prefix}-1`, "success");
@@ -290,6 +323,7 @@ const createHarness = () => {
     instructionNarration,
     gestureStore,
     publish,
+    publishPhrase,
     completeMovement,
   };
 };
@@ -301,8 +335,15 @@ describe("guided migration controller", () => {
   it.each([1, 2, 3, 4, 5])(
     "runs the complete annual tutorial deterministically (run %s)",
     async () => {
-      const { controller, store, calls, completed, completeMovement, publish } =
-        createHarness();
+      const {
+        controller,
+        store,
+        calls,
+        completed,
+        completeMovement,
+        publish,
+        publishPhrase,
+      } = createHarness();
 
       expect(store.guided.phase).toBe("idle");
       expect(controller.panelModel.value.actions).toEqual([
@@ -326,7 +367,15 @@ describe("guided migration controller", () => {
       await publish("summer-step", "old-summer-id", "success");
       expect(store.guided.successfulBars).toBe(0);
       const autumnMovement = store.guided.activeMovementId!;
-      await completeMovement(autumnMovement, "autumn");
+      await publish(autumnMovement, "autumn-bar-success", "success");
+      expect(store.guided.successfulBars).toBe(0);
+      await publishPhrase(autumnMovement, "autumn-phrase-failed", "failed");
+      expect(store.guided.successfulBars).toBe(0);
+      await publishPhrase(autumnMovement, "autumn-phrase-1", "success");
+      expect(store.guided.successfulBars).toBe(1);
+      await publishPhrase(autumnMovement, "autumn-phrase-2", "success", 2);
+      expect(store.guided.successfulBars).toBe(2);
+      await publishPhrase(autumnMovement, "autumn-phrase-3", "success");
       expect(store.guided.phase).toBe("winter-practice");
       expect(calls.gestureDemonstrations).toEqual(["departure", "arrival"]);
       expect(calls.gesturePractices).toEqual(["departure", "arrival"]);
@@ -480,7 +529,7 @@ describe("guided migration controller", () => {
     handoverStart?.();
     expect(store.guided.phase).toBe("autumn-departure-practice-prompt");
     expect(instructionNarration.speakText).toHaveBeenCalledWith(
-      "Now it's your turn. Depart with the stork.",
+      "During the countdown, move into a crouch so you're ready on count one.",
       expect.objectContaining({
         behavior: "replace",
         rate: GUIDED_ACT2_NARRATION_RATE,

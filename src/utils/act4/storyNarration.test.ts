@@ -145,45 +145,44 @@ const expectedComparisonValues = {
 
 const expectedComparisonCopy = {
   "act4.story.2000_2004.winter":
-    "Winter: {deltaSpoken} degrees above the reference — {movementValue} percent. Our first increase from the baseline.",
+    "Winter is {deltaSpoken} degrees above the reference. Use {movementValue} percent.",
   "act4.story.2000_2004.spring":
-    "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. A similar increase.",
+    "Spring is {deltaSpoken} degrees above the reference. Use {movementValue} percent.",
   "act4.story.2000_2004.summer":
-    "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Close to spring.",
+    "Summer is {deltaSpoken} degrees above the reference. Use {movementValue} percent.",
   "act4.story.2000_2004.autumn":
-    "Autumn is also {deltaSpoken} degrees above the reference. That's {movementValue} percent.",
+    "Autumn is {deltaSpoken} degrees above the reference. Use {movementValue} percent.",
   "act4.story.2005_2009.winter":
-    "Winter: {deltaSpoken} degrees above the reference — {movementValue} percent. Almost unchanged from before.",
+    "Winter stays close to the last period. Use {movementValue} percent.",
   "act4.story.2005_2009.spring":
-    "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. Again, little change.",
+    "Spring stays similar. Use {movementValue} percent.",
   "act4.story.2005_2009.summer":
-    "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Much closer to the baseline now.",
-  "act4.story.2005_2009.autumn":
-    "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent. A clear rise from before.",
+    "Summer moves closer to the reference. Use {movementValue} percent.",
+  "act4.story.2005_2009.autumn": "Autumn rises. Use {movementValue} percent.",
   "act4.story.2010_2014.winter":
-    "Winter: {deltaAbsSpoken} degrees below the reference — minus 10 percent. This time, winter reverses direction.",
+    "Winter falls below the reference by {deltaAbsSpoken} degrees. Use minus 10 percent.",
   "act4.story.2010_2014.spring":
-    "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. Unlike winter, it stays above the baseline.",
+    "Spring stays above the reference. Use {movementValue} percent.",
   "act4.story.2010_2014.summer":
-    "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Still close to the baseline.",
+    "Summer stays close to the reference. Use {movementValue} percent.",
   "act4.story.2010_2014.autumn":
-    "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent.",
+    "Autumn is above the reference. Use {movementValue} percent.",
   "act4.story.2015_2019.winter":
-    "Winter: {deltaSpoken} degrees above the reference — {movementValue} percent. A sharp rise from the previous period.",
+    "Winter rises again. Use {movementValue} percent.",
   "act4.story.2015_2019.spring":
-    "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. It rises as well.",
+    "Spring rises slightly. Use {movementValue} percent.",
   "act4.story.2015_2019.summer":
-    "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. A much larger difference than before.",
+    "Summer is much farther from the reference. Use {movementValue} percent.",
   "act4.story.2015_2019.autumn":
-    "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent. Higher again.",
+    "Autumn remains high. Use {movementValue} percent.",
   "act4.story.2020_2024.winter":
-    "Winter: {deltaSpoken} degrees above the reference — 100 percent. The largest difference in the dataset.",
+    "Winter reaches the largest difference: {deltaSpoken} degrees. Use the full movement.",
   "act4.story.2020_2024.spring":
-    "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. Slightly lower than before.",
+    "Spring is above the reference. Use {movementValue} percent.",
   "act4.story.2020_2024.summer":
-    "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Almost unchanged.",
+    "Summer stays high. Use {movementValue} percent.",
   "act4.story.2020_2024.autumn":
-    "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent. A strong final increase.",
+    "Autumn rises strongly. Use {movementValue} percent.",
 } as const;
 
 describe("Act 4 story narration", () => {
@@ -228,7 +227,6 @@ describe("Act 4 story narration", () => {
       "act4.story.completed.embodied",
       "act4.story.completed.seasons",
       "act4.story.completed.maximum",
-      "act4.story.completed.maximumContext",
       "act4.story.completed.migration",
     ]);
   });
@@ -262,12 +260,12 @@ describe("Act 4 story narration", () => {
       en.story.acts.act4.narration.story.referenceComplete.scale;
 
     expect(scaleText).toBe(
-      "Remember: the full 100 percent movement represents the largest difference in the data.",
+      "The largest difference in this story is 2.33 degrees. That becomes the full, 100 percent movement.",
     );
     expect(scaleText).not.toContain("1.17");
   });
 
-  it("keeps all comparison cues authored with temperature before percentage", () => {
+  it("keeps comparison cues short and action-oriented", () => {
     expect(Object.keys(expectedComparisonCopy)).toHaveLength(20);
 
     Object.entries(expectedComparisonCopy).forEach(([cueId, expectedText]) => {
@@ -276,19 +274,8 @@ describe("Act 4 story narration", () => {
           cueId as keyof typeof act4StoryNarrationCatalog
         ];
       const text = getTranslation(cue.textKey);
-      const temperaturePlaceholder = expectedText.includes("{deltaAbsSpoken}")
-        ? "{deltaAbsSpoken}"
-        : "{deltaSpoken}";
-      const percentageIndex = expectedText.includes("{movementValue}")
-        ? expectedText.indexOf("{movementValue}")
-        : expectedText.includes("minus 10 percent")
-          ? expectedText.indexOf("minus 10 percent")
-          : expectedText.indexOf("100 percent");
-
       expect(text, cueId).toBe(expectedText);
-      expect(expectedText.indexOf(temperaturePlaceholder), cueId).toBeLessThan(
-        percentageIndex,
-      );
+      expect(expectedText.split(/\s+/).length, cueId).toBeLessThanOrEqual(12);
     });
   });
 
@@ -375,7 +362,7 @@ describe("Act 4 story narration", () => {
       resolveAct4StoryNarrationCue(winter2010!)?.params.deltaAbsSpoken,
     ).toBe("point three");
     expect(en.story.acts.act4.narration.story["2010_2014"].winter).toContain(
-      "{deltaAbsSpoken} degrees below",
+      "falls below the reference by {deltaAbsSpoken} degrees",
     );
     expect(
       en.story.acts.act4.narration.story["2010_2014"].winter,

@@ -5,6 +5,8 @@ import type {
   MigrationMovementBarEvaluation,
   MigrationMovementBeatEvaluation,
   MigrationMovementBeatIndex,
+  MigrationMovementPhraseEvaluation,
+  MigrationMovementPhraseIndex,
   MigrationMovementRecognitionProfile,
   MigrationMovementWingState,
 } from "~/types/migrationAct";
@@ -76,6 +78,8 @@ export const useMigrationActMovementRecognition = () => {
   const lastBeatEvaluation = shallowRef<MigrationMovementBeatEvaluation | null>(
     null,
   );
+  const lastPhraseEvaluation =
+    shallowRef<MigrationMovementPhraseEvaluation | null>(null);
   const validPoseSampleCount = ref(0);
   const currentBeatWindow = ref("none");
   const {
@@ -139,6 +143,7 @@ export const useMigrationActMovementRecognition = () => {
     lastSuccessfulEvaluationId.value = null;
     lastBarEvaluation.value = null;
     lastBeatEvaluation.value = null;
+    lastPhraseEvaluation.value = null;
   };
 
   const prepare = (profile: MigrationMovementRecognitionProfile | null) => {
@@ -285,6 +290,46 @@ export const useMigrationActMovementRecognition = () => {
   const isReturnBeat = (beatIndex: MigrationMovementBeatIndex) =>
     beatIndex === 2 || beatIndex === 4;
 
+  const getPhraseIndexForBeat = (
+    beatIndex: MigrationMovementBeatIndex,
+  ): MigrationMovementPhraseIndex => (beatIndex <= 2 ? 1 : 2);
+
+  const publishPhraseEvaluation = (
+    barIndex: number,
+    phraseIndex: MigrationMovementPhraseIndex,
+  ) => {
+    const profile = recognitionProfile.value;
+    if (!profile) return;
+
+    const phraseBeats =
+      phraseIndex === 1 ? ([1, 2] as const) : ([3, 4] as const);
+    const beatResults = phraseBeats
+      .map((beatIndex) => beatEvaluations.get(beatIndex))
+      .filter((result): result is MigrationMovementBeatEvaluation =>
+        Boolean(result),
+      );
+    const statuses = beatResults.map((result) => result.status);
+    const status =
+      beatResults.length < phraseBeats.length ||
+      statuses.includes("not_evaluable")
+        ? "not_evaluable"
+        : statuses.every((beatStatus) => beatStatus === "success")
+          ? "success"
+          : "failed";
+
+    lastPhraseEvaluation.value = {
+      evaluationId: `migration-${recognitionSessionId}-${profile}-${barIndex}-phrase-${phraseIndex}`,
+      sessionId: recognitionSessionId,
+      profile,
+      movementId: activeMovementId || profile,
+      barIndex,
+      phraseIndex,
+      status,
+      beatResults,
+      evaluatedAtMs: performance.now(),
+    };
+  };
+
   const getBeatEndMs = (beatIndex: MigrationMovementBeatIndex) =>
     beatIndex * MIGRATION_RECOGNITION_THRESHOLDS.beatDurationMs +
     (isReturnBeat(beatIndex)
@@ -344,6 +389,9 @@ export const useMigrationActMovementRecognition = () => {
     });
     if (evaluation.status === "success" || finalize) {
       publishBeatEvaluation(barIndex, beatIndex, evaluation);
+      if (isReturnBeat(beatIndex)) {
+        publishPhraseEvaluation(barIndex, getPhraseIndexForBeat(beatIndex));
+      }
     }
   };
 
@@ -647,6 +695,7 @@ export const useMigrationActMovementRecognition = () => {
     lastSuccessfulEvaluationId,
     lastBarEvaluation,
     lastBeatEvaluation,
+    lastPhraseEvaluation,
     validPoseSampleCount,
     currentBeatWindow,
     diagnostics,

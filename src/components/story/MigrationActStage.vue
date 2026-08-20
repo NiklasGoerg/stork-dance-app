@@ -1,5 +1,18 @@
 <template>
+  <ActEntryScreen
+    v-if="isEntryVisible"
+    :title="entryContent.title"
+    :subtitle="entryContent.subtitle"
+    :description="entryContent.description"
+    :back-label="entryContent.backLabel"
+    :continue-label="entryContent.continueLabel"
+    :locked="stageMode === 'starting'"
+    @back="handleEntryBack"
+    @continue="handleEntryContinue"
+  />
+
   <MigrationStoryLayout
+    v-else
     :season="activeSeasonId"
     :map-aria-label="t('story.aria.map', { title: actTitle })"
     :stage-aria-label="t('story.aria.stage', { title: actTitle })"
@@ -127,12 +140,66 @@
         @toggle-auto-progress="controller.toggleAutoProgress"
       />
     </template>
+
+    <template #overlay>
+      <ActDebugDock
+        v-if="showMigrationDebugDock"
+        :open="store.debug.enabled"
+        :toggle-label="t('story.debug.toggle')"
+        :panel-label="t('story.debug.controls')"
+        @toggle="controller.toggleDebug"
+      >
+        <button
+          v-if="canShowStoryProgress"
+          type="button"
+          class="btn"
+          @click="handleStoryProgress"
+        >
+          {{ t("story.acts.act2.controls.storyProgress") }}
+        </button>
+        <template v-if="canShowCycleDebugControls">
+          <button
+            v-for="cycle in cycleRuns"
+            :key="cycle.id"
+            class="btn"
+            type="button"
+            @click="controller.startSingleCycle(cycle.id)"
+          >
+            {{ getMigrationCycleButtonLabel(cycle) }}
+          </button>
+          <button
+            class="migration-auto-toggle"
+            type="button"
+            :class="{
+              'migration-auto-toggle--active': store.debug.autoProgressEnabled,
+            }"
+            :aria-pressed="store.debug.autoProgressEnabled"
+            @click="controller.toggleAutoProgress"
+          >
+            <span class="migration-auto-toggle__track" aria-hidden="true">
+              <span class="migration-auto-toggle__thumb" />
+            </span>
+            <span>
+              {{
+                t("story.debug.autoProgress", {
+                  state: store.debug.autoProgressEnabled
+                    ? t("common.on")
+                    : t("common.off"),
+                })
+              }}
+            </span>
+          </button>
+        </template>
+      </ActDebugDock>
+    </template>
   </MigrationStoryLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import BirdMap from "~/components/map/BirdMap.vue";
+import ActDebugDock from "~/components/story/ActDebugDock.vue";
+import ActEntryScreen from "~/components/story/ActEntryScreen.vue";
 import CycleTransitionCover from "~/components/story/CycleTransitionCover.vue";
 import MovementCamera from "~/components/movement/MovementCamera.vue";
 import MovementStage from "~/components/movement/MovementStage.vue";
@@ -146,13 +213,18 @@ import { useMigrationActInfoPanelModel } from "~/composables/migrationActs/useMi
 import { useMigrationActRuntime } from "~/composables/migrationActs/useMigrationActRuntime";
 import { useGuidedMigrationController } from "~/composables/act2/useGuidedMigrationController";
 import { useNarration } from "~/composables/narration/useNarration";
+import { useStoryAutoAdvance } from "~/composables/useStoryAutoAdvance";
 import { useStoryEngine } from "~/composables/useStoryEngine";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
 import { migrationStoryCycleDefinitions as storyCycleDefinitions } from "~/utils/migrationStoryData";
 import { getSeasonForDate } from "~/utils/storyCycle";
 import { isCycleTransitionCoverMounted } from "~/utils/migrationActs/cycleTransitionCover";
-import { resolveMigrationActCycleRuns } from "~/utils/migrationActs/config";
+import {
+  getMigrationCycleButtonLabel,
+  resolveMigrationActCycleRuns,
+} from "~/utils/migrationActs/config";
+import { usePresenterActions } from "~/composables/usePresenterActions";
 import type { StoryAct } from "~/story/types";
 import type { MigrationInfoPanelActionId } from "~/types/migrationAct";
 
@@ -166,11 +238,16 @@ const cycleRuns = resolveMigrationActCycleRuns(props.act);
 const controller = useMigrationActRuntime({ act: props.act, cycleRuns });
 const instructionNarration = useNarration();
 const { t: translateGuidedNarration } = useI18n();
+const { advanceToNextAct } = useStoryAutoAdvance();
 const guidedController = useGuidedMigrationController({
   runtime: controller,
   enabled: props.act.id === "act-2",
   instructionNarration,
   translate: (key) => translateGuidedNarration(key),
+  onGuidedCycleCompleted: async () => {
+    runtimeStore.completeAct();
+    await advanceToNextAct();
+  },
 });
 const gestureStore = controller.gestures.store;
 const infoPanel = useMigrationActInfoPanelModel({
@@ -181,6 +258,37 @@ const infoPanel = useMigrationActInfoPanelModel({
   showContinueAction: computed(() => runtimeStore.showContinueGate),
 });
 
+type MigrationStageMode = "entry" | "starting" | "running";
+
+const isGuidedAct = computed(() => props.act.id === "act-2");
+const isGatedMigrationAct = computed(
+  () => props.act.id === "act-2" || props.act.id === "act-3",
+);
+const stageMode = ref<MigrationStageMode>(
+  isGatedMigrationAct.value ? "entry" : "running",
+);
+const isEntryVisible = computed(
+  () => isGatedMigrationAct.value && stageMode.value !== "running",
+);
+const entryContent = computed(() => {
+  if (props.act.id === "act-3") {
+    return {
+      title: t("story.acts.act3.entry.title"),
+      subtitle: t("story.acts.act3.entry.subtitle"),
+      description: t("story.acts.act3.entry.description"),
+      backLabel: t("story.acts.act3.entry.back"),
+      continueLabel: t("story.acts.act3.entry.continue"),
+    };
+  }
+
+  return {
+    title: t("story.acts.act2.entry.title"),
+    subtitle: t("story.acts.act2.entry.subtitle"),
+    description: undefined,
+    backLabel: t("story.acts.act2.entry.back"),
+    continueLabel: t("story.acts.act2.entry.continue"),
+  };
+});
 const actTitle = computed(() => getActTitle(props.act));
 const activeInfoPanelModel = computed(() =>
   guidedController.isGuidedUiActive.value
@@ -190,7 +298,9 @@ const activeInfoPanelModel = computed(() =>
 const showStoryAction = computed(() => !guidedController.enabled);
 const showBottomControls = computed(
   () =>
-    !guidedController.enabled || activeInfoPanelModel.value.actions.length > 0,
+    !isGatedMigrationAct.value &&
+    (!guidedController.enabled ||
+      activeInfoPanelModel.value.actions.length > 0),
 );
 const routeDebugEnabled = computed(
   () => import.meta.dev && route.query.debug === "true",
@@ -226,10 +336,33 @@ const skeletonPulseProgress = computed(() =>
     ? controller.gestures.pulseProgress.value
     : controller.movementRecognition.pulseProgress.value,
 );
+const canShowStoryProgress = computed(
+  () =>
+    isGuidedAct.value &&
+    stageMode.value === "running" &&
+    store.debug.enabled &&
+    activeInfoPanelModel.value.actions.some(
+      (action) =>
+        action.id === "forceCompleteGuidedStep" && action.disabled !== true,
+    ),
+);
+const canShowCycleDebugControls = computed(
+  () =>
+    props.act.id === "act-3" &&
+    stageMode.value === "running" &&
+    store.debug.enabled,
+);
+const showMigrationDebugDock = computed(
+  () => isGatedMigrationAct.value && stageMode.value === "running",
+);
 const continueToNextAct = async () => {
   const nextActId = runtimeStore.currentAct?.nextActId;
   storyEngine.continueFromGate();
   if (nextActId) await navigateTo(`/story/${nextActId}`);
+};
+
+const handleStoryProgress = () => {
+  handlePanelAction("forceCompleteGuidedStep");
 };
 
 const handlePanelAction = (actionId: MigrationInfoPanelActionId) => {
@@ -249,6 +382,47 @@ const handlePanelAction = (actionId: MigrationInfoPanelActionId) => {
   if (actionId === "continueToNextAct") void continueToNextAct();
 };
 
+const startMigrationStage = async () => {
+  if (!isGatedMigrationAct.value || stageMode.value !== "entry") return;
+
+  stageMode.value = "starting";
+  store.setDebugEnabled(routeDebugEnabled.value);
+  await controller.initialize();
+  guidedController.initialize();
+  stageMode.value = "running";
+
+  if (isGuidedAct.value) {
+    guidedController.startGuidedJourney();
+    return;
+  }
+
+  await controller.startStory();
+};
+
+const handleEntryBack = async () => {
+  if (stageMode.value === "starting") return;
+
+  if (props.act.id === "act-3") {
+    await navigateTo("/story/act-2");
+    return;
+  }
+
+  await navigateTo("/story/prologue");
+};
+
+const handleEntryContinue = () => {
+  void startMigrationStage();
+};
+
+const handleActivePresenterPageDown = () => {
+  if (runtimeStore.showContinueGate) {
+    void continueToNextAct();
+    return;
+  }
+
+  if (isGuidedAct.value) handleStoryProgress();
+};
+
 const handleStartStory = () => controller.startStory();
 const handlePause = () => guidedController.pause();
 const handleResume = () => void guidedController.resume();
@@ -258,6 +432,8 @@ const handleReset = () => {
 };
 
 onMounted(async () => {
+  if (isGatedMigrationAct.value) return;
+
   store.setDebugEnabled(routeDebugEnabled.value);
   await controller.initialize();
   guidedController.initialize();
@@ -266,9 +442,26 @@ watch(
   () => routeDebugEnabled.value,
   (enabled) => store.setDebugEnabled(enabled),
 );
+watch(
+  () => runtimeStore.showContinueGate,
+  (showContinueGate) => {
+    if (
+      showContinueGate &&
+      props.act.id === "act-3" &&
+      stageMode.value === "running"
+    ) {
+      void advanceToNextAct();
+    }
+  },
+);
 onBeforeUnmount(() => {
   guidedController.dispose();
   controller.dispose();
+});
+
+usePresenterActions({
+  enabled: computed(() => showMigrationDebugDock.value),
+  onPageDown: handleActivePresenterPageDown,
 });
 </script>
 
@@ -339,5 +532,59 @@ onBeforeUnmount(() => {
 
 .migration-clock__date {
   font-weight: 700;
+}
+
+.migration-auto-toggle {
+  flex: 0 0 auto;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid rgb(31 49 39 / 0.18);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.72);
+  color: #26382f;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.migration-auto-toggle--active {
+  border-color: rgb(42 108 74 / 0.42);
+  background: rgb(219 244 228 / 0.9);
+  color: #1f5b3d;
+}
+
+.migration-auto-toggle__track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgb(31 49 39 / 0.22);
+  transition: background 140ms ease;
+}
+
+.migration-auto-toggle--active .migration-auto-toggle__track {
+  background: #2f8e5d;
+}
+
+.migration-auto-toggle__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(31 49 39 / 0.22);
+  transition: transform 140ms ease;
+}
+
+.migration-auto-toggle--active .migration-auto-toggle__thumb {
+  transform: translateX(12px);
 }
 </style>

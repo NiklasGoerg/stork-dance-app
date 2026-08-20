@@ -153,7 +153,6 @@ export const migrationChangeFlow = {
     completionCue("structure"),
     completionCue("pattern"),
     completionCue("qualification"),
-    completionCue("question"),
     completionCue("climateTransition"),
   ],
 } as const satisfies MigrationChangeFlowDefinition;

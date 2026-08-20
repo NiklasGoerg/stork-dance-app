@@ -52,7 +52,12 @@ import type {
   MigrationActMapFrame,
   MigrationMapCameraMode,
 } from "~/types/migrationAct";
-import type { StorkDataSource, StorkStoryCycleDefinition } from "~/types/stork";
+import type {
+  StorkDataSource,
+  StorkMigrationEvent,
+  StorkMigrationPhase,
+  StorkStoryCycleDefinition,
+} from "~/types/stork";
 import { migrationStoryCycleDefinitions as defaultStoryCycleDefinitions } from "~/utils/migrationStoryData";
 import {
   buildPreparedStoryTimeline,
@@ -94,6 +99,7 @@ const props = withDefaults(
     dataSource?: StorkDataSource;
     playbackSource?: "story-playback" | "migration-runtime";
     cameraMode?: MigrationMapCameraMode;
+    showStoryMarker?: boolean;
   }>(),
   {
     showControls: true,
@@ -104,6 +110,7 @@ const props = withDefaults(
     dataSource: "raw",
     playbackSource: "migration-runtime",
     cameraMode: "migration",
+    showStoryMarker: true,
   },
 );
 const emit = defineEmits<{
@@ -205,16 +212,26 @@ const currentTimelineDay = computed(() =>
       ),
 );
 
+const activeRuntimeEvent = computed(
+  () =>
+    migrationActStore.events.find(
+      (event) => event.id === migrationActStore.activeEventId,
+    ) ?? null,
+);
+
+const pendingRuntimeEvent = computed(
+  () =>
+    migrationActStore.events.find(
+      (event) => event.id === migrationActStore.pendingEventId,
+    ) ??
+    migrationActStore.events.find((event) => event.status === "pending") ??
+    null,
+);
+
 const semanticCameraConfig = {
   migration: {
-    bounds: [
-      [31.5, -8.5],
-      [53, 13],
-    ] as Array<[number, number]>,
-    center: [42.25, 2.25] as [number, number],
-    padding: [12, 12] as [number, number],
-    zoom: 6,
-    maxZoom: 8,
+    padding: [54, 54] as [number, number],
+    maxZoom: 6,
   },
   residence: {
     padding: [80, 80] as [number, number],
@@ -253,6 +270,49 @@ const getActiveResidencePoints = () => {
   );
 };
 
+const getMigrationPhaseForEvent = (
+  eventType: StorkMigrationEvent | null | undefined,
+): Extract<
+  StorkMigrationPhase,
+  "autumn_migration" | "spring_migration"
+> | null => {
+  if (eventType === "autumn_departure" || eventType === "autumn_arrival") {
+    return "autumn_migration";
+  }
+
+  if (eventType === "spring_departure" || eventType === "spring_arrival") {
+    return "spring_migration";
+  }
+
+  return null;
+};
+
+const getActiveMigrationCameraPhase = () => {
+  const eventPhase =
+    getMigrationPhaseForEvent(activeRuntimeEvent.value?.eventType) ??
+    getMigrationPhaseForEvent(pendingRuntimeEvent.value?.eventType);
+
+  if (eventPhase) return eventPhase;
+
+  const phase = currentTimelineDay.value?.phase;
+  return phase === "autumn_migration" || phase === "spring_migration"
+    ? phase
+    : null;
+};
+
+const getActiveMigrationPoints = () => {
+  const route = interpolationRoute.value;
+  const migrationPhase = getActiveMigrationCameraPhase();
+
+  if (!route) return [];
+
+  const migrationPhasePoints = migrationPhase
+    ? route.points.filter((point) => point.story?.phase === migrationPhase)
+    : [];
+
+  return migrationPhasePoints.length ? migrationPhasePoints : route.points;
+};
+
 const fitCameraToPoints = (
   points: Array<{ lat: number; lng: number }>,
   options: { maxZoom: number; padding: [number, number]; animate: boolean },
@@ -278,13 +338,14 @@ const fitCameraToPoints = (
 const getSemanticCameraKey = () => {
   const day = currentTimelineDay.value;
   const route = interpolationRoute.value;
+  const migrationCameraPhase = getActiveMigrationCameraPhase();
 
   if (!usesMigrationRuntime.value || selectedMapMode.value !== "story") {
     return "";
   }
 
   return props.cameraMode === "migration"
-    ? `${route?.id ?? "none"}:migration`
+    ? `${route?.id ?? "none"}:migration:${migrationCameraPhase ?? "full"}`
     : `${route?.id ?? "none"}:residence:${day?.phase ?? "none"}`;
 };
 
@@ -297,8 +358,11 @@ const applySemanticCamera = (animate = true, force = false) => {
 
   if (props.cameraMode === "migration") {
     const config = semanticCameraConfig.migration;
-    map.value?.stop?.();
-    map.value?.setView?.(config.center, config.zoom, { animate });
+    fitCameraToPoints(getActiveMigrationPoints(), {
+      padding: config.padding,
+      maxZoom: config.maxZoom,
+      animate,
+    });
     scheduleStoryMarkerRefresh();
     return;
   }
@@ -415,11 +479,22 @@ const getConfiguredStoryCycleIds = (): string[] =>
       ? [activeStoryCycleDefinitions.value[0]?.label].filter(isDefinedString)
       : activeStoryCycleDefinitions.value.map((cycle) => cycle.label);
 
+const getInitialStoryDate = () => {
+  if (currentDate.value) return currentDate.value;
+
+  const configuredCycleId = getConfiguredStoryCycleIds()[0];
+  const configuredCycle = storyCycleRoutes.value.find(
+    (cycle) => cycle.id === configuredCycleId,
+  );
+
+  return configuredCycle?.startDate ?? "2016-06-01";
+};
+
 const configureStoryMode = () => {
   selectedMapMode.value = "story";
   showStoryCyclesTogether.value = !props.singleStoryCycleMode;
   selectedStoryCycleIds.value = getConfiguredStoryCycleIds();
-  seekStoryToDate(currentDate.value);
+  seekStoryToDate(getInitialStoryDate());
 };
 
 const renderCurrentMode = () => {
@@ -435,11 +510,13 @@ const renderCurrentMode = () => {
 
   if (selectedMapMode.value === "story") {
     drawYearRoutes(map.value, leaflet.value, visibleStoryCycleRoutes.value);
-    drawSelectedStoryPoints(
-      map.value,
-      leaflet.value,
-      selectedStoryPoints.value,
-    );
+    if (props.showStoryMarker) {
+      drawSelectedStoryPoints(
+        map.value,
+        leaflet.value,
+        selectedStoryPoints.value,
+      );
+    }
     return;
   }
 
@@ -573,6 +650,7 @@ watch(
 
 watch(selectedStoryPoints, (points) => {
   if (selectedMapMode.value !== "story") return;
+  if (!props.showStoryMarker) return;
 
   const usesInterpolatedMarker = Boolean(interpolationRoute.value);
   drawSelectedStoryPoints(map.value, leaflet.value, points, {
@@ -628,6 +706,14 @@ watch([storyTimelinePoints, showStoryCyclesTogether], () => {
   renderCurrentMode();
   scheduleStoryMarkerRefresh();
 });
+
+watch(
+  () => props.showStoryMarker,
+  () => {
+    renderCurrentMode();
+    scheduleStoryMarkerRefresh();
+  },
+);
 
 onBeforeUnmount(() => {
   if (markerRefreshFrame) {

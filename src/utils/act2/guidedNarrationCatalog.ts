@@ -228,7 +228,7 @@ export const guidedNarrationCatalog = {
     display: true,
     speak: true,
     title: "Departure Gesture",
-    text: "Now it's your turn. Depart with the stork.",
+    text: "During the countdown, move into a crouch so you're ready on count one.",
   }),
   "act2.departure.success": cue({
     id: "act2.departure.success",
@@ -370,7 +370,7 @@ export const guidedNarrationCatalog = {
     display: true,
     speak: true,
     title: "Arrival Gesture",
-    text: "Now it's your turn. Land with the stork.",
+    text: "Get ready with your arms open. On count one, begin the landing with the avatar.",
   }),
   "act2.arrival.success": cue({
     id: "act2.arrival.success",
@@ -616,7 +616,7 @@ export const guidedNarrationCatalog = {
     display: true,
     speak: true,
     title: "Spring Arrival",
-    text: "Complete the journey with the arrival gesture.",
+    text: "Get ready with your arms open. On count one, land with the stork.",
   }),
   "act2.springArrival.success": cue({
     id: "act2.springArrival.success",

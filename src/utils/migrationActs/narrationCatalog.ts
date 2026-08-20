@@ -103,7 +103,7 @@ export const migrationActNarrationCatalog = {
     priority: MIGRATION_ACT_NARRATION_PRIORITY.gestureHandover,
     speak: true,
     title: "Arrival",
-    text: "Land with the stork.",
+    text: "Get ready with your arms open. On count one, land with the stork.",
   }),
   "act3.arrival.success": cue({
     id: "act3.arrival.success",

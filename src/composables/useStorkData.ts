@@ -22,6 +22,7 @@ import {
   getStoryDayDistance,
   type StoryDateInput,
 } from "~/utils/storyCycle";
+import { getStorkRouteColor } from "~/utils/storkRouteColors";
 
 const rawStorkPoints = ref<StorkDataPoint[]>([]);
 const selectedTag = ref("");
@@ -43,22 +44,6 @@ type UseStorkDataOptions = {
   storyCycleDefinitions?: MaybeRef<StorkStoryCycleDefinition[]>;
   dataSource?: MaybeRef<StorkDataSource>;
 };
-
-const routeColors = [
-  "#c1121f",
-  "#1f77b4",
-  "#2ca02c",
-  "#ffb000",
-  "#7b2cbf",
-  "#009688",
-  "#e76f51",
-  "#4d908e",
-  "#f72585",
-  "#4361ee",
-];
-
-const getRouteColor = (index: number) =>
-  routeColors[index % routeColors.length] ?? "#c1121f";
 
 const getDayOfYear = (date: string) => {
   const [year, month, day] = date.split("-").map(Number);
@@ -196,7 +181,7 @@ export const useStorkData = (options: UseStorkDataOptions = {}) => {
 
     return availableYearsForSelectedTag.value.map((year, index) => ({
       year,
-      color: getRouteColor(index),
+      color: getStorkRouteColor(index),
       points: storkPoints.value
         .filter(
           (point) => point.tag === selectedTag.value && point.year === year,
@@ -260,7 +245,7 @@ export const useStorkData = (options: UseStorkDataOptions = {}) => {
       return {
         ...cycle,
         id: cycle.label,
-        color: getRouteColor(index),
+        color: getStorkRouteColor(index),
         startDate,
         endDate,
         points,

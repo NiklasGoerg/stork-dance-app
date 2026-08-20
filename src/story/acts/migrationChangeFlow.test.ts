@@ -50,7 +50,6 @@ describe("migration change flow", () => {
       "act3.story.completed.structure",
       "act3.story.completed.pattern",
       "act3.story.completed.qualification",
-      "act3.story.completed.question",
       "act3.story.completed.climateTransition",
     ]);
 

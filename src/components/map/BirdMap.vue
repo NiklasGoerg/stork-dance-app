@@ -10,6 +10,7 @@
         :data-source="dataSource"
         :playback-source="playbackSource"
         :camera-mode="cameraMode"
+        :show-story-marker="showStoryMarker"
         @story-frame="$emit('story-frame', $event)"
       />
       <template #fallback>
@@ -37,6 +38,7 @@ withDefaults(
     dataSource?: StorkDataSource;
     playbackSource?: "story-playback" | "migration-runtime";
     cameraMode?: MigrationMapCameraMode;
+    showStoryMarker?: boolean;
   }>(),
   {
     showControls: true,
@@ -47,6 +49,7 @@ withDefaults(
     dataSource: "raw",
     playbackSource: "migration-runtime",
     cameraMode: "migration",
+    showStoryMarker: true,
   },
 );
 

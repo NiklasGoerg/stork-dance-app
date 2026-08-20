@@ -33,6 +33,8 @@
     >
       <slot name="controls" />
     </footer>
+
+    <slot name="overlay" />
   </main>
 </template>
 
@@ -61,6 +63,7 @@ withDefaults(
   --migration-season-background: var(--act4-season-transition-background);
   --migration-season-surface: var(--act4-season-transition-surface);
 
+  position: relative;
   width: 100vw;
   height: 100vh;
   height: 100dvh;

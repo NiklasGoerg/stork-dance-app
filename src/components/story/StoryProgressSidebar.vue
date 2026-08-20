@@ -1,29 +1,46 @@
 <template>
   <nav class="story-progress" :aria-label="t('story.aria.progress')">
     <button
-      v-for="(act, index) in progressActs"
-      :key="act.id"
       type="button"
-      class="story-progress__item"
-      :class="{
-        'story-progress__item--active': activeActId === act.id,
-        'story-progress__item--completed': isCompleted(index),
-        'story-progress__item--line-complete': index <= completedThroughIndex,
-      }"
-      :aria-current="activeActId === act.id ? 'page' : undefined"
-      :title="getProgressActTitle(act)"
-      @click="goToAct(act.path)"
+      class="story-progress__home"
+      :aria-label="t('story.progress.home.label')"
+      :title="t('story.progress.home.label')"
+      @click="goHome"
     >
-      <span class="story-progress__marker" aria-hidden="true">
-        <BaseIcon :path="isCompleted(index) ? mdiCheck : act.icon" :size="20" />
-      </span>
-      <span class="story-progress__copy">
-        <span class="story-progress__label">{{
-          getProgressActLabel(act)
-        }}</span>
-        <span class="story-progress__name">{{ getProgressActName(act) }}</span>
-      </span>
+      <BaseIcon :path="mdiHomeOutline" :size="22" />
     </button>
+
+    <div class="story-progress__acts">
+      <button
+        v-for="(act, index) in progressActs"
+        :key="act.id"
+        type="button"
+        class="story-progress__item"
+        :class="{
+          'story-progress__item--active': activeActId === act.id,
+          'story-progress__item--completed': isCompleted(index),
+          'story-progress__item--line-complete': index <= completedThroughIndex,
+        }"
+        :aria-current="activeActId === act.id ? 'page' : undefined"
+        :title="getProgressActTitle(act)"
+        @click="goToAct(act.path)"
+      >
+        <span class="story-progress__marker" aria-hidden="true">
+          <BaseIcon
+            :path="isCompleted(index) ? mdiCheck : act.icon"
+            :size="20"
+          />
+        </span>
+        <span class="story-progress__copy">
+          <span class="story-progress__label">{{
+            getProgressActLabel(act)
+          }}</span>
+          <span class="story-progress__name">{{
+            getProgressActName(act)
+          }}</span>
+        </span>
+      </button>
+    </div>
   </nav>
 </template>
 
@@ -32,6 +49,7 @@ import { computed } from "vue";
 import {
   mdiBird,
   mdiCheck,
+  mdiFlagCheckered,
   mdiHomeOutline,
   mdiMapMarkerPath,
   mdiThermometerLines,
@@ -93,7 +111,7 @@ const progressActs: ProgressAct[] = [
     nameKey: "story.progress.epilogue.name",
     titleKey: "story.progress.epilogue.title",
     path: "/story/epilogue",
-    icon: mdiHomeOutline,
+    icon: mdiFlagCheckered,
   },
 ];
 
@@ -138,6 +156,10 @@ const goToAct = async (path: string) => {
   await navigateTo(path);
 };
 
+const goHome = async () => {
+  await navigateTo("/");
+};
+
 const getProgressActLabel = (act: ProgressAct) => t(act.labelKey);
 const getProgressActName = (act: ProgressAct) => t(act.nameKey);
 const getProgressActTitle = (act: ProgressAct) => t(act.titleKey);
@@ -147,13 +169,49 @@ const getProgressActTitle = (act: ProgressAct) => t(act.titleKey);
 .story-progress {
   position: absolute;
   z-index: 700;
-  top: 50%;
+  top: 0;
+  bottom: 0;
   left: 10px;
+  width: 74px;
+  height: 100vh;
+  height: 100dvh;
+  padding: 0;
+  pointer-events: none;
+}
+
+.story-progress__home {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1.5px solid rgba(31, 49, 39, 0.2);
+  border-radius: 999px;
+  background: #f8fbf7;
+  color: #20362a;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translateX(-50%);
+}
+
+.story-progress__home:hover,
+.story-progress__home:focus-visible {
+  border-color: #26382f;
+  outline: 3px solid rgb(47 158 91 / 0.24);
+  outline-offset: 3px;
+}
+
+.story-progress__acts {
+  position: absolute;
+  top: 50%;
+  left: 0;
   display: grid;
   justify-items: center;
   gap: 8px;
-  width: 74px;
-  padding: 0;
+  width: 100%;
+  pointer-events: auto;
   transform: translateY(-50%);
 }
 
@@ -263,11 +321,18 @@ const getProgressActTitle = (act: ProgressAct) => t(act.titleKey);
 
 @media (max-width: 860px) {
   .story-progress {
-    top: 12px;
     left: 8px;
     width: 66px;
+  }
+
+  .story-progress__home {
+    top: 10px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .story-progress__acts {
     gap: 6px;
-    transform: none;
   }
 
   .story-progress__item {

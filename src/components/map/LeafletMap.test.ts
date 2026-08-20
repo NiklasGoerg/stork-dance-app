@@ -23,4 +23,27 @@ describe("LeafletMap story marker refresh", () => {
     expect(migrationCameraIndex).toBeGreaterThanOrEqual(0);
     expect(firstRefreshAfterCamera).toBeGreaterThan(migrationCameraIndex);
   });
+
+  it("fits semantic migration camera to the active migration route context", () => {
+    expect(leafletMapSource).toContain("getActiveMigrationPoints");
+    expect(leafletMapSource).toContain("getActiveMigrationCameraPhase");
+    expect(leafletMapSource).toContain("pendingRuntimeEvent");
+    expect(leafletMapSource).toContain(
+      "fitCameraToPoints(getActiveMigrationPoints()",
+    );
+    expect(leafletMapSource).toContain(
+      '${route?.id ?? "none"}:migration:${migrationCameraPhase ?? "full"}',
+    );
+    expect(leafletMapSource).not.toContain("config.center");
+    expect(leafletMapSource).not.toContain("config.zoom");
+  });
+
+  it("uses a configured cycle start date when no migration runtime date exists", () => {
+    expect(leafletMapSource).toContain("getInitialStoryDate");
+    expect(leafletMapSource).toContain("if (currentDate.value)");
+    expect(leafletMapSource).toContain("configuredCycle?.startDate");
+    expect(leafletMapSource).toContain(
+      "seekStoryToDate(getInitialStoryDate())",
+    );
+  });
 });

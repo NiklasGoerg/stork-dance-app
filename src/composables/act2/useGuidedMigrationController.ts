@@ -8,6 +8,7 @@ import type {
   MigrationActInfoPanelModel,
   MigrationInfoPanelActionId,
   MigrationMovementBarEvaluation,
+  MigrationMovementPhraseEvaluation,
   ResolvedMigrationMovement,
 } from "~/types/migrationAct";
 import {
@@ -45,6 +46,7 @@ type GestureTutorialPhases = {
 type ContinuousPractice = {
   runId: number;
   movementId: string;
+  evaluationUnit: "bar" | "phrase";
   resolve: (completed: boolean) => void;
 };
 
@@ -67,7 +69,7 @@ export const useGuidedMigrationController = ({
   runtime: MigrationActRuntimeService;
   enabled: boolean;
   timing?: GuidedAct2TimingConfig;
-  onGuidedCycleCompleted?: () => void;
+  onGuidedCycleCompleted?: () => void | Promise<void>;
   translate?: (key: string) => string;
   instructionNarration?: {
     play?: (
@@ -231,10 +233,16 @@ export const useGuidedMigrationController = ({
 
   const waitForContinuousPractice = (
     movementId: string,
+    evaluationUnit: ContinuousPractice["evaluationUnit"],
     currentRunId: number,
   ) =>
     new Promise<boolean>((resolve) => {
-      activePractice = { movementId, runId: currentRunId, resolve };
+      activePractice = {
+        movementId,
+        evaluationUnit,
+        runId: currentRunId,
+        resolve,
+      };
     });
 
   const useGuidedRecognitionProfile = (
@@ -273,6 +281,7 @@ export const useGuidedMigrationController = ({
     processedEvaluationIds.clear();
     const practiceCompleted = waitForContinuousPractice(
       guidedMovement.movementId,
+      movement.movementType === "migration" ? "phrase" : "bar",
       currentRunId,
     );
     await runtime.playTutorialDemonstration(
@@ -772,13 +781,14 @@ export const useGuidedMigrationController = ({
         },
       });
       if (!isCurrentRun(currentRunId)) return;
-      runtime.completeGuidedInterlude?.();
       cue("act2.completion.title", `${currentRunId}:completion:title`);
+      if (!(await waitForSuccessBar(currentRunId))) return;
+      runtime.completeGuidedInterlude?.();
       store.markCycleCompleted(store.activeCycleRun?.id ?? "guided-cycle");
       store.setGuidedState({
         completionCount: store.guided.completionCount + 1,
       });
-      onGuidedCycleCompleted?.();
+      await onGuidedCycleCompleted?.();
     } catch (error) {
       if (!isCurrentRun(currentRunId)) return;
       store.setError(
@@ -819,6 +829,57 @@ export const useGuidedMigrationController = ({
     if (actionId === "forceCompleteGuidedStep") forceCompleteGuidedStep();
   };
 
+  const handleContinuousPracticeEvaluation = (
+    evaluation:
+      MigrationMovementBarEvaluation | MigrationMovementPhraseEvaluation,
+    expectedUnit: ContinuousPractice["evaluationUnit"],
+  ) => {
+    const practice = activePractice;
+    if (!enabled || disposed || !practice) return;
+    if (practice.evaluationUnit !== expectedUnit) return;
+
+    if (
+      !isCurrentRun(practice.runId) ||
+      evaluation.movementId !== practice.movementId ||
+      processedEvaluationIds.has(evaluation.evaluationId)
+    ) {
+      return;
+    }
+
+    processedEvaluationIds.add(evaluation.evaluationId);
+    if (evaluation.status !== "success") {
+      const prefix = getContinuousCuePrefix(store.guided.phase);
+      if (evaluation.status === "not_evaluable") {
+        cue(
+          "act2.feedback.bodyNotVisible",
+          `${evaluation.evaluationId}:tracking`,
+        );
+      } else {
+        const noMovement = evaluation.beatResults.every(
+          (beat) =>
+            beat.detectedSide === null &&
+            (beat.metrics.activeFootDelta === null ||
+              Math.abs(beat.metrics.activeFootDelta) < 0.01),
+        );
+        cue(
+          `act2.${prefix}.failure.${noMovement ? "noMovement" : "incomplete"}` as GuidedNarrationId,
+          `${evaluation.evaluationId}:movement-failure`,
+        );
+      }
+      return;
+    }
+
+    const successfulBars = Math.min(
+      store.guided.successfulBars + 1,
+      store.guided.requiredSuccessfulBars,
+    );
+    store.setGuidedState({ successfulBars });
+    if (successfulBars < store.guided.requiredSuccessfulBars) return;
+
+    activePractice = null;
+    practice.resolve(true);
+  };
+
   const stopEvaluationWatch: WatchStopHandle = watch(
     runtime.movementRecognition.lastBarEvaluation,
     (evaluation) => {
@@ -832,46 +893,16 @@ export const useGuidedMigrationController = ({
         return;
       }
 
-      if (
-        !isCurrentRun(practice.runId) ||
-        evaluation.movementId !== practice.movementId ||
-        processedEvaluationIds.has(evaluation.evaluationId)
-      ) {
-        return;
-      }
+      handleContinuousPracticeEvaluation(evaluation, "bar");
+    },
+  );
 
-      processedEvaluationIds.add(evaluation.evaluationId);
-      if (evaluation.status !== "success") {
-        const prefix = getContinuousCuePrefix(store.guided.phase);
-        if (evaluation.status === "not_evaluable") {
-          cue(
-            "act2.feedback.bodyNotVisible",
-            `${evaluation.evaluationId}:tracking`,
-          );
-        } else {
-          const noMovement = evaluation.beatResults.every(
-            (beat) =>
-              beat.detectedSide === null &&
-              (beat.metrics.activeFootDelta === null ||
-                Math.abs(beat.metrics.activeFootDelta) < 0.01),
-          );
-          cue(
-            `act2.${prefix}.failure.${noMovement ? "noMovement" : "incomplete"}` as GuidedNarrationId,
-            `${evaluation.evaluationId}:movement-failure`,
-          );
-        }
-        return;
-      }
+  const stopPhraseEvaluationWatch: WatchStopHandle = watch(
+    runtime.movementRecognition.lastPhraseEvaluation,
+    (evaluation) => {
+      if (!enabled || disposed || !evaluation) return;
 
-      const successfulBars = Math.min(
-        store.guided.successfulBars + 1,
-        store.guided.requiredSuccessfulBars,
-      );
-      store.setGuidedState({ successfulBars });
-      if (successfulBars < store.guided.requiredSuccessfulBars) return;
-
-      activePractice = null;
-      practice.resolve(true);
+      handleContinuousPracticeEvaluation(evaluation, "phrase");
     },
   );
 
@@ -967,6 +998,7 @@ export const useGuidedMigrationController = ({
     invalidateRun();
     narration.cancel("dispose");
     stopEvaluationWatch();
+    stopPhraseEvaluationWatch();
     stopGestureEvaluationWatch();
     runtime.cancelGuidedInterlude();
   };

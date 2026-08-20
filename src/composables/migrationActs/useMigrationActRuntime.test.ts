@@ -447,6 +447,7 @@ describe("migration act runtime", () => {
     });
     raf.step(0);
 
+    expect(controller.store.mapCameraMode).toBe("migration");
     expect(controller.avatarPlaybackOwner.value).toBe("departure");
     expect(controller.ownerSwitchTrace.value.at(-1)).toEqual({
       fromOwner: "summer",
@@ -563,7 +564,7 @@ describe("migration act runtime", () => {
     expect(controller.store.currentElapsedMs).toBe(boundaryMs - 1);
     expect(controller.store.isGestureActive).toBe(false);
     expect(gestures.calls.starts).toEqual([]);
-    expect(controller.store.mapCameraMode).toBe("residence");
+    expect(controller.store.mapCameraMode).toBe("migration");
     expect(controller.avatarPlaybackOwner.value).toBe("summer");
     expect(controller.guidedTrace.value).toMatchObject({
       avatarPlaybackOwner: "summer",
@@ -829,6 +830,85 @@ describe("migration act runtime", () => {
       }),
       behavior: "queue",
     });
+  });
+
+  it("starts the Act III synthesis during the final summer residence", async () => {
+    const { controller, raf, narration } = createHarness({ cycleCount: 5 });
+
+    await controller.initialize();
+    await controller.startStory();
+    await finishInitialCountdown(raf);
+
+    for (let index = 0; index < 4; index++) {
+      controller.store.replaceEvents(
+        controller.store.events.map((event) => ({
+          ...event,
+          status: "skipped" as const,
+        })),
+      );
+      controller.store.setElapsedMs(controller.store.cycleDurationMs - 1);
+      raf.step(0);
+      raf.step(2);
+      await flushPromises();
+
+      const preparedMapFrame = controller.getCurrentMapFrame();
+      controller.reportMapFrame({
+        ...preparedMapFrame!,
+        cameraReady: true,
+      });
+      raf.step(4_002);
+      await vi.waitFor(() => {
+        expect(controller.store.playbackState).toBe("playing");
+      });
+    }
+
+    expect(controller.store.activeCycleId).toBe("individual_4004_2022_2023");
+    expect(controller.store.playbackMode).toBe("story");
+    expect(controller.store.activeCycleIndex).toBe(4);
+    const springArrival = controller.store.events.find(
+      (event) => event.eventType === "spring_arrival",
+    )!;
+
+    await controller.seekToElapsedMs(springArrival.boundaryTimeMs - 1);
+    await flushPromises();
+    raf.step(0);
+    raf.step(1);
+    await flushPromises();
+    raf.step(4_000);
+    await flushPromises();
+
+    expect(narration.calls.play).toContainEqual({
+      key: "story.acts.act3.narration.cycles.2022_2023.breedingReflection1.text",
+      params: expect.objectContaining({ startYear: 2022, endYear: 2023 }),
+      behavior: "queue",
+    });
+    expect(controller.store.playbackState).toBe("playing");
+    expect(controller.store.currentElapsedMs).toBeLessThan(
+      controller.store.cycleDurationMs,
+    );
+    await vi.waitFor(() => {
+      expect(
+        narration.calls.play.some((call) =>
+          call.key.includes("story.acts.act3.narration.completed"),
+        ),
+      ).toBe(true);
+    });
+    const finalResidenceCueKeys = narration.calls.play
+      .map((call) => call.key)
+      .filter(
+        (key) =>
+          key.includes("cycles.2022_2023.breedingReflection") ||
+          key.includes("story.acts.act3.narration.completed"),
+      );
+
+    expect(finalResidenceCueKeys).toEqual([
+      "story.acts.act3.narration.cycles.2022_2023.breedingReflection1.text",
+      "story.acts.act3.narration.cycles.2022_2023.breedingReflection2.text",
+      "story.acts.act3.narration.completed.structure.text",
+      "story.acts.act3.narration.completed.pattern.text",
+      "story.acts.act3.narration.completed.qualification.text",
+      "story.acts.act3.narration.completed.climateTransition.text",
+    ]);
   });
 
   it("queues the 2013 breeding reflection before the 2016 transition without duplicate intro", async () => {
@@ -1400,7 +1480,7 @@ describe("migration act runtime", () => {
     });
   });
 
-  it("bar-aligns a continuous phase restart to the existing master transport", async () => {
+  it("catches up a continuous phase restart after the master bar has already started", async () => {
     const { controller, raf, audio } = createHarness();
 
     await controller.initialize();
@@ -1412,7 +1492,7 @@ describe("migration act runtime", () => {
 
     await controller.seekToElapsedMs(0);
     await flushPromises();
-    expect(controller.movement.movementSourceTimeMs.value).toBe(0);
+    expect(controller.movement.movementSourceTimeMs.value).toBeCloseTo(2_200);
 
     raf.step(2_800);
     expect(audio.state.currentOffsetSeconds).toBeCloseTo(8);
@@ -1441,7 +1521,7 @@ describe("migration act runtime", () => {
         narration.calls.play.filter((call) =>
           call.key.includes("story.acts.act3.narration.completed"),
         ),
-      ).toHaveLength(5);
+      ).toHaveLength(4);
     });
 
     expect(controller.store.playbackState).toBe("completed");
@@ -1457,7 +1537,6 @@ describe("migration act runtime", () => {
       "story.acts.act3.narration.completed.structure.text",
       "story.acts.act3.narration.completed.pattern.text",
       "story.acts.act3.narration.completed.qualification.text",
-      "story.acts.act3.narration.completed.question.text",
       "story.acts.act3.narration.completed.climateTransition.text",
     ]);
 
@@ -1562,16 +1641,22 @@ describe("migration act runtime", () => {
 
   it("advances a guided story transition monotonically to the exact event boundary", async () => {
     const { controller, raf } = createHarness();
+    const autumnMovement = resolveMigrationMovement({
+      phase: "autumn_migration",
+      phaseDurationMs: 100,
+    });
 
     await controller.initialize();
-    await controller.enterGuidedInterlude();
+    await controller.enterGuidedInterlude(autumnMovement);
     const targetElapsedMs = controller.store.events[0]!.boundaryTimeMs;
     const transition = controller.playGuidedStoryTransition({
       targetElapsedMs,
       durationMs: 4_000,
+      movement: autumnMovement,
     });
 
     raf.step(0);
+    expect(controller.store.mapCameraMode).toBe("migration");
     expect(controller.store.currentElapsedMs).toBe(0);
     raf.step(1_000);
     const firstElapsedMs = controller.store.currentElapsedMs;
@@ -1591,6 +1676,28 @@ describe("migration act runtime", () => {
     );
     expect(controller.store.events[0]!.status).toBe("pending");
     expect(controller.guidedStoryTransitionActive.value).toBe(false);
+  });
+
+  it("returns guided story transition camera to residence for residence movements", async () => {
+    const { controller, raf } = createHarness();
+    const summerMovement = resolveMigrationMovement({
+      phase: "summer_rest",
+      phaseDurationMs: 100,
+    });
+
+    await controller.initialize();
+    await controller.enterGuidedInterlude(summerMovement);
+    controller.store.setMapCameraMode("migration");
+    const transition = controller.playGuidedStoryTransition({
+      targetElapsedMs: 100,
+      durationMs: 4_000,
+      movement: summerMovement,
+    });
+
+    raf.step(0);
+    expect(controller.store.mapCameraMode).toBe("residence");
+    raf.step(4_000);
+    await transition;
   });
 
   it("ends tutorial preroll on beat one and plays two bars with passive recognition", async () => {
