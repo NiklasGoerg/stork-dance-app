@@ -217,20 +217,32 @@ export const buildMigrationActInfoPanelModel = ({
   }
 
   if (gestureId && gestureFeedback && gestureFeedbackVisible) {
+    const departure = gestureId === "departure";
+    const instruction = translate(
+      departure
+        ? "story.migrationPanel.gestures.departure.preparation"
+        : "story.migrationPanel.gestures.arrival.preparation",
+    );
+    const detail = gestureCueText
+      ? gestureCueText
+      : translate(
+          departure
+            ? "story.migrationPanel.gestures.departure.instruction"
+            : "story.migrationPanel.gestures.arrival.instruction",
+        );
+
     if (gestureFeedback.status === "success") {
-      const departure = gestureId === "departure";
       return {
         mode: "gestureFeedback",
-        title: translate(
-          departure
-            ? "story.migrationPanel.success.departure.title"
-            : "story.migrationPanel.success.arrival.title",
-        ),
+        title: storyNarrationTitle ?? translate("common.ready"),
+        instruction: storyNarrationText || instruction,
+        detail: storyNarrationText ? undefined : detail,
         feedbackText: translate(
           departure
             ? "story.migrationPanel.success.departure.text"
             : "story.migrationPanel.success.arrival.text",
         ),
+        feedbackPrimary: true,
         tone: "success",
         movements,
         actions: gestureActions({
@@ -247,7 +259,10 @@ export const buildMigrationActInfoPanelModel = ({
     );
     return {
       mode: "gestureFeedback",
-      title: translate(
+      title: storyNarrationTitle ?? translate("common.ready"),
+      instruction: storyNarrationText || instruction,
+      detail: storyNarrationText ? undefined : detail,
+      feedbackTitle: translate(
         catalog?.titleKey ?? "story.migrationPanel.feedback.tryAgain",
       ),
       feedbackText: translate(
@@ -340,8 +355,10 @@ export const buildMigrationActInfoPanelModel = ({
   if (movementFeedbackVisible) {
     return {
       mode: "movementFeedback",
-      title: translate("story.acts.act4.movementText.good"),
+      title: storyNarrationTitle ?? translate(metadata.labelKey),
       instruction: translate(metadata.instructionKey),
+      feedbackText: translate("story.acts.act4.movementText.good"),
+      feedbackPrimary: true,
       tone: "success",
       movements,
       actions: [],

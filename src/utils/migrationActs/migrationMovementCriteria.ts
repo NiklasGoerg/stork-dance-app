@@ -130,6 +130,42 @@ const getPointDelta = (
     side === "left" ? sample.leftAnkle : sample.rightAnkle,
   );
 
+const getFootXMovement = (
+  samples: MigrationMovementRecognitionSample[],
+  side: MigrationSummerStepSide,
+) => {
+  const points = samples
+    .map((sample) => (side === "left" ? sample.leftAnkle : sample.rightAnkle))
+    .filter((point): point is PosePoint => !!point);
+  const torsoScale = getScale(samples);
+  const first = points[0];
+  const last = points.at(-1);
+
+  if (!first || !last || !torsoScale) return null;
+
+  return (last.x - first.x) / torsoScale;
+};
+
+const getAnatomicalFootAction = (
+  samples: MigrationMovementRecognitionSample[],
+  side: MigrationSummerStepSide,
+) => {
+  const movement = getFootXMovement(samples, side);
+  if (movement === null) return null;
+
+  return side === "right" ? movement : -movement;
+};
+
+const getAnatomicalFootClose = (
+  samples: MigrationMovementRecognitionSample[],
+  side: MigrationSummerStepSide,
+) => {
+  const movement = getFootXMovement(samples, side);
+  if (movement === null) return null;
+
+  return side === "right" ? -movement : movement;
+};
+
 const getReturnMetrics = (
   returnSamples: MigrationMovementRecognitionSample[],
   actionSamples: MigrationMovementRecognitionSample[],
@@ -327,9 +363,7 @@ export const evaluateMigrationMovementBeat = ({
       returnMetrics.stanceChange !== null &&
       returnMetrics.stanceChange >=
         MIGRATION_RECOGNITION_THRESHOLDS.summerSupportingStanceChange;
-    const passed = isActionBeat
-      ? footPassed
-      : returnPassed && returnStancePassed;
+    const passed = isActionBeat ? footPassed : returnPassed;
     return {
       status: passed ? "success" : "failed",
       detectedSide: activeFootDelta !== null ? activeSide : null,
@@ -341,9 +375,7 @@ export const evaluateMigrationMovementBeat = ({
           : getStatus(returnMetrics !== null, returnPassed),
         stanceChange: getStatus(
           (returnMetrics?.stanceChange ?? stanceChange) !== null,
-          (returnMetrics?.stanceChange ?? stanceChange) !== null &&
-            (returnMetrics?.stanceChange ?? stanceChange)! >=
-              MIGRATION_RECOGNITION_THRESHOLDS.summerSupportingStanceChange,
+          returnStancePassed,
         ),
       },
       metrics,
@@ -351,28 +383,37 @@ export const evaluateMigrationMovementBeat = ({
   }
 
   if (profile === "winter_rest") {
+    const footAction = isActionBeat
+      ? getAnatomicalFootAction(validSamples, activeSide)
+      : getAnatomicalFootClose(validSamples, activeSide);
     const footPassed =
-      activeFootDelta !== null &&
-      activeFootDelta >=
+      footAction !== null &&
+      footAction >=
         (isActionBeat
           ? MIGRATION_RECOGNITION_THRESHOLDS.winterStepOutDelta
           : MIGRATION_RECOGNITION_THRESHOLDS.winterCloseDelta);
     const stancePassed =
       stanceChange !== null &&
       stanceChange >= MIGRATION_RECOGNITION_THRESHOLDS.winterStanceChange;
-    const passed = footPassed && stancePassed;
+    const passed = isActionBeat ? footPassed : footPassed || stancePassed;
     return {
       status: passed ? "success" : "failed",
       detectedSide: activeFootDelta !== null ? activeSide : null,
       criteria: {
         ...baseCriteria,
-        footActivity: getStatus(activeFootDelta !== null, footPassed),
+        footActivity: getStatus(footAction !== null, footPassed),
         returnToBaseline: isActionBeat
           ? "not_evaluable"
-          : getStatus(activeFootDelta !== null, footPassed),
+          : getStatus(
+              footAction !== null || stanceChange !== null,
+              footPassed || stancePassed,
+            ),
         stanceChange: getStatus(stanceChange !== null, stancePassed),
       },
-      metrics,
+      metrics: {
+        ...metrics,
+        activeFootDelta: footAction,
+      },
     };
   }
 

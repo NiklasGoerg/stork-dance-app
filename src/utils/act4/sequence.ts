@@ -165,11 +165,7 @@ export const buildAct4TutorialSequence = (): Act4SequenceTarget[] =>
   climateChangeFlow.tutorialTargets.map(({ season, target }) =>
     createTutorialTarget(
       season,
-      target === "example"
-        ? 20
-        : target === "maximum"
-          ? 100
-          : resolveMinimumMovementValue(season),
+      target === "maximum" ? 100 : resolveMinimumMovementValue(season),
       target,
     ),
   );

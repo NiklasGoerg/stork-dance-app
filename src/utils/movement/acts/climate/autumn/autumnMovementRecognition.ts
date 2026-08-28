@@ -640,31 +640,36 @@ export const evaluateAutumnBeat = (
   const { passed, trackingUnavailable } = getBeatPassState({
     criteria,
     score,
-    passScore: autumnMovementConfig.thresholds.beatPassScore,
+    passScore: beat === 3 ? 0 : autumnMovementConfig.thresholds.beatPassScore,
   });
+  const negativeFeedbackEligible = beat === 2 ? passed : true;
+  const feedbackCode = passed ? undefined : getAutumnBeatFeedbackCode(criteria);
 
   return {
     beat,
     measureIndex: context.measureIndex,
     score,
     passed,
+    negativeFeedbackEligible,
     trackingUnavailable,
     criteria,
     timestamp,
     expectedDirection,
     expectedValueClass,
-    feedbackCode: passed ? undefined : getAutumnBeatFeedbackCode(criteria),
-    feedbackSignals: buildAct4BeatFeedbackSignals<AutumnFeedbackCode>({
-      season: "autumn",
-      beat,
-      measureIndex: context.measureIndex ?? null,
-      criteria,
-      trackingUnavailable,
-      fallbackCode: getAutumnBeatFeedbackCode(criteria),
-      codeMetadata: autumnFeedbackMetadata,
-      criterionMetadata: autumnCriterionFeedbackMetadata,
-      landmarkConfidence: metricsWithContext.landmarkConfidence,
-    }),
+    feedbackCode,
+    feedbackSignals: negativeFeedbackEligible
+      ? buildAct4BeatFeedbackSignals<AutumnFeedbackCode>({
+          season: "autumn",
+          beat,
+          measureIndex: context.measureIndex ?? null,
+          criteria,
+          trackingUnavailable,
+          fallbackCode: feedbackCode,
+          codeMetadata: autumnFeedbackMetadata,
+          criterionMetadata: autumnCriterionFeedbackMetadata,
+          landmarkConfidence: metricsWithContext.landmarkConfidence,
+        })
+      : [],
     metrics: metricsWithContext,
   };
 };

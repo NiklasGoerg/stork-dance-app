@@ -26,6 +26,7 @@ export type Act4StoryCompletionCueId =
   | "act4.story.completed.embodied"
   | "act4.story.completed.seasons"
   | "act4.story.completed.maximum"
+  | "act4.story.completed.maximumContext"
   | "act4.story.completed.migration";
 
 export type Act4StoryNarrationCueId =
@@ -228,6 +229,10 @@ export const act4StoryNarrationCatalog = {
   "act4.story.completed.maximum": createCue(
     "act4.story.completed.maximum",
     "story.acts.act4.narration.story.completed.maximum",
+  ),
+  "act4.story.completed.maximumContext": createCue(
+    "act4.story.completed.maximumContext",
+    "story.acts.act4.narration.story.completed.maximumContext",
   ),
   "act4.story.completed.migration": createCue(
     "act4.story.completed.migration",

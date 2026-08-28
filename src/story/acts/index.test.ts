@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import en from "~/locales/en.json";
 import actDebugDockSource from "~/components/story/ActDebugDock.vue?raw";
 import actEntryScreenSource from "~/components/story/ActEntryScreen.vue?raw";
+import act4InfoCardSource from "~/components/act4/InfoCard.vue?raw";
+import climateProgressChartSource from "~/components/act4/ClimateProgressChart.vue?raw";
+import migrationActInfoPanelSource from "~/components/story/MigrationActInfoPanel.vue?raw";
 import migrationActStageSource from "~/components/story/MigrationActStage.vue?raw";
 import migrationStoryLayoutSource from "~/components/story/MigrationStoryLayout.vue?raw";
 import storyProgressSidebarSource from "~/components/story/StoryProgressSidebar.vue?raw";
@@ -150,6 +153,102 @@ describe("story acts registry", () => {
     expect(migrationStoryLayoutSource).toContain('<slot name="overlay" />');
     expect(actDebugDockSource).toContain("<slot />");
     expect(en.story.acts.act2.controls.storyProgress).toBe("Story Progress");
+  });
+
+  it("keeps Act II and Act III migration guidance focused on narration and temporary feedback", () => {
+    expect(migrationActInfoPanelSource).not.toContain(
+      "migration-info-panel__movements",
+    );
+    expect(migrationActInfoPanelSource).not.toContain(
+      "migration-info-panel__movement-state",
+    );
+    expect(migrationActInfoPanelSource).not.toContain(
+      "getMovementStateLabel",
+    );
+    expect(migrationActInfoPanelSource).not.toContain(
+      "migration-info-panel__status",
+    );
+    expect(migrationActInfoPanelSource).not.toContain(
+      "migration-info-panel__title",
+    );
+    expect(migrationActInfoPanelSource).not.toContain(
+      "migration-info-panel__detail",
+    );
+    expect(migrationActInfoPanelSource).not.toContain("showTitle");
+    expect(migrationActInfoPanelSource).not.toContain("showFeedbackTitle");
+    expect(migrationActInfoPanelSource).not.toContain("feedbackTitle");
+    expect(migrationActInfoPanelSource).toContain(
+      "migration-info-panel__content",
+    );
+    expect(migrationActInfoPanelSource).toContain("visibleNarrationText");
+    expect(migrationActInfoPanelSource).toContain(
+      "migration-info-panel__feedback",
+    );
+    expect(migrationActInfoPanelSource).toContain(
+      "migration-info-panel__progress",
+    );
+    expect(migrationActInfoPanelSource).toContain(
+      "migration-info-panel__progress-dot",
+    );
+    expect(migrationActInfoPanelSource).toContain(
+      "migration-info-panel__progress-title",
+    );
+    expect(migrationActInfoPanelSource).toContain(
+      "story.migrationPanel.practiceProgress.title",
+    );
+    expect(migrationActInfoPanelSource).toContain(
+      "story.migrationPanel.practiceProgress.ariaLabel",
+    );
+    expect(migrationActInfoPanelSource).toContain(
+      "const progressDotIndexes = [0, 1, 2] as const;",
+    );
+    expect(migrationActInfoPanelSource).toContain("width: 56px;");
+    expect(migrationActInfoPanelSource).toContain("height: 56px;");
+    expect(migrationActInfoPanelSource).not.toContain(
+      "migration-info-panel__progress-caption",
+    );
+    expect(migrationActInfoPanelSource).toContain("position: absolute;");
+    expect(migrationActInfoPanelSource).toContain("bottom: 0;");
+    expect(migrationActInfoPanelSource).toContain("z-index: 3;");
+    expect(migrationActInfoPanelSource).toContain("model.feedbackPrimary");
+    expect(migrationActInfoPanelSource).toContain("model.feedbackText");
+    expect(migrationActStageSource).toContain("activeCyclePeriodLabel");
+    expect(migrationActStageSource).toContain("formatMigrationCyclePeriod");
+    expect(migrationActStageSource).toContain(
+      "migration-map__period-indicator",
+    );
+    expect(en.story.migrationPanel.practiceProgress.title).toBe(
+      "Practice progress",
+    );
+    expect(en.story.migrationPanel.practiceProgress.ariaLabel).toBe(
+      "Movement practice progress: {current} of {total} successful",
+    );
+  });
+
+  it("keeps Climate movement, data, narration, and chart period context visible", () => {
+    expect(act4InfoCardSource).toContain("act4-info-card__season");
+    expect(act4InfoCardSource).toContain("act4-info-card__movement");
+    expect(act4InfoCardSource).toContain("act4-info-card__data-content");
+    expect(act4InfoCardSource).toContain("act4-info-card__narration");
+    expect(act4InfoCardSource).toContain("act4-info-card__feedback");
+    expect(act4InfoCardSource).toContain("act4-info-card__period-transition");
+    expect(act4InfoCardSource).toContain("act4-info-card__completion-subtitle");
+    expect(act4InfoCardSource).toContain("model.mode === 'narration'");
+    expect(act4InfoCardSource).not.toContain("act4-info-card__instructions");
+    expect(act4InfoCardSource).not.toContain("model.instructions");
+    expect(act4InfoCardSource).toContain("model.seasonLabel");
+    expect(act4InfoCardSource).toContain("model.movementPercentLabel");
+    expect(act4InfoCardSource).toContain("model.temperature.valueLabel");
+    expect(act4InfoCardSource).toContain("model.temperature.contextLabel");
+    expect(climateActStageSource).toContain("activeClimatePeriodLabel");
+    expect(climateActStageSource).toContain("formatDelimitedPeriod");
+    expect(climateActStageSource).toContain("formatPeriodTransition");
+    expect(climateActStageSource).toContain(
+      ':period-label="activeClimatePeriodLabel"',
+    );
+    expect(climateProgressChartSource).toContain(
+      "act4-climate-chart__period-indicator",
+    );
   });
 
   it("keeps Climate behind an entry screen until the full tutorial flow starts", () => {

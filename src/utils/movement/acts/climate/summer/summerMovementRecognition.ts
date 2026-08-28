@@ -337,7 +337,20 @@ export const evaluateSummerBeat = (
     (!intensityCriteria.length ||
       (!intensityHasFailedEssential &&
         intensityMatchScore >= reference.intensityPassScore));
-  const passed = movementShapePassed && intensityMatched;
+  const summerCount3TransitionPassed =
+    beat === 3 &&
+    criteria.some((item) => item.id === "hands-open-sides" && item.passed) &&
+    criteria.some(
+      (item) => item.id === "hands-lowered-from-expansion" && item.passed,
+    );
+  const passed =
+    beat === 3
+      ? !trackingUnavailable && summerCount3TransitionPassed
+      : movementShapePassed && intensityMatched;
+  const negativeFeedbackEligible = beat === 3 ? passed : true;
+  const feedbackCode = passed
+    ? undefined
+    : getSummerBeatFeedbackCode(beat, criteria);
 
   return {
     beat,
@@ -346,28 +359,29 @@ export const evaluateSummerBeat = (
     movementShapeScore,
     intensityMatchScore,
     overallScore: score,
-    movementShapePassed,
-    intensityMatched,
+    movementShapePassed: beat === 3 ? passed : movementShapePassed,
+    intensityMatched: beat === 3 ? true : intensityMatched,
     passed,
+    negativeFeedbackEligible,
     trackingUnavailable,
     criteria,
     timestamp,
     detectedStepSide: metrics.detectedStepSide,
     detectedIntensityClass: metrics.detectedIntensityClass,
-    feedbackCode: passed
-      ? undefined
-      : getSummerBeatFeedbackCode(beat, criteria),
-    feedbackSignals: buildAct4BeatFeedbackSignals<SummerFeedbackCode>({
-      season: "summer",
-      beat,
-      measureIndex: context.measureIndex ?? null,
-      criteria,
-      trackingUnavailable,
-      fallbackCode: getSummerBeatFeedbackCode(beat, criteria),
-      codeMetadata: summerFeedbackMetadata,
-      criterionMetadata: summerCriterionFeedbackMetadata,
-      landmarkConfidence: metrics.landmarkConfidence,
-    }),
+    feedbackCode,
+    feedbackSignals: negativeFeedbackEligible
+      ? buildAct4BeatFeedbackSignals<SummerFeedbackCode>({
+          season: "summer",
+          beat,
+          measureIndex: context.measureIndex ?? null,
+          criteria,
+          trackingUnavailable,
+          fallbackCode: feedbackCode,
+          codeMetadata: summerFeedbackMetadata,
+          criterionMetadata: summerCriterionFeedbackMetadata,
+          landmarkConfidence: metrics.landmarkConfidence,
+        })
+      : [],
     metrics,
   };
 };

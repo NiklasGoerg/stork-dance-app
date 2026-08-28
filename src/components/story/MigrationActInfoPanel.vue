@@ -7,69 +7,49 @@
     ]"
     :aria-label="t('story.migrationPanel.ariaLabel')"
   >
-    <div class="migration-info-panel__primary">
-      <p v-if="model.status" class="migration-info-panel__status">
-        {{ model.status }}
-      </p>
-      <h1 class="migration-info-panel__title">{{ model.title }}</h1>
-      <p v-if="model.instruction" class="migration-info-panel__instruction">
-        {{ model.instruction }}
-      </p>
-      <p v-if="model.detail" class="migration-info-panel__detail">
-        {{ model.detail }}
-      </p>
-
-      <div
-        v-if="model.feedbackTitle || model.feedbackText"
-        class="migration-info-panel__feedback"
-        aria-live="polite"
-        aria-atomic="true"
+    <div class="migration-info-panel__content">
+      <p
+        v-if="visibleNarrationText"
+        class="migration-info-panel__narration"
       >
-        <strong v-if="model.feedbackTitle">{{ model.feedbackTitle }}</strong>
-        <span v-if="model.feedbackText">{{ model.feedbackText }}</span>
-      </div>
+        {{ visibleNarrationText }}
+      </p>
+    </div>
 
-      <div
-        v-if="model.progress"
-        class="migration-info-panel__progress"
-        role="status"
-        :aria-label="model.progress.label"
-      >
+    <div
+      v-if="model.feedbackText"
+      class="migration-info-panel__feedback"
+      :class="{
+        'migration-info-panel__feedback--primary': model.feedbackPrimary,
+      }"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <span>{{ model.feedbackText }}</span>
+    </div>
+
+    <div
+      v-if="model.progress"
+      class="migration-info-panel__progress"
+      role="status"
+      :aria-label="progressAriaLabel"
+    >
+      <p class="migration-info-panel__progress-title">
+        {{ t("story.migrationPanel.practiceProgress.title") }}
+      </p>
+      <div class="migration-info-panel__progress-dots">
         <span
-          v-for="index in model.progress.total"
+          v-for="index in progressDotIndexes"
           :key="index"
           class="migration-info-panel__progress-dot"
           :class="{
             'migration-info-panel__progress-dot--complete':
-              index <= model.progress.current,
+              index < completedProgressDots,
           }"
           aria-hidden="true"
         />
-        <span class="migration-info-panel__progress-label">
-          {{ model.progress.label }}
-        </span>
       </div>
     </div>
-
-    <ol
-      v-if="model.movements.length"
-      class="migration-info-panel__movements"
-      aria-label="Movement sequence"
-    >
-      <li
-        v-for="movement in model.movements"
-        :key="movement.id"
-        class="migration-info-panel__movement"
-        :class="`migration-info-panel__movement--${movement.state}`"
-      >
-        <span class="migration-info-panel__movement-state">
-          {{ getMovementStateLabel(movement.state) }}
-        </span>
-        <span class="migration-info-panel__movement-label">
-          {{ movement.label }}
-        </span>
-      </li>
-    </ol>
 
     <div
       v-if="showActions && model.actions.length"
@@ -94,10 +74,9 @@
 import type {
   MigrationActInfoPanelModel,
   MigrationInfoPanelActionId,
-  MigrationMovementListItem,
 } from "~/types/migrationAct";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     model: MigrationActInfoPanelModel;
     showActions?: boolean;
@@ -107,113 +86,139 @@ withDefaults(
 defineEmits<{ action: [actionId: MigrationInfoPanelActionId] }>();
 const { t } = useI18n();
 
-const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
-  if (state === "current") return t("story.migrationPanel.current");
-  if (state === "completed") {
-    return t("story.migrationPanel.completedMovement");
-  }
-  return t("story.migrationPanel.next");
-};
+const visibleNarrationText = computed(
+  () => props.model.instruction || props.model.title,
+);
+const progressDotIndexes = [0, 1, 2] as const;
+const completedProgressDots = computed(() =>
+  Math.min(
+    progressDotIndexes.length,
+    Math.max(0, Math.floor(props.model.progress?.current ?? 0)),
+  ),
+);
+const progressAriaLabel = computed(() => {
+  const progress = props.model.progress;
+  if (!progress) return "";
+  return t("story.migrationPanel.practiceProgress.ariaLabel", {
+    current: progress.current,
+    total: progress.total,
+  });
+});
 </script>
 
 <style scoped>
 .migration-info-panel {
-  display: grid;
-  grid-template-rows: minmax(0, auto) minmax(0, 1fr) auto;
-  gap: clamp(14px, 1.7dvh, 24px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   width: 100%;
   min-width: 0;
   min-height: 100%;
+  max-height: 100%;
+  overflow: hidden;
   color: var(--act4-color-text-strong);
 }
 
-.migration-info-panel__primary {
+.migration-info-panel__content {
   display: grid;
   align-content: start;
-  gap: clamp(8px, 1dvh, 14px);
+  gap: clamp(12px, 1.4dvh, 20px);
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: none;
 }
 
-.migration-info-panel__status,
-.migration-info-panel__title,
-.migration-info-panel__instruction,
-.migration-info-panel__detail {
+.migration-info-panel__content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.migration-info-panel__narration {
   margin: 0;
-}
-
-.migration-info-panel__status {
-  color: var(--act4-color-text-muted);
-  font-size: 0.78rem;
-  font-weight: 850;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.migration-info-panel__title {
-  font-size: clamp(2.1rem, 3.2vw, 4.5rem);
-  font-weight: 900;
-  letter-spacing: -0.035em;
-  line-height: 0.95;
-}
-
-.migration-info-panel__instruction {
   color: var(--act4-color-text-strong);
-  font-size: clamp(1.05rem, 1.3vw, 1.55rem);
-  font-weight: 800;
-  line-height: 1.15;
-}
-
-.migration-info-panel__detail {
-  color: var(--act4-color-text-soft);
-  font-size: clamp(0.92rem, 1vw, 1.18rem);
-  font-weight: 650;
-  line-height: 1.3;
+  max-width: 24ch;
+  font-size: clamp(1.65rem, 2.35vw, 3.15rem);
+  font-weight: 700;
+  line-height: 1.12;
 }
 
 .migration-info-panel__feedback {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
   display: grid;
   gap: 6px;
-  margin-top: var(--space-1);
-  padding: clamp(13px, 1.4vw, 20px);
+  max-height: min(42%, 220px);
+  overflow: hidden;
+  padding: clamp(14px, 1.5vw, 22px);
   border: 1px solid var(--act4-feedback-neutral-border);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: var(--act4-feedback-neutral-background);
   color: var(--act4-feedback-neutral-text);
-}
-
-.migration-info-panel__feedback strong {
-  font-size: clamp(1.4rem, 2vw, 2.4rem);
-  line-height: 1;
+  box-shadow: var(--act4-shadow-feedback);
 }
 
 .migration-info-panel__feedback span {
-  font-size: clamp(0.92rem, 1.05vw, 1.2rem);
-  font-weight: 700;
-  line-height: 1.25;
+  font-size: clamp(1.22rem, 1.58vw, 1.95rem);
+  font-weight: 800;
+  line-height: 1.16;
+}
+
+.migration-info-panel__feedback--primary span {
+  font-size: clamp(1.72rem, 2.5vw, 3.35rem);
+  font-weight: 900;
+  line-height: 1.04;
 }
 
 .migration-info-panel__progress {
+  position: absolute;
+  right: clamp(14px, 1.5vw, 22px);
+  bottom: clamp(14px, 1.5vw, 22px);
+  z-index: 2;
+  display: grid;
+  justify-items: end;
+  max-width: min(100%, 440px);
+  gap: 14px;
+  text-align: right;
+  pointer-events: none;
+}
+
+.migration-info-panel__progress-title {
+  margin: 0;
+}
+
+.migration-info-panel__progress-title {
+  color: var(--act4-color-text-strong);
+  font-size: clamp(1.75rem, 2.45vw, 3rem);
+  font-weight: 900;
+  line-height: 0.95;
+}
+
+.migration-info-panel__progress-dots {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-end;
+  gap: 18px;
 }
 
 .migration-info-panel__progress-dot {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--act4-color-text-muted);
+  width: 56px;
+  height: 56px;
+  border: 4px solid rgba(11, 52, 41, 0.34);
   border-radius: 50%;
+  background: rgba(255, 255, 255, 0.54);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.44);
 }
 
 .migration-info-panel__progress-dot--complete {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-}
-
-.migration-info-panel__progress-label {
-  flex-basis: 100%;
-  color: var(--act4-color-text-soft);
-  font-weight: 750;
+  border-color: var(--color-success);
+  background: var(--color-success);
+  box-shadow:
+    0 0 0 8px rgba(47, 158, 68, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
 }
 
 .migration-info-panel--success .migration-info-panel__feedback {
@@ -229,68 +234,16 @@ const getMovementStateLabel = (state: MigrationMovementListItem["state"]) => {
   color: var(--act4-feedback-warning-text);
 }
 
-.migration-info-panel__movements {
-  display: grid;
-  align-content: start;
-  gap: clamp(8px, 1dvh, 14px);
-  min-height: 0;
-  margin: 0;
-  overflow: auto;
-  padding: var(--space-2) 0 0;
-  border-top: 1px solid var(--act4-color-border);
-  list-style: none;
-}
-
-.migration-info-panel__movement {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-2);
-  padding: clamp(10px, 1.2dvh, 16px) clamp(12px, 1.1vw, 18px);
-  border: 1px solid transparent;
-  border-radius: 10px;
-  color: var(--act4-color-text-muted);
-}
-
-.migration-info-panel__movement--current {
-  border-color: var(--act4-instruction-active-border);
-  background: var(--act4-instruction-active-background);
-  color: var(--act4-color-text-strong);
-  box-shadow: var(--act4-shadow-instruction);
-  transform: translateX(2px);
-}
-
-.migration-info-panel__movement--completed {
-  opacity: 0.72;
-}
-
-.migration-info-panel__movement-state {
-  font-size: clamp(0.72rem, 0.72vw, 0.92rem);
-  font-weight: 850;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.migration-info-panel__movement-label {
-  overflow: hidden;
-  font-size: clamp(1.05rem, 1.18vw, 1.42rem);
-  font-weight: 800;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .migration-info-panel__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  padding-top: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--act4-color-border);
 }
 
-.migration-info-panel--gestureFeedback .migration-info-panel__title,
-.migration-info-panel--movementFeedback .migration-info-panel__title,
-.migration-info-panel--completed .migration-info-panel__title {
+.migration-info-panel--completed .migration-info-panel__narration {
   font-size: clamp(2.8rem, 4.2vw, 5.8rem);
 }
 </style>

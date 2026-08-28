@@ -83,7 +83,7 @@ export const AUTUMN_MOVEMENT_REFERENCE: Record<
 export const autumnMovementConfig = {
   thresholds: {
     handsTogetherMax: 1.45,
-    startSideMinOffset: 0.42,
+    startSideMinOffset: 0.32,
     centerMaxOffset: 0.42,
     chestMinY: -0.75,
     chestMaxY: 1.55,

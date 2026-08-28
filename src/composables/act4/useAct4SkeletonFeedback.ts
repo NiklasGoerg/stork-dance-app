@@ -12,7 +12,7 @@ export const useAct4SkeletonFeedback = ({
   const {
     skeletonFeedbackState,
     pulseProgress,
-    triggerBeatSuccess,
+    triggerBeatFeedback,
     setTrackingLimited,
     resetSkeletonFeedback,
   } = useSkeletonVisualFeedback();
@@ -36,14 +36,21 @@ export const useAct4SkeletonFeedback = ({
       if (!target) return;
 
       nextEvaluations.forEach((evaluation, index) => {
-        triggerBeatSuccess({
+        triggerBeatFeedback({
           evaluationId: `${target.id}-${store.attempt.attemptNumber}-${evaluation.beat}-${processedBeatCount + index}`,
           flowId: store.flowId ?? "act4",
           flowStepId: target.climateData?.id ?? target.id,
           measureIndex:
             recognition.currentMeasureEvaluation.value?.measureIndex ?? 0,
           beatIndex: evaluation.beat,
-          result: evaluation.passed ? "passed" : "failed",
+          result: evaluation.trackingUnavailable
+            ? "notEvaluable"
+            : evaluation.negativeFeedbackEligible === false &&
+                !evaluation.passed
+            ? "notEvaluable"
+            : evaluation.passed
+              ? "passed"
+              : "failed",
         });
       });
     }),
@@ -53,7 +60,7 @@ export const useAct4SkeletonFeedback = ({
   ];
 
   const triggerSkeletonPulseTest = () => {
-    triggerBeatSuccess({
+    triggerBeatFeedback({
       evaluationId: `debug-skeleton-pulse-${Math.round(performance.now())}`,
       flowId: "debug",
       flowStepId: "debug-skeleton-pulse",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import en from "~/locales/en.json";
 import { resolveAct4FeedbackNarrationCue } from "~/utils/act4/feedback/catalog";
 
 describe("resolveAct4FeedbackNarrationCue", () => {
@@ -86,5 +87,23 @@ describe("resolveAct4FeedbackNarrationCue", () => {
     ["summer", undefined],
   ] as const)("returns null for %s %s", (season, feedbackCode) => {
     expect(resolveAct4FeedbackNarrationCue(season, feedbackCode)).toBeNull();
+  });
+
+  it("uses avatar-relative Autumn wrong-side and wrong-direction wording", () => {
+    expect(en.story.acts.act4.narration.feedback.autumn.startLeft).toBe(
+      "Start on the same side as the avatar.",
+    );
+    expect(en.story.acts.act4.narration.feedback.autumn.startRight).toBe(
+      "Start on the same side as the avatar.",
+    );
+    expect(en.story.acts.act4.narration.feedback.autumn.wrongSweepDirection).toBe(
+      "Sweep toward the same side as the avatar.",
+    );
+    expect(en.story.acts.act4.autumnFeedback.START_LEFT).toBe(
+      "Start on the same side as the avatar.",
+    );
+    expect(en.story.acts.act4.autumnFeedback.START_RIGHT).toBe(
+      "Start on the same side as the avatar.",
+    );
   });
 });

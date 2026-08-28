@@ -502,6 +502,7 @@ export interface MigrationActInfoPanelModel {
   status?: string;
   feedbackTitle?: string;
   feedbackText?: string;
+  feedbackPrimary?: boolean;
   tone: MigrationInfoPanelTone;
   progress?: {
     current: number;

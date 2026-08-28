@@ -1068,6 +1068,7 @@ export const useMigrationActRuntime = ({
       movementElapsedMs,
       prerollMs: tutorialMovement.playbackTiming.prerollMs,
       movementId: tutorialMovement.movementId,
+      negativeFeedbackEnabled: purpose === "practice-gating",
     });
   };
 

@@ -907,6 +907,7 @@ describe("migration act runtime", () => {
       "story.acts.act3.narration.completed.structure.text",
       "story.acts.act3.narration.completed.pattern.text",
       "story.acts.act3.narration.completed.qualification.text",
+      "story.acts.act3.narration.completed.question.text",
       "story.acts.act3.narration.completed.climateTransition.text",
     ]);
   });
@@ -1521,7 +1522,7 @@ describe("migration act runtime", () => {
         narration.calls.play.filter((call) =>
           call.key.includes("story.acts.act3.narration.completed"),
         ),
-      ).toHaveLength(4);
+      ).toHaveLength(5);
     });
 
     expect(controller.store.playbackState).toBe("completed");
@@ -1537,6 +1538,7 @@ describe("migration act runtime", () => {
       "story.acts.act3.narration.completed.structure.text",
       "story.acts.act3.narration.completed.pattern.text",
       "story.acts.act3.narration.completed.qualification.text",
+      "story.acts.act3.narration.completed.question.text",
       "story.acts.act3.narration.completed.climateTransition.text",
     ]);
 

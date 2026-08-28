@@ -368,6 +368,14 @@ export const buildSummerBeatCriteria = (
         : expectedIntensity === "30"
           ? 0.28
           : 0.48;
+    const loweredFromExpansion =
+      averageHandY !== null &&
+      context.expansionReference?.lowestHandHeightFromShoulders !== null &&
+      context.expansionReference?.lowestHandHeightFromShoulders !==
+        undefined
+        ? averageHandY >=
+          context.expansionReference.lowestHandHeightFromShoulders + 0.08
+        : averageHandY !== null;
 
     return [
       criterion({
@@ -381,7 +389,7 @@ export const buildSummerBeatCriteria = (
       criterion({
         id: "hands-open-sides",
         label: "Hands opened to both sides",
-        importance: "essential",
+        importance: "supporting",
         value: opening?.span,
         passed:
           opening !== null &&
@@ -389,21 +397,22 @@ export const buildSummerBeatCriteria = (
           opening.span >= minimumShapeOpening &&
           openingDirectionMatches,
         expectedRange: `>= ${minimumShapeOpening}`,
-        feedbackCode: "OPEN_ARMS_TO_SIDES",
       }),
       criterion({
-        id: "hands-shoulder-height",
-        label: "Hands around shoulder height",
-        importance: "essential",
+        id: "hands-lowered-from-expansion",
+        label: "Hands continue lower from the high point",
+        importance: "supporting",
         value: averageHandY,
-        passed:
-          metrics.leftHandHeightFromShoulders !== null &&
-          metrics.rightHandHeightFromShoulders !== null &&
-          Math.abs(metrics.leftHandHeightFromShoulders) <=
-            thresholds.shoulderHeightTolerance &&
-          Math.abs(metrics.rightHandHeightFromShoulders) <=
-            thresholds.shoulderHeightTolerance,
-        expectedRange: `+/- ${thresholds.shoulderHeightTolerance}`,
+        passed: loweredFromExpansion,
+        expectedRange:
+          context.expansionReference?.lowestHandHeightFromShoulders !== null &&
+          context.expansionReference?.lowestHandHeightFromShoulders !==
+            undefined
+            ? `>= ${roundCriterionDebugValue(
+                context.expansionReference.lowestHandHeightFromShoulders +
+                  0.08,
+              )}`
+            : "visible lower transition",
       }),
       rangeCriterion({
         id: "arm-opening-target",
@@ -411,20 +420,8 @@ export const buildSummerBeatCriteria = (
         importance: "supporting",
         value: metrics.normalizedArmOpening,
         range: reference.beat3.armOpening,
-        tooLowFeedback: "OPEN_ARMS_TO_SIDES",
-        tooHighFeedback:
-          expectedIntensity === "100" ? "TRY_AGAIN" : "OPEN_ARMS_LESS",
-      }),
-      rangeCriterion({
-        id: "elbow-angle-target",
-        label: `Elbow bend matches ${expectedIntensity}`,
-        importance: "supporting",
-        value: averageElbowAngle,
-        range: reference.beat3.elbowAngle,
-        tooLowFeedback:
-          expectedIntensity === "100" ? "STRAIGHTEN_ARMS" : "TRY_AGAIN",
-        tooHighFeedback:
-          expectedIntensity === "100" ? "TRY_AGAIN" : "BEND_ELBOWS_MORE",
+        tooLowFeedback: "TRY_AGAIN",
+        tooHighFeedback: "TRY_AGAIN",
       }),
       criterion({
         id: "hands-similar-height",
@@ -551,6 +548,7 @@ export const getSummerBeatFeedbackCode = (
   );
 
   if (notEvaluable) return "HANDS_NOT_VISIBLE";
+  if (beat === 3) return undefined;
   if (!failed) {
     const supportingFailure = criteria.find(
       (item) => item.importance === "supporting" && item.status === "failed",
@@ -578,7 +576,7 @@ export const getSummerBeatFeedbackCode = (
   ) {
     return "RAISE_ARMS_HIGHER";
   }
-  if (failed.id === "hands-open-sides" || beat === 3) {
+  if (failed.id === "hands-open-sides") {
     return "OPEN_ARMS_TO_SIDES";
   }
   if (failed.id === "feet-returned-close") return "RETURN_FEET_TO_CENTER";

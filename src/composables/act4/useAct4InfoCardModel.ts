@@ -1,4 +1,5 @@
 import { computed } from "vue";
+import { useStoryTranslations } from "~/composables/useStoryTranslations";
 import { useAct4Store } from "~/store/act4";
 import { act4IntroCycleConfig } from "~/story/act4IntroCycle";
 import type { Act4Recognition } from "~/composables/act4/useAct4Recognition";
@@ -24,69 +25,8 @@ type Act4CyclePresentationState = {
   isTransition: { value: boolean };
 };
 
-const ACT4_LARGE_SEASON_PREVIEW_DURATION_MS = 3_000;
-
-const summerBeatFallbackInstructions: Record<number, string> = {
-  1: "story.acts.act4.summerInstructions.fallback.1",
-  2: "story.acts.act4.summerInstructions.fallback.2",
-  3: "story.acts.act4.summerInstructions.fallback.3",
-  4: "story.acts.act4.summerInstructions.fallback.4",
-};
-
-const summerIntensityGuidance: Record<string, Record<number, string>> = {
-  "100": {
-    1: "story.acts.act4.summerInstructions.beats.1",
-    2: "story.acts.act4.summerInstructions.beats.100.2",
-    3: "story.acts.act4.summerInstructions.beats.100.3",
-    4: "story.acts.act4.summerInstructions.beats.4",
-  },
-  "60": {
-    1: "story.acts.act4.summerInstructions.beats.1",
-    2: "story.acts.act4.summerInstructions.beats.60.2",
-    3: "story.acts.act4.summerInstructions.beats.60.3",
-    4: "story.acts.act4.summerInstructions.beats.4",
-  },
-  "30": {
-    1: "story.acts.act4.summerInstructions.beats.1",
-    2: "story.acts.act4.summerInstructions.beats.30.2",
-    3: "story.acts.act4.summerInstructions.beats.30.3",
-    4: "story.acts.act4.summerInstructions.beats.4",
-  },
-  "10": {
-    1: "story.acts.act4.summerInstructions.beats.1",
-    2: "story.acts.act4.summerInstructions.beats.10.2",
-    3: "story.acts.act4.summerInstructions.beats.10.3",
-    4: "story.acts.act4.summerInstructions.beats.4",
-  },
-};
-
-const beatInstructions: Record<ClimateSeason, Record<number, string>> = {
-  summer: summerBeatFallbackInstructions,
-  autumn: {
-    1: "story.acts.act4.autumnInstructions.beats.1",
-    2: "story.acts.act4.autumnInstructions.beats.2",
-    3: "story.acts.act4.autumnInstructions.beats.3",
-    4: "story.acts.act4.autumnInstructions.beats.4",
-  },
-  spring: {
-    1: "story.acts.act4.springInstructions.beat1",
-    2: "story.acts.act4.springInstructions.beat2",
-    3: "story.acts.act4.springInstructions.beat3",
-    4: "story.acts.act4.springInstructions.beat4",
-  },
-  winter: {
-    1: "story.acts.act4.winterInstructions.beat1",
-    2: "story.acts.act4.winterInstructions.beat2",
-    3: "story.acts.act4.winterInstructions.beat3",
-    4: "story.acts.act4.winterInstructions.beat4",
-  },
-};
-
 const formatMovementPercent = (value: string | number) =>
   String(value).replace(/\.0$/, "");
-
-const clampBeat = (beat: number | null) =>
-  Math.min(Math.max(Math.round(beat ?? 1), 1), 4);
 
 export const useAct4InfoCardModel = ({
   cycle,
@@ -110,7 +50,6 @@ export const useAct4InfoCardModel = ({
   const activeClimateStep = computed(
     () => store.currentTarget?.climateData ?? null,
   );
-  const activeBeat = computed(() => clampBeat(cycle.currentBeat.value));
   const activeMovementPercentLabel = computed(() => {
     const value =
       store.currentTarget?.movementValue ??
@@ -154,55 +93,43 @@ export const useAct4InfoCardModel = ({
   const baselinePeriodLabel = computed(
     () => getSeasonBaselineStep(activeSeason.value)?.interval ?? "",
   );
-  const getBeatInstructionKey = (beat: number) => {
-    if (activeSeason.value === "summer") {
-      const value = String(store.currentTarget?.movementValue ?? "100");
-
-      return (
-        summerIntensityGuidance[value]?.[beat] ??
-        beatInstructions.summer[beat] ??
-        "story.acts.act4.instructions.repeat"
-      );
-    }
-
-    return (
-      beatInstructions[activeSeason.value][beat] ??
-      "story.acts.act4.instructions.repeat"
-    );
-  };
-  const instructions = computed(() =>
-    Array.from({ length: 4 }, (_, index) => {
-      const beat = ((activeBeat.value + index - 1) % 4) + 1;
-      const instructionKey = getBeatInstructionKey(beat);
-
-      return {
-        beat,
-        text: t(instructionKey),
-        active: beat === activeBeat.value,
-      };
-    }),
-  );
   const mode = computed<Act4InfoCardMode>(() => {
     if (store.isCompleted) return "completed";
     if (store.sequenceStatus === "periodTransition") return "periodTransition";
     if (store.sequenceStatus === "tutorialExplanation") {
-      return "tutorialExplanation";
+      return "narration";
     }
     if (
       store.sequenceStatus === "storyIntro" ||
       store.sequenceStatus === "storyReferencePreview" ||
       store.sequenceStatus === "storyReferenceComplete"
     ) {
-      return "storyNarration";
+      return "narration";
     }
 
-    const isLargeSeasonPreviewVisible =
-      store.isFlowActive &&
-      cycle.seasonPhase.value === "preview" &&
-      cycle.seasonElapsedMs.value < ACT4_LARGE_SEASON_PREVIEW_DURATION_MS &&
-      !store.attempt.retryPreviewFeedbackText;
+    return store.phase === "tutorial" ? "tutorial" : "story";
+  });
+  const narration = computed<Act4InfoCardModel["narration"]>(() => {
+    if (mode.value !== "narration") return undefined;
 
-    return isLargeSeasonPreviewVisible ? "seasonPreview" : "activeMovement";
+    if (store.sequenceStatus === "tutorialExplanation") {
+      return store.tutorialNarration.textKey
+        ? {
+            text: t(
+              store.tutorialNarration.textKey,
+              store.tutorialNarration.params,
+            ),
+            tone: "neutral",
+          }
+        : undefined;
+    }
+
+    return store.storyNarration.textKey
+      ? {
+          text: t(store.storyNarration.textKey, store.storyNarration.params),
+          tone: "neutral",
+        }
+      : undefined;
   });
   const isMeasureFeedbackVisible = computed(
     () =>
@@ -218,28 +145,7 @@ export const useAct4InfoCardModel = ({
       !store.isCompleted,
   );
   const feedback = computed<Act4InfoCardModel["feedback"]>(() => {
-    if (mode.value === "tutorialExplanation") {
-      return store.tutorialNarration.textKey
-        ? {
-            text: t(
-              store.tutorialNarration.textKey,
-              store.tutorialNarration.params,
-            ),
-            tone: "neutral",
-          }
-        : undefined;
-    }
-
-    if (mode.value === "storyNarration") {
-      return store.storyNarration.textKey
-        ? {
-            text: t(store.storyNarration.textKey, store.storyNarration.params),
-            tone: "neutral",
-          }
-        : undefined;
-    }
-
-    if (mode.value !== "activeMovement") return undefined;
+    if (mode.value !== "tutorial" && mode.value !== "story") return undefined;
 
     if (climateDataError.value) {
       return {
@@ -296,7 +202,12 @@ export const useAct4InfoCardModel = ({
     return undefined;
   });
   const subtitle = computed(() => {
-    if (mode.value !== "activeMovement" || feedback.value) return "";
+    if (
+      (mode.value !== "tutorial" && mode.value !== "story") ||
+      feedback.value
+    ) {
+      return "";
+    }
 
     if (cycle.isCountingDown.value) {
       return t("story.acts.act4.instructions.countdown", {
@@ -320,21 +231,36 @@ export const useAct4InfoCardModel = ({
       return t("story.acts.act4.movementText.nextPeriod");
     }
 
-    return t(getBeatInstructionKey(activeBeat.value));
+    return "";
   });
+  const displayText = computed(() => {
+    if (mode.value === "completed") {
+      return t("story.acts.act4.story.completionTitle");
+    }
+
+    if (mode.value === "periodTransition") return "";
+
+    return narration.value?.text ?? feedback.value?.text ?? subtitle.value;
+  });
+  const displayTone = computed<Act4InfoCardModel["displayTone"]>(
+    () => narration.value?.tone ?? feedback.value?.tone ?? "neutral",
+  );
   const model = computed<Act4InfoCardModel>(() => ({
     mode: mode.value,
+    displayText: displayText.value,
+    displayTone: displayTone.value,
     seasonLabel: currentSeasonLabel.value,
     movementPercentLabel: activeMovementPercentLabel.value,
     periodLabel: periodLabel.value,
     temperature: {
-      valueLabel: activeClimateStep.value?.isBaseline
-        ? t("story.acts.act4.climateInfo.referencePeriod")
-        : temperatureLabel.value,
+      valueLabel: temperatureLabel.value,
       baselineLabel: baselinePeriodLabel.value,
+      contextLabel: activeClimateStep.value?.isBaseline
+        ? t("story.acts.act4.infoCard.seasonalMean")
+        : "",
       isBaseline: activeClimateStep.value?.isBaseline ?? false,
     },
-    instructions: mode.value === "activeMovement" ? instructions.value : [],
+    narration: narration.value,
     feedback: feedback.value,
     subtitle: subtitle.value,
     completion: {

@@ -1,4 +1,8 @@
-export type SkeletonVisualMode = "neutral" | "successPulse" | "trackingLimited";
+export type SkeletonVisualMode =
+  | "neutral"
+  | "successPulse"
+  | "missPulse"
+  | "trackingLimited";
 
 export type BeatSkeletonFeedbackResult = "passed" | "failed" | "notEvaluable";
 
@@ -17,6 +21,7 @@ export const SKELETON_SUCCESS_PULSE_DURATION_MS = 450;
 export const SKELETON_VISUAL_CONFIG = {
   innerColor: "#172033",
   innerSuccessColor: "#43d17a",
+  innerMissColor: "#f2a93b",
   outerNeutralColor: "#ffffff",
   outerLineWidth: 7,
   innerLineWidth: 4,

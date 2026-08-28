@@ -77,4 +77,77 @@ describe("autumn criteria", () => {
     expect(getCriterion(criteria, "progress-from-start")?.passed).toBe(false);
     expect(getCriterion(criteria, "endpoint-value-range")?.passed).toBe(false);
   });
+
+  it("accepts the smallest Autumn value when the target is reached early and held", () => {
+    const criteria = buildAutumnBeatCriteria(
+      3,
+      createMetrics({
+        directionLocked: true,
+        directionResult: "matched",
+        detectedDirection: "leftToRight",
+        signedProgressFromBeat1: 0.28,
+        normalizedProgress: 0.28,
+        handTravelProgress: 0.28,
+        handCenterRegionProgress: 0.28,
+        progressFromStartingPose: 0.28,
+        detectedEndpointRegion: "startSideDiagonal",
+        endpointErrorKind: "matched",
+        outerWristProgressToCenter: 0.18,
+        detectedValueClass: "25",
+      }),
+      {
+        expectedDirection: "leftToRight",
+        expectedValueClass: "25",
+      },
+    );
+
+    expect(getCriterion(criteria, "sweep-direction")?.passed).toBe(true);
+    expect(getCriterion(criteria, "progress-from-start")?.passed).toBe(true);
+    expect(getCriterion(criteria, "endpoint-value-range")?.passed).toBe(true);
+  });
+
+  it("keeps large Autumn endpoint checks separate from arm styling", () => {
+    const criteria = buildAutumnBeatCriteria(
+      3,
+      createMetrics({
+        directionLocked: true,
+        directionResult: "matched",
+        detectedDirection: "leftToRight",
+        signedProgressFromBeat1: 0.92,
+        normalizedProgress: 0.92,
+        handTravelProgress: 0.92,
+        handCenterRegionProgress: 0.92,
+        progressFromStartingPose: 0.92,
+        detectedEndpointRegion: "farDestinationSide",
+        endpointErrorKind: "matched",
+        outerWristRelativeToOuterShoulder: -0.2,
+        outerWristProgressToCenter: 0.9,
+        detectedValueClass: "100",
+        armExtended: false,
+        outerArmExtensionClass: "compact",
+        innerForearmDirectionX: -1,
+      }),
+      {
+        expectedDirection: "leftToRight",
+        expectedValueClass: "100",
+      },
+    );
+
+    expect(getCriterion(criteria, "endpoint-value-range")?.passed).toBe(true);
+    expect(getCriterion(criteria, "outer-arm-extension")?.importance).toBe(
+      "supporting",
+    );
+    expect(getCriterion(criteria, "outer-arm-extension")?.feedbackCode).toBe(
+      undefined,
+    );
+    expect(
+      getCriterion(criteria, "inner-forearm-oriented-endpoint")?.importance,
+    ).toBe("supporting");
+    expect(
+      getCriterion(criteria, "inner-forearm-oriented-endpoint")?.feedbackCode,
+    ).toBe(undefined);
+    expect(getCriterion(criteria, "outer-wrist-endpoint-side")?.importance).toBe(
+      "supporting",
+    );
+  });
 });

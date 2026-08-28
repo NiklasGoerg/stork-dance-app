@@ -27,7 +27,7 @@ describe("migration act story narration", () => {
     const cueIds = Object.keys(migrationActStoryNarrationCatalog);
 
     expect(migrationActStoryIntroCueIds).toHaveLength(2);
-    expect(migrationActStoryCompletionCueIds).toHaveLength(4);
+    expect(migrationActStoryCompletionCueIds).toHaveLength(5);
 
     for (const cycle of migrationStoryCycleDefinitions) {
       expect(getMigrationActStoryCycleIntroCueId(cycle.label)).toBeTruthy();
@@ -68,6 +68,7 @@ describe("migration act story narration", () => {
       "act3.story.completed.structure",
       "act3.story.completed.pattern",
       "act3.story.completed.qualification",
+      "act3.story.completed.question",
       "act3.story.completed.climateTransition",
     ]);
 

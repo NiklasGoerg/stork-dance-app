@@ -16,6 +16,14 @@
     ]"
     aria-labelledby="act4-progress-chart-title"
   >
+    <div
+      v-if="periodLabel"
+      class="act4-climate-chart__period-indicator"
+      aria-live="polite"
+    >
+      {{ periodLabel }}
+    </div>
+
     <div class="act4-climate-chart__header">
       <div class="act4-climate-chart__heading">
         <p class="act4-climate-chart__eyebrow">{{ eyebrowLabel }}</p>
@@ -287,6 +295,7 @@ type RenderSegment = {
 
 const props = defineProps<Act4ClimateProgressChartProps>();
 const { t } = useI18n();
+const periodLabel = computed(() => props.periodLabel ?? "");
 
 const chartWidth = 960;
 const chartHeight = 300;
@@ -988,6 +997,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .act4-climate-chart {
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
@@ -1012,6 +1022,26 @@ onBeforeUnmount(() => {
     border-color 220ms ease,
     box-shadow 220ms ease,
     opacity 220ms ease;
+}
+
+.act4-climate-chart__period-indicator {
+  position: absolute;
+  top: clamp(8px, 1vw, 14px);
+  left: 50%;
+  z-index: 4;
+  translate: -50% 0;
+  max-width: min(72%, 340px);
+  padding: 7px 14px;
+  border: 1px solid rgba(31, 49, 39, 0.14);
+  border-radius: 999px;
+  background: rgba(248, 251, 247, 0.82);
+  color: var(--act4-color-text-strong);
+  box-shadow: 0 10px 26px rgba(31, 49, 39, 0.12);
+  font-size: clamp(0.86rem, 1vw, 1.05rem);
+  font-weight: 760;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .act4-climate-chart--inactive {

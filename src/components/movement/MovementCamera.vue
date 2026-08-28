@@ -234,10 +234,15 @@ const easeOutCubic = (value: number) => 1 - Math.pow(1 - value, 3);
 const getSkeletonStyle = () => {
   const progress = clamp(props.skeletonPulseProgress, 0, 1);
   const isSuccessPulse = props.skeletonVisualMode === "successPulse";
-  const pulseStrength = isSuccessPulse ? Math.sin(Math.PI * progress) : 0;
-  const innerColor = isSuccessPulse
+  const isMissPulse = props.skeletonVisualMode === "missPulse";
+  const isTerminalPulse = isSuccessPulse || isMissPulse;
+  const pulseStrength = isTerminalPulse ? Math.sin(Math.PI * progress) : 0;
+  const pulseColor = isMissPulse
+    ? SKELETON_VISUAL_CONFIG.innerMissColor
+    : SKELETON_VISUAL_CONFIG.innerSuccessColor;
+  const innerColor = isTerminalPulse
     ? mixColor(
-        SKELETON_VISUAL_CONFIG.innerSuccessColor,
+        pulseColor,
         SKELETON_VISUAL_CONFIG.innerColor,
         easeOutCubic(progress),
       )

@@ -77,6 +77,7 @@ export type Act4FeedbackBeatEvaluationLike<TCode extends string = string> = {
   measureIndex?: number | null;
   score: number;
   passed: boolean;
+  negativeFeedbackEligible?: boolean;
   trackingUnavailable: boolean;
   criteria: Act4FeedbackCriterionLike<TCode>[];
   feedbackCode?: TCode;
@@ -101,7 +102,7 @@ export type Act4Phase = "tutorial" | "climateStory" | "completed";
 export type Act4DisplayPhase = Act4Phase | "idle";
 export type Act4FlowId = "act4Full" | "act4Story" | "act4TutorialDebug";
 export type Act4FlowContext = "tutorial" | "climateStory";
-export type Act4TutorialTarget = "example" | "maximum" | "minimum";
+export type Act4TutorialTarget = "maximum" | "minimum";
 export type Act4EncodingId =
   "circleRadius" | "horizontalArcExtent" | "bodyHeight" | "verticalArcExtent";
 
@@ -263,34 +264,33 @@ export type Act4RecognitionMeasureEvaluation = MovementMeasureEvaluation<
   string
 >;
 
-export type Act4InfoInstruction = {
-  beat: number;
-  text: string;
-  active: boolean;
-};
-
 export type Act4InfoTone =
   "instruction" | "neutral" | "excellent" | "success" | "error" | "warning";
 
 export type Act4InfoCardMode =
-  | "seasonPreview"
-  | "tutorialExplanation"
-  | "storyNarration"
-  | "activeMovement"
+  | "narration"
+  | "tutorial"
+  | "story"
   | "periodTransition"
   | "completed";
 
 export type Act4InfoCardModel = {
   mode: Act4InfoCardMode;
+  displayText: string;
+  displayTone: Act4InfoTone;
   seasonLabel: string;
   movementPercentLabel: string;
   periodLabel: string;
   temperature: {
     valueLabel: string;
     baselineLabel?: string;
+    contextLabel?: string;
     isBaseline: boolean;
   };
-  instructions: Act4InfoInstruction[];
+  narration?: {
+    text: string;
+    tone: Act4InfoTone;
+  };
   feedback?: {
     text: string;
     tone: Act4InfoTone;
@@ -320,6 +320,7 @@ export type Act4ClimateChartMeasureEvaluation = {
 
 export type Act4ClimateProgressChartProps = {
   rows: ClimateSeasonDataRow[];
+  periodLabel?: string;
   phase: Act4Phase | "idle";
   flowId: Act4FlowId | null;
   sequenceStatus: Act4ClimateChartSequenceStatus;

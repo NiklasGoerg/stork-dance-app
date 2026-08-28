@@ -638,42 +638,42 @@ describe("useAct4Controller narration", () => {
     expect(narration.play).toHaveBeenNthCalledWith(
       1,
       "story.acts.act4.narration.tutorial.intro.context",
-      { behavior: "replace", params: { value: "20" } },
+      { behavior: "replace", params: { value: "100" } },
     );
     expect(narration.play).toHaveBeenNthCalledWith(
       2,
       "story.acts.act4.narration.tutorial.intro.encoding",
-      { behavior: "replace", params: { value: "20" } },
+      { behavior: "replace", params: { value: "100" } },
     );
     expect(narration.play).toHaveBeenNthCalledWith(
       3,
       "story.acts.act4.narration.tutorial.intro.scale",
-      { behavior: "replace", params: { value: "20" } },
+      { behavior: "replace", params: { value: "100" } },
     );
     expect(narration.play).toHaveBeenNthCalledWith(
       4,
       "story.acts.act4.narration.tutorial.intro.range",
-      { behavior: "replace", params: { value: "20" } },
+      { behavior: "replace", params: { value: "100" } },
     );
     expect(narration.play).toHaveBeenNthCalledWith(
       5,
       "story.acts.act4.narration.tutorial.intro.measureLength",
-      { behavior: "replace", params: { value: "20" } },
+      { behavior: "replace", params: { value: "100" } },
     );
     expect(narration.play).toHaveBeenNthCalledWith(
       6,
       "story.acts.act4.narration.tutorial.intro.watchThenMove",
-      { behavior: "replace", params: { value: "20" } },
+      { behavior: "replace", params: { value: "100" } },
     );
     expect(narration.play).toHaveBeenNthCalledWith(
       7,
       "story.acts.act4.narration.tutorial.winter.encoding",
-      { behavior: "replace", params: { value: "20" } },
+      { behavior: "replace", params: { value: "100" } },
     );
     expect(narration.play).toHaveBeenNthCalledWith(
       8,
-      "story.acts.act4.narration.tutorial.winter.example",
-      { behavior: "replace", params: { value: "20" } },
+      "story.acts.act4.narration.tutorial.winter.maximum",
+      { behavior: "replace", params: { value: "100" } },
     );
     const winterEncodingCallOrder = narration.play.mock.invocationCallOrder[6];
     const winterCueCallOrder = narration.play.mock.invocationCallOrder[7];
@@ -698,7 +698,7 @@ describe("useAct4Controller narration", () => {
       expect.objectContaining({
         context: "tutorial",
         season: "winter",
-        movementValue: 20,
+        movementValue: 100,
       }),
       { keepCalibration: false, manual: true },
     );

@@ -81,6 +81,7 @@ export type SummerBeatEvaluation = {
   movementShapePassed: boolean;
   intensityMatched: boolean;
   passed: boolean;
+  negativeFeedbackEligible?: boolean;
   trackingUnavailable: boolean;
   criteria: SummerCriterionResult[];
   timestamp: number;

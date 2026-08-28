@@ -35,6 +35,13 @@
           :single-story-cycle-mode="true"
           @story-frame="controller.reportMapFrame"
         />
+        <div
+          v-if="activeCyclePeriodLabel"
+          class="migration-map__period-indicator"
+          aria-live="polite"
+        >
+          {{ activeCyclePeriodLabel }}
+        </div>
         <StoryProgressSidebar />
         <CycleTransitionCover
           v-if="cycleTransitionCoverMounted"
@@ -225,6 +232,7 @@ import {
   resolveMigrationActCycleRuns,
 } from "~/utils/migrationActs/config";
 import { usePresenterActions } from "~/composables/usePresenterActions";
+import { formatMigrationCyclePeriod } from "~/utils/storyPeriodLabel";
 import type { StoryAct } from "~/story/types";
 import type { MigrationInfoPanelActionId } from "~/types/migrationAct";
 
@@ -310,6 +318,9 @@ const showDebugToggle = computed(
     import.meta.dev && !guidedController.enabled && props.act.id === "act-3",
 );
 const activeCycleId = computed(() => store.activeCycleId);
+const activeCyclePeriodLabel = computed(() =>
+  formatMigrationCyclePeriod(store.activeCycleRun),
+);
 const cycleTransitionCoverMounted = computed(() =>
   isCycleTransitionCoverMounted(store.cycleTransitionOverlay.state),
 );
@@ -480,6 +491,25 @@ usePresenterActions({
 
 .migration-map--gesture-active :deep(.bird-map) {
   filter: saturate(0.7) brightness(0.82);
+  pointer-events: none;
+}
+
+.migration-map__period-indicator {
+  position: absolute;
+  top: clamp(12px, 2dvh, 22px);
+  left: 50%;
+  z-index: 18;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border: 1px solid rgb(31 49 39 / 0.16);
+  border-radius: 999px;
+  background: rgb(248 251 247 / 0.86);
+  color: var(--act4-color-text-strong);
+  font-size: clamp(1.05rem, 1.35vw, 1.55rem);
+  font-weight: 760;
+  line-height: 1;
+  box-shadow: 0 8px 22px rgb(31 49 39 / 0.12);
+  backdrop-filter: blur(10px);
   pointer-events: none;
 }
 

@@ -417,8 +417,8 @@ describe("migration movement metrics and criteria", () => {
         ],
       }).status;
 
-    expect(evaluateDelta(0.633)).toBe("failed");
-    expect(evaluateDelta(0.632)).toBe("success");
+    expect(evaluateDelta(0.637)).toBe("failed");
+    expect(evaluateDelta(0.636)).toBe("success");
     expect(evaluateDelta(0.63)).toBe("success");
   });
 
@@ -435,6 +435,44 @@ describe("migration movement metrics and criteria", () => {
     expect(evaluation.status).toBe("success");
     expect(evaluation.stepActivity).toBe("success");
     expect(evaluation.verticalBounce).toBe("failed");
+  });
+
+  it("accepts Winter Residence side steps without stance-width precision", () => {
+    const relaxedWinterSamples = winterSamples.map((sample) => ({
+      ...sample,
+      stanceWidth: 1,
+      hipCenter: { x: 0.5, y: 0.55 },
+      wingState: "neutral" as const,
+    }));
+    const evaluation = evaluateMigrationMovementWindow(
+      "winter_rest",
+      relaxedWinterSamples,
+    );
+
+    expect(evaluation.status).toBe("success");
+    expect(evaluation.beatResults.map((result) => result.status)).toEqual([
+      "success",
+      "success",
+      "success",
+      "success",
+    ]);
+    expect(evaluation.stanceWidthChange).toBe("failed");
+  });
+
+  it("rejects standing still for Winter Residence", () => {
+    const stillSamples = [0, 700, 1_000, 1_700, 2_000, 2_700, 3_000, 3_700].map(
+      (barElapsedMs) =>
+        createSample({
+          barElapsedMs,
+          ankleX: 0.4,
+          rightAnkleX: 0.6,
+          stanceWidth: 1,
+        }),
+    );
+
+    expect(evaluateMigrationMovementWindow("winter_rest", stillSamples)).toMatchObject({
+      status: "failed",
+    });
   });
 
   it("requires both wing beat and step activity for migration", () => {
@@ -672,6 +710,49 @@ describe("migration movement metrics and criteria", () => {
     });
   });
 
+  it("accepts Summer Residence returns without stance narrowing when the active foot returns", () => {
+    const baseline = createSample({
+      barElapsedMs: 0,
+      ankleX: 0.4,
+      rightAnkleX: 0.6,
+      stanceWidth: 1,
+    });
+    const actionSamples = [
+      baseline,
+      createSample({
+        barElapsedMs: 700,
+        ankleX: 0.4,
+        rightAnkleX: 0.65,
+        stanceWidth: 1.25,
+      }),
+    ];
+    const returnSamples = [1_000, 1_700].map((barElapsedMs) =>
+      createSample({
+        barElapsedMs,
+        ankleX: 0.4,
+        rightAnkleX: 0.605,
+        stanceWidth: 1.25,
+      }),
+    );
+
+    expect(
+      evaluateMigrationMovementBeat({
+        profile: "summer_rest",
+        beatIndex: 2,
+        samples: returnSamples,
+        actionSamples,
+        barBaseline: baseline,
+        returnSide: "right",
+      }),
+    ).toMatchObject({
+      status: "success",
+      criteria: {
+        returnToBaseline: "success",
+        stanceChange: "failed",
+      },
+    });
+  });
+
   it("rejects Autumn beat 2 when the stepped foot stays out", () => {
     const stayedOutSamples = successfulSamples.map((sample) =>
       sample.barElapsedMs >= 1_000 && sample.barElapsedMs <= 2_000
@@ -881,6 +962,132 @@ describe("migration movement metrics and criteria", () => {
     recognition.cleanup();
   });
 
+  it("waits for a finalized gated practice window before pulsing green or amber", () => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", () => undefined);
+    const recognition = useMigrationActMovementRecognition();
+
+    recognition.start("summer_rest", {
+      transportTimeMs: 0,
+      movementElapsedMs: 0,
+      movementId: "summer-step",
+      negativeFeedbackEnabled: true,
+    });
+
+    [
+      { time: 0, leftAnkleX: 0.4, rightAnkleX: 0.6 },
+      { time: 120, leftAnkleX: 0.4, rightAnkleX: 0.6 },
+    ].forEach((frame) => {
+      recognition.handlePoseFrame({
+        landmarks: createLandmarks(frame),
+        transportTimeMs: frame.time,
+        timestampMs: frame.time,
+      });
+    });
+
+    expect(recognition.skeletonFeedbackState.value.mode).toBe("neutral");
+
+    recognition.handlePoseFrame({
+      landmarks: createLandmarks({
+        leftAnkleX: 0.4,
+        rightAnkleX: 0.575,
+      }),
+      transportTimeMs: 700,
+      timestampMs: 700,
+    });
+    recognition.handlePoseFrame({
+      landmarks: createLandmarks(),
+      transportTimeMs: 1_000,
+      timestampMs: 1_000,
+    });
+
+    expect(recognition.lastBeatEvaluation.value).toMatchObject({
+      beatIndex: 1,
+      status: "success",
+    });
+    expect(recognition.skeletonFeedbackState.value.mode).toBe("successPulse");
+
+    recognition.cleanup();
+  });
+
+  it("pulses amber only when finalized continuous movement failure is context-enabled", () => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", () => undefined);
+    const recognition = useMigrationActMovementRecognition();
+    const failFirstBeat = () => {
+      [
+        { time: 0, leftAnkleX: 0.4, rightAnkleX: 0.6 },
+        { time: 120, leftAnkleX: 0.4, rightAnkleX: 0.6 },
+        { time: 1_000, leftAnkleX: 0.4, rightAnkleX: 0.6 },
+      ].forEach((frame) => {
+        recognition.handlePoseFrame({
+          landmarks: createLandmarks(frame),
+          transportTimeMs: frame.time,
+          timestampMs: frame.time,
+        });
+      });
+    };
+
+    recognition.start("summer_rest", {
+      transportTimeMs: 0,
+      movementElapsedMs: 0,
+      movementId: "summer-step",
+      negativeFeedbackEnabled: false,
+    });
+    failFirstBeat();
+
+    expect(recognition.lastBeatEvaluation.value).toMatchObject({
+      beatIndex: 1,
+      status: "failed",
+    });
+    expect(recognition.skeletonFeedbackState.value.mode).toBe("neutral");
+
+    recognition.start("summer_rest", {
+      transportTimeMs: 0,
+      movementElapsedMs: 0,
+      movementId: "summer-step",
+      negativeFeedbackEnabled: true,
+    });
+    failFirstBeat();
+
+    expect(recognition.lastBeatEvaluation.value).toMatchObject({
+      beatIndex: 1,
+      status: "failed",
+    });
+    expect(recognition.skeletonFeedbackState.value.mode).toBe("missPulse");
+
+    recognition.cleanup();
+  });
+
+  it("does not pulse amber for tracking-only continuous movement windows", () => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", () => undefined);
+    const recognition = useMigrationActMovementRecognition();
+
+    recognition.start("summer_rest", {
+      transportTimeMs: 0,
+      movementElapsedMs: 0,
+      movementId: "summer-step",
+      negativeFeedbackEnabled: true,
+    });
+
+    [0, 120, 1_000].forEach((time) => {
+      recognition.handlePoseFrame({
+        landmarks: null,
+        transportTimeMs: time,
+        timestampMs: time,
+      });
+    });
+
+    expect(recognition.lastBeatEvaluation.value).toMatchObject({
+      beatIndex: 1,
+      status: "not_evaluable",
+    });
+    expect(recognition.skeletonFeedbackState.value.mode).toBe("neutral");
+
+    recognition.cleanup();
+  });
+
   it("uses the delayed Beat-2 return window for live Autumn feedback", () => {
     vi.stubGlobal("requestAnimationFrame", () => 1);
     vi.stubGlobal("cancelAnimationFrame", () => undefined);
@@ -987,7 +1194,6 @@ describe("migration movement metrics and criteria", () => {
 
   it.each([
     ["stayed out", 0.65, 1.25],
-    ["did not narrow the stance", 0.605, 1.25],
     ["only jittered", 0.648, 1.24],
   ] as const)(
     "rejects a Summer beat-2 return that %s",

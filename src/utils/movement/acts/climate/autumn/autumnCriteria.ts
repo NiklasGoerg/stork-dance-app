@@ -163,26 +163,25 @@ const outerArmExtensionCriterion = (
   context: BeatContext,
 ) => {
   const reference = AUTUMN_MOVEMENT_REFERENCE[context.expectedValueClass];
-  const requiresStraightArm =
+  const expectsLongReach =
     context.expectedValueClass === "100" || context.expectedValueClass === "80";
 
   return criterion({
     id: "outer-arm-extension",
     label: "Outer arm reaches toward the endpoint",
-    importance: requiresStraightArm ? "essential" : "supporting",
-    value: requiresStraightArm
+    importance: "supporting",
+    value: expectsLongReach
       ? metrics.armExtended
       : metrics.outerArmExtensionClass,
-    passed: requiresStraightArm
+    passed: expectsLongReach
       ? metrics.armExtended === true
       : hasAtLeastExtension(
           metrics.outerArmExtensionClass,
           reference.outerArmExtension,
         ),
-    expectedRange: requiresStraightArm
+    expectedRange: expectsLongReach
       ? `elbow >= ${autumnMovementConfig.thresholds.outerElbowExtendedMin} or elbow >= ${autumnMovementConfig.thresholds.outerElbowNearExtendedMin} with shoulder-wrist distance >= ${autumnMovementConfig.thresholds.normalizedShoulderWristDistanceMin}`
       : reference.outerArmExtension,
-    feedbackCode: "EXTEND_OUTER_ARM",
   });
 };
 
@@ -231,11 +230,7 @@ const outerWristCriterion = (
   return criterion({
     id: "outer-wrist-endpoint-side",
     label: "Outer wrist reaches toward the endpoint side",
-    importance:
-      context.expectedValueClass === "100" ||
-      context.expectedValueClass === "80"
-        ? "essential"
-        : "supporting",
+    importance: "supporting",
     value: metrics.outerWristRelativeToOuterShoulder,
     passed:
       metrics.outerWristRelativeToOuterShoulder !== null &&
@@ -274,23 +269,17 @@ const armDirectionCriteria = (
         outerDirectionTowardEndpoint !== null &&
         outerDirectionTowardEndpoint >= 0.1,
       expectedRange: "toward endpoint",
-      feedbackCode: "WRONG_SWEEP_DIRECTION",
     }),
     criterion({
       id: "inner-forearm-oriented-endpoint",
       label: "Inner forearm follows the endpoint direction",
-      importance:
-        context.expectedValueClass === "100" ||
-        context.expectedValueClass === "80"
-          ? "essential"
-          : "supporting",
+      importance: "supporting",
       value: innerForearmTowardEndpoint,
       passed:
         innerForearmTowardEndpoint !== null &&
         innerForearmTowardEndpoint >=
           autumnMovementConfig.thresholds.innerForearmDestinationMin,
       expectedRange: `>= ${autumnMovementConfig.thresholds.innerForearmDestinationMin}`,
-      feedbackCode: "ALIGN_BOTH_ARMS",
     }),
     criterion({
       id: "shared-arm-direction",
@@ -302,7 +291,6 @@ const armDirectionCriteria = (
         metrics.armDirectionSimilarity >=
           autumnMovementConfig.thresholds.armDirectionSimilarityMin,
       expectedRange: `>= ${autumnMovementConfig.thresholds.armDirectionSimilarityMin}`,
-      feedbackCode: "ALIGN_BOTH_ARMS",
     }),
   ];
 };

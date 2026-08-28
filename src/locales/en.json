@@ -208,6 +208,10 @@
       "systemError": "Something went wrong",
       "nextCycle": "The next migration cycle is about to begin.",
       "completed": "Migration act completed",
+      "practiceProgress": {
+        "title": "Practice progress",
+        "ariaLabel": "Movement practice progress: {current} of {total} successful"
+      },
       "movements": {
         "summerRest": "Summer Stay",
         "autumnMigration": "Autumn Migration",
@@ -415,7 +419,7 @@
               },
               "winterReflection1": {
                 "title": "Morocco",
-                "text": "You've reached Morocco. Keep that first journey south in mind; it is our reference for the cycles ahead."
+                "text": "You've reached Morocco. Remember how long that first journey south felt — it will be our reference for the cycles ahead."
               },
               "springPrepare": {
                 "title": "Travel North",
@@ -441,19 +445,19 @@
               },
               "autumnPrepare": {
                 "title": "Travel South",
-                "text": "Get ready to travel south. Notice whether this journey feels shorter or longer."
+                "text": "Get ready to travel south — about {experienceDurationSecondsSpoken} seconds this time."
               },
               "winterReflection1": {
                 "title": "Morocco",
-                "text": "Back in Morocco. This journey south was much shorter: less than three weeks in the tracking data."
+                "text": "Back in Morocco — but the journey south was much shorter this time. It took less than three weeks."
               },
               "springPrepare": {
                 "title": "Travel North",
-                "text": "Now head north again. Feel the return journey."
+                "text": "Now head north again — about {experienceDurationSecondsSpoken} seconds."
               },
               "breedingReflection1": {
                 "title": "Germany",
-                "text": "Back in Germany by March 26, more than two months earlier than in our reference cycle."
+                "text": "Back in Germany by March 26 — more than two months earlier than in our reference cycle."
               },
               "summerTiming": {
                 "title": "Still in Germany",
@@ -471,7 +475,7 @@
               },
               "autumnPrepare": {
                 "title": "Travel South",
-                "text": "Get ready to travel south. Let the movement show the length of the journey."
+                "text": "Get ready to travel south — about {experienceDurationSecondsSpoken} seconds."
               },
               "winterReflection1": {
                 "title": "Iberian Peninsula",
@@ -483,7 +487,7 @@
               },
               "springPrepare": {
                 "title": "Travel North",
-                "text": "Time to head north. Stay with the rhythm until arrival."
+                "text": "Time to head north — about {experienceDurationSecondsSpoken} seconds."
               },
               "breedingReflection1": {
                 "title": "Germany",
@@ -505,11 +509,11 @@
               },
               "autumnPrepare": {
                 "title": "Travel South",
-                "text": "Get ready. This journey south will be very short."
+                "text": "Get ready — this journey south will be very short: about {experienceDurationSecondsSpoken} seconds."
               },
               "winterReflection1": {
                 "title": "Short Autumn",
-                "text": "That was a remarkably short autumn migration: only six days in the tracking data."
+                "text": "That was a remarkably short autumn migration — only six days in the tracking data."
               },
               "winterReflection2": {
                 "title": "Iberian Peninsula",
@@ -517,7 +521,7 @@
               },
               "springPrepare": {
                 "title": "Travel North",
-                "text": "Get ready to return north. Notice how quickly this cycle moves."
+                "text": "Get ready to return north — about {experienceDurationSecondsSpoken} seconds."
               },
               "breedingReflection1": {
                 "title": "Germany",
@@ -543,7 +547,7 @@
               },
               "autumnPrepare": {
                 "title": "Travel South",
-                "text": "Get ready to travel south. This final cycle changes again."
+                "text": "Get ready to travel south — about {experienceDurationSecondsSpoken} seconds."
               },
               "winterReflection1": {
                 "title": "Iberian Peninsula",
@@ -551,11 +555,11 @@
               },
               "springPrepare": {
                 "title": "Travel North",
-                "text": "Already heading north. The return begins early."
+                "text": "Already heading north — about {experienceDurationSecondsSpoken} seconds."
               },
               "breedingReflection1": {
                 "title": "Germany",
-                "text": "Back in Germany on February 15. This spring migration began in January, the earliest of the five cycles."
+                "text": "Back in Germany on February 15. This spring migration began in January — the earliest of the five cycles."
               },
               "breedingReflection2": {
                 "title": "Not Linear",
@@ -574,19 +578,23 @@
           "completed": {
             "structure": {
               "title": "Five Journeys",
-              "text": "Across the five journeys, the annual cycle stayed recognizable, but timing, duration, and winter destination changed."
+              "text": "The annual cycle stayed recognizable, but its timing, duration, and destination changed across these five journeys."
             },
             "pattern": {
               "title": "Observed Pattern",
-              "text": "You felt shorter migrations, closer wintering areas, and earlier returns in your own movement."
+              "text": "Later examples included much shorter migrations, wintering closer to Germany, and substantially earlier returns."
             },
             "qualification": {
               "title": "Tracked Examples",
               "text": "The changes were not identical in every cycle, and these five tracked journeys are individual examples rather than a complete population trend."
             },
+            "question": {
+              "title": "Open Question",
+              "text": "So what might be shaping these changing journeys?"
+            },
             "climateTransition": {
               "title": "Seasonal Environment",
-              "text": "Now we broaden the picture: what changed in the seasonal environment these storks move through?"
+              "text": "To broaden the picture, let's look at how the seasonal environment has changed over time."
             }
           },
           "transitions": {
@@ -721,95 +729,95 @@
         "narration": {
           "tutorial": {
             "intro": {
-              "context": "We saw the storks' migration change over time. Now we look at seasonal average temperatures in Germany.",
-              "encoding": "We compare winter, spring, summer, and autumn temperatures with the 1995 to 1999 reference period.",
-              "scale": "Each season has its own dance movement. One part of that movement shows how much the temperature changed.",
-              "range": "Zero percent means no change from the reference. One hundred percent means the largest difference here: 2.33 degrees.",
+              "context": "We saw the storks' migration change over time. Now let's look at one possible environmental factor: temperature.",
+              "encoding": "Each season has its own movement, and one part of that movement represents the data value.",
+              "scale": "We scale the movements to the largest temperature difference in the data: 2.33 degrees. That is 100 percent; 50 percent represents about 1.17 degrees.",
+              "range": "First, you'll learn the largest and smallest version of each movement. For now, 100 percent simply means the full movement.",
               "measureLength": "Each movement lasts four bars.",
               "watchThenMove": "In the first bar, watch the avatar to remember the movement. Then perform the movement through the next three bars."
             },
             "winter": {
-              "encoding": "First, winter. Watch a 20 percent example: open your arms on one, wrap them in on two, then let your body height show the value.",
-              "example": "At 20 percent, stay wrapped and sink low on count three. Lower means closer to no temperature change.",
-              "maximum": "Now learn 100 percent: open your arms, wrap them around your body, then stay upright on count three.",
-              "minimum": "Winter also has one value below the reference. For minus 10 percent, sink as low as you can and protect your head.",
-              "complete": "Good. In winter, the value is the height of your body on count three."
+              "encoding": "First, winter. Your body height carries the value. At 100 percent, you stay at full height; lower values bring your body lower.",
+              "maximum": "Start with {value} percent: stay standing at your full height and follow the avatar.",
+              "minimum": "Great. Now the other end: at {value} percent, make yourself as small as you can and bring your arms over your head.",
+              "complete": "Well done. You now know the winter range."
             },
             "spring": {
-              "encoding": "Next, spring. The movement opens like a plant growing upward. The height of your arm arc carries the value.",
-              "maximum": "For 100 percent, raise the full arc until your hands meet above your head. The avatar may lift a knee; that is optional.",
-              "minimum": "Now keep the same spring shape, but let the arms rise only a little. The arm height is what counts.",
-              "complete": "Good. In spring, the value is how high the bloom reaches."
+              "encoding": "Next, spring. The arm arc carries the value. At 100 percent, complete the full arc above your head; at 50 percent, you would stop around shoulder height.",
+              "maximum": "Now start with {value} percent: complete the full arc until your hands meet above your head.",
+              "minimum": "Great. At {value} percent, follow the same arc, but raise your arms only a little.",
+              "complete": "Well done. You now know the spring range."
             },
             "summer": {
-              "encoding": "Now, summer. The movement draws a sun-like circle. The size of the circle carries the value.",
-              "maximum": "For 100 percent, trace the largest circle with your arms. You can follow the avatar's side lunge, but the circle size is the data.",
-              "minimum": "Now keep the same circle idea, but make it small and close to your body.",
-              "complete": "Good. In summer, the value is the size of the circle."
+              "encoding": "Now, summer. The circle size carries the value. Start with your hands at your chest: at 100 percent, reach fully up and trace the largest circle; smaller values create a smaller circle.",
+              "maximum": "Now try {value} percent: reach fully up, keep your arms extended, and trace the largest circle.",
+              "minimum": "Great. At {value} percent, reach only a little and trace a very small circle.",
+              "complete": "Good. You now know both ends of the summer scale."
             },
             "autumn": {
-              "encoding": "Finally, autumn. The movement sweeps sideways like wind moving leaves. The distance of the sweep carries the value.",
-              "maximum": "For 100 percent, sweep all the way from one side to the other. The avatar's leg shift can help, but it is optional.",
-              "minimum": "Now keep the same sweep, but stop much earlier on the arc.",
-              "complete": "You now know all four seasonal movements. Next, you will use them to show temperature change in Germany."
+              "encoding": "Finally, autumn. The sweep distance carries the value. At 100 percent, move all the way from one side to the other; at 50 percent, you would stop in front of your chest.",
+              "maximum": "Now start with {value} percent: sweep all the way from one side to the other.",
+              "minimum": "Great. At {value} percent, start from the same side but sweep only a quarter of the full distance.",
+              "complete": "Great. You now know all four seasonal movement scales."
             }
           },
           "story": {
             "intro": {
-              "chart": "Now use those four movements to move through 30 years of seasonal temperatures. The chart fills in as you complete each season.",
-              "reference": "We begin with 1995 to 1999, the reference period. This is not a change yet; use full movements to set the baseline."
+              "chart": "Now we'll move through 30 years of seasonal temperatures. The chart below fills in as you complete each movement.",
+              "reference": "We begin with 1995 to 1999, our reference period. For now, use the full movement for each season."
             },
             "reference": {
-              "winter": "Winter reference. Use the full movement.",
-              "spring": "Spring reference. Use the full movement.",
-              "summer": "Summer reference. Use the full movement.",
-              "autumn": "Autumn reference. Use the full movement to finish the baseline."
+              "winter": "First, winter. Use the full movement to set our winter reference.",
+              "spring": "Now spring. Again, use the full movement to set the reference.",
+              "summer": "Next, summer. Use the full movement for our summer reference.",
+              "autumn": "Finally, autumn. Complete the full movement to finish our reference period."
             },
             "referenceComplete": {
-              "summary": "The reference is set. From now on, one part of each movement changes to show the difference from 1995 to 1999.",
-              "scale": "The largest difference in this story is 2.33 degrees. That becomes the full, 100 percent movement."
+              "summary": "Our reference is set. From now on, movement size shows how much each season differs from 1995 to 1999.",
+              "scale": "Remember: the full 100 percent movement represents the largest difference in the data."
             },
             "2000_2004": {
-              "winter": "Winter is {deltaSpoken} degrees above the reference. Use {movementValue} percent.",
-              "spring": "Spring is {deltaSpoken} degrees above the reference. Use {movementValue} percent.",
-              "summer": "Summer is {deltaSpoken} degrees above the reference. Use {movementValue} percent.",
-              "autumn": "Autumn is {deltaSpoken} degrees above the reference. Use {movementValue} percent."
+              "winter": "Winter: {deltaSpoken} degrees above the reference — {movementValue} percent. Our first increase from the baseline.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. A similar increase.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Close to spring.",
+              "autumn": "Autumn is also {deltaSpoken} degrees above the reference. That's {movementValue} percent."
             },
             "2005_2009": {
-              "winter": "Winter stays close to the last period. Use {movementValue} percent.",
-              "spring": "Spring stays similar. Use {movementValue} percent.",
-              "summer": "Summer moves closer to the reference. Use {movementValue} percent.",
-              "autumn": "Autumn rises. Use {movementValue} percent."
+              "winter": "Winter: {deltaSpoken} degrees above the reference — {movementValue} percent. Almost unchanged from before.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. Again, little change.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Much closer to the baseline now.",
+              "autumn": "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent. A clear rise from before."
             },
             "2010_2014": {
-              "winter": "Winter falls below the reference by {deltaAbsSpoken} degrees. Use minus 10 percent.",
-              "spring": "Spring stays above the reference. Use {movementValue} percent.",
-              "summer": "Summer stays close to the reference. Use {movementValue} percent.",
-              "autumn": "Autumn is above the reference. Use {movementValue} percent."
+              "winter": "Winter: {deltaAbsSpoken} degrees below the reference — minus 10 percent. This time, winter reverses direction.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. Unlike winter, it stays above the baseline.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Still close to the baseline.",
+              "autumn": "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent."
             },
             "2015_2019": {
-              "winter": "Winter rises again. Use {movementValue} percent.",
-              "spring": "Spring rises slightly. Use {movementValue} percent.",
-              "summer": "Summer is much farther from the reference. Use {movementValue} percent.",
-              "autumn": "Autumn remains high. Use {movementValue} percent."
+              "winter": "Winter: {deltaSpoken} degrees above the reference — {movementValue} percent. A sharp rise from the previous period.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. It rises as well.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. A much larger difference than before.",
+              "autumn": "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent. Higher again."
             },
             "2020_2024": {
-              "winter": "Winter reaches the largest difference: {deltaSpoken} degrees. Use the full movement.",
-              "spring": "Spring is above the reference. Use {movementValue} percent.",
-              "summer": "Summer stays high. Use {movementValue} percent.",
-              "autumn": "Autumn rises strongly. Use {movementValue} percent."
+              "winter": "Winter: {deltaSpoken} degrees above the reference — 100 percent. The largest difference in the dataset.",
+              "spring": "Spring is {deltaSpoken} degrees above the reference. That's {movementValue} percent. Slightly lower than before.",
+              "summer": "Summer: {deltaSpoken} degrees above the reference — {movementValue} percent. Almost unchanged.",
+              "autumn": "Autumn reaches {deltaSpoken} degrees above the reference — {movementValue} percent. A strong final increase."
             },
             "transition": {
               "2000_2004": "All four seasons were above the reference. Next: 2005 to 2009.",
-              "2005_2009": "The seasons start to separate. Next: 2010 to 2014.",
-              "2010_2014": "Winter dipped below the reference. Next: 2015 to 2019.",
-              "2015_2019": "Most seasons are now farther above the reference. Next: 2020 to 2024."
+              "2005_2009": "The seasons begin to diverge: summer moves closer to the baseline, while autumn rises. Next: 2010 to 2014.",
+              "2010_2014": "Winter fell below the reference, while the other seasons stayed above it. Next: 2015 to 2019.",
+              "2015_2019": "Now all four seasons have moved further above the reference. Next: 2020 to 2024."
             },
             "completed": {
               "embodied": "You have now moved through 30 years of seasonal temperature change.",
-              "seasons": "The seasons did not change equally. Winter and autumn end with some of the largest differences.",
-              "maximum": "By the final period, winter is 2.3 degrees above the reference, the largest difference here.",
-              "migration": "Temperature may be one part of the changing environment the storks move through. These data do not prove it caused any one migration change."
+              "seasons": "The seasons did not change equally. Winter and autumn end with some of the largest differences, while spring varies much less across the comparison periods.",
+              "maximum": "By the final period, winter is 2.3 degrees above our 1995 to 1999 reference — the largest difference in the dataset.",
+              "maximumContext": "That compares two five-year winter averages, making it a substantial shift in the seasonal conditions captured here.",
+              "migration": "Could changing temperatures be one factor shaping the storks' migration? These data cannot prove that connection, but they reveal part of the changing environment the storks migrate through."
             }
           },
           "feedback": {
@@ -865,9 +873,9 @@
               "lowerArms": "Lower your arms as the circle closes."
             },
             "autumn": {
-              "startLeft": "Begin the autumn arc on your left.",
-              "startRight": "Begin the autumn arc on your right.",
-              "wrongSweepDirection": "Let the arc travel toward the other side.",
+              "startLeft": "Start on the same side as the avatar.",
+              "startRight": "Start on the same side as the avatar.",
+              "wrongSweepDirection": "Sweep toward the same side as the avatar.",
               "sweepLeft": "Sweep the autumn arc to the left.",
               "sweepRight": "Sweep the autumn arc to the right.",
               "insufficientProgress": "The autumn was warmer than that. Let the arc travel farther.",
@@ -1021,14 +1029,16 @@
         },
         "infoCard": {
           "periodShift": "Period shift",
+          "seasonalMean": "Seasonal mean",
           "vs": "vs {value}",
           "aria": {
             "card": "Act 4 climate information",
             "completion": "Act 4 completion",
             "periodTransition": "Climate period transition",
+            "narration": "Current narration",
             "currentTarget": "Current movement target",
             "currentClimateData": "Current climate data",
-            "instructions": "Movement instructions"
+            "feedback": "Movement feedback"
           }
         },
         "chart": {
@@ -1068,9 +1078,9 @@
           "SUCCESS": "Bravo",
           "FULL_BODY_NOT_VISIBLE": "Make sure your full body is visible.",
           "HANDS_NOT_VISIBLE": "Make sure both hands are visible.",
-          "START_LEFT": "Start with your hands on the left side.",
-          "START_RIGHT": "Start with your hands on the right side.",
-          "WRONG_SWEEP_DIRECTION": "Sweep in the other direction.",
+          "START_LEFT": "Start on the same side as the avatar.",
+          "START_RIGHT": "Start on the same side as the avatar.",
+          "WRONG_SWEEP_DIRECTION": "Sweep toward the same side as the avatar.",
           "INSUFFICIENT_PROGRESS": "Move a little farther from the starting pose.",
           "SWEEP_RIGHT": "Sweep toward the right side.",
           "SWEEP_LEFT": "Sweep toward the left side.",

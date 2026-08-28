@@ -132,6 +132,7 @@ export type AutumnBeatEvaluation = {
   measureIndex?: number | null;
   score: number;
   passed: boolean;
+  negativeFeedbackEligible?: boolean;
   trackingUnavailable: boolean;
   criteria: AutumnCriterionResult[];
   timestamp: number;

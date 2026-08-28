@@ -353,9 +353,20 @@ describe("guided migration controller", () => {
       await flushFlow();
       expect(store.guided.phase).toBe("summer-practice");
       expect(controller.panelModel.value.actions).toEqual([]);
+      expect(controller.panelModel.value.progress).toEqual({
+        current: 0,
+        total: 3,
+        label: "0 of 3 successful movements",
+      });
 
       await completeMovement("summer-step", "summer");
       expect(store.guided.phase).toBe("autumn-migration-practice");
+      expect(store.guided.successfulBars).toBe(0);
+      expect(controller.panelModel.value.progress).toEqual({
+        current: 0,
+        total: 3,
+        label: "0 of 3 successful movements",
+      });
       expect(calls.gestureDemonstrations).toEqual(["departure"]);
       expect(calls.gesturePractices).toEqual(["departure"]);
       expect(calls.transitions[0]).toEqual({
@@ -373,10 +384,25 @@ describe("guided migration controller", () => {
       expect(store.guided.successfulBars).toBe(0);
       await publishPhrase(autumnMovement, "autumn-phrase-1", "success");
       expect(store.guided.successfulBars).toBe(1);
+      expect(controller.panelModel.value.progress).toEqual({
+        current: 1,
+        total: 3,
+        label: "1 of 3 successful movements",
+      });
       await publishPhrase(autumnMovement, "autumn-phrase-2", "success", 2);
       expect(store.guided.successfulBars).toBe(2);
+      expect(controller.panelModel.value.progress).toEqual({
+        current: 2,
+        total: 3,
+        label: "2 of 3 successful movements",
+      });
       await publishPhrase(autumnMovement, "autumn-phrase-3", "success");
       expect(store.guided.phase).toBe("winter-practice");
+      expect(controller.panelModel.value.progress).toEqual({
+        current: 0,
+        total: 3,
+        label: "0 of 3 successful movements",
+      });
       expect(calls.gestureDemonstrations).toEqual(["departure", "arrival"]);
       expect(calls.gesturePractices).toEqual(["departure", "arrival"]);
 
@@ -553,14 +579,21 @@ describe("guided migration controller", () => {
     await flushFlow();
     await publish("summer-step", "summer-1", "success");
     expect(store.guided.successfulBars).toBe(1);
+    expect(controller.panelModel.value.progress).toEqual({
+      current: 1,
+      total: 3,
+      label: "1 of 3 successful movements",
+    });
 
     await controller.resetAct();
     expect(runtime.cancelGuidedInterlude).toHaveBeenCalled();
     expect(store.guided.phase).toBe("idle");
     expect(store.guided.successfulBars).toBe(0);
+    expect(controller.panelModel.value.progress).toBeUndefined();
     await publish("summer-step", "summer-late", "success");
     expect(store.guided.phase).toBe("idle");
     expect(store.guided.successfulBars).toBe(0);
+    expect(controller.panelModel.value.progress).toBeUndefined();
   });
 
   it("keeps ordinary movement failures silent without resetting progress", async () => {
@@ -572,15 +605,69 @@ describe("guided migration controller", () => {
     const panelBeforeFailure = controller.panelModel.value.instruction;
     const callsBeforeFailure = instructionNarration.speakText.mock.calls.length;
 
+    await publish("summer-step", "summer-first-success", "success");
+    expect(store.guided.successfulBars).toBe(1);
+    expect(controller.panelModel.value.progress).toEqual({
+      current: 1,
+      total: 3,
+      label: "1 of 3 successful movements",
+    });
+
     await publish("summer-step", "summer-quiet-failure", "failed");
-    expect(store.guided.successfulBars).toBe(0);
+    expect(store.guided.successfulBars).toBe(1);
+    expect(controller.panelModel.value.progress).toEqual({
+      current: 1,
+      total: 3,
+      label: "1 of 3 successful movements",
+    });
     expect(controller.panelModel.value.instruction).toBe(panelBeforeFailure);
     expect(instructionNarration.speakText).toHaveBeenCalledTimes(
       callsBeforeFailure,
     );
 
     await publish("summer-step", "summer-success-after-failure", "success");
-    expect(store.guided.successfulBars).toBe(1);
+    expect(store.guided.successfulBars).toBe(2);
+    controller.dispose();
+  });
+
+  it("exposes progress only for continuous guided practice", async () => {
+    const { controller, store } = createHarness();
+    controller.startGuidedJourney();
+    await flushFlow();
+
+    store.setGuidedState({
+      phase: "summer-practice",
+      status: "practicing",
+      activeMovementId: "summer-step",
+      activeGestureId: null,
+      successfulBars: 3,
+      requiredSuccessfulBars: 3,
+    });
+    expect(controller.panelModel.value.progress).toEqual({
+      current: 3,
+      total: 3,
+      label: "3 of 3 successful movements",
+    });
+
+    store.setGuidedState({
+      phase: "summer-demonstration",
+      status: "demonstrating",
+      activeMovementId: "summer-step",
+      activeGestureId: null,
+      successfulBars: 1,
+      requiredSuccessfulBars: 3,
+    });
+    expect(controller.panelModel.value.progress).toBeUndefined();
+
+    store.setGuidedState({
+      phase: "autumn-departure-practice",
+      status: "practicing",
+      activeMovementId: null,
+      activeGestureId: "departure",
+      successfulBars: 1,
+      requiredSuccessfulBars: 3,
+    });
+    expect(controller.panelModel.value.progress).toBeUndefined();
     controller.dispose();
   });
 

@@ -54,6 +54,7 @@
       <Act4ClimateProgressChart
         class="climate-act-temperature-chart"
         :rows="chartModel.rows.value"
+        :period-label="activeClimatePeriodLabel"
         :phase="chartModel.phase.value"
         :flow-id="chartModel.flowId.value"
         :sequence-status="chartModel.sequenceStatus.value"
@@ -199,6 +200,10 @@ import { useStoryEngine } from "~/composables/useStoryEngine";
 import { useAct4Store } from "~/store/act4";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
 import { act4IntroCycleConfig } from "~/story/act4IntroCycle";
+import {
+  formatDelimitedPeriod,
+  formatPeriodTransition,
+} from "~/utils/storyPeriodLabel";
 import type {
   Act4RecognitionSequenceEvaluation,
   Act4SequenceTarget,
@@ -306,6 +311,14 @@ forwardRecognitionResult = controller.handleRecognitionResult;
 
 const chartRows = computed(() => climateData.dataset.value?.rows ?? []);
 const chartModel = useAct4ChartModel({ rows: chartRows, recognition });
+const activeClimatePeriodLabel = computed(() => {
+  if (act4Store.periodTransition) {
+    return formatPeriodTransition(act4Store.periodTransition);
+  }
+
+  const activeStep = chartModel.activeStep.value;
+  return activeStep ? formatDelimitedPeriod(activeStep.interval) : "";
+});
 const infoCardModel = useAct4InfoCardModel({
   cycle: {
     currentSeason,

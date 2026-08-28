@@ -35,7 +35,6 @@ describe("climate change flow", () => {
       "autumn",
     ]);
     expect(climateChangeFlow.tutorialTargets).toEqual([
-      { season: "winter", target: "example" },
       { season: "winter", target: "maximum" },
       { season: "winter", target: "minimum" },
       { season: "spring", target: "maximum" },

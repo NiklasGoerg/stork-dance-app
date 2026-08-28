@@ -85,7 +85,7 @@ export const useMigrationActMovementRecognition = () => {
   const {
     skeletonFeedbackState,
     pulseProgress,
-    triggerBeatSuccess,
+    triggerBeatFeedback,
     resetSkeletonFeedback,
   } = useSkeletonVisualFeedback();
 
@@ -107,6 +107,7 @@ export const useMigrationActMovementRecognition = () => {
   let transportOriginMs = 0;
   let recognitionPrerollMs = 0;
   let activeMovementId = "";
+  let negativeSkeletonFeedbackEnabled = false;
 
   const clearSamplesAndBaselines = () => {
     windowSamples = [];
@@ -123,6 +124,7 @@ export const useMigrationActMovementRecognition = () => {
     transportOriginMs = 0;
     recognitionPrerollMs = 0;
     activeMovementId = "";
+    negativeSkeletonFeedbackEnabled = false;
     validPoseSampleCount.value = 0;
     currentBeatWindow.value = "none";
     hipCenterX.value = null;
@@ -162,17 +164,20 @@ export const useMigrationActMovementRecognition = () => {
       movementElapsedMs = 0,
       prerollMs = 0,
       movementId = profile,
+      negativeFeedbackEnabled = false,
     }: {
       transportTimeMs?: number;
       movementElapsedMs?: number;
       prerollMs?: number;
       movementId?: string;
+      negativeFeedbackEnabled?: boolean;
     } = {},
   ) => {
     prepare(profile);
     transportOriginMs = transportTimeMs - Math.max(movementElapsedMs, 0);
     recognitionPrerollMs = Math.max(prerollMs, 0);
     activeMovementId = movementId;
+    negativeSkeletonFeedbackEnabled = negativeFeedbackEnabled;
     recognitionActive.value =
       migrationMovementRecognitionConfig[profile].enabled;
   };
@@ -271,18 +276,23 @@ export const useMigrationActMovementRecognition = () => {
 
     beatEvaluations.set(beatIndex, evaluation);
     lastBeatEvaluation.value = evaluation;
-    if (result.status !== "success") return;
+    if (result.status !== "success" && !negativeSkeletonFeedbackEnabled) {
+      return;
+    }
+    if (result.status === "not_evaluable") return;
 
     const config = migrationMovementRecognitionConfig[profile];
-    lastPulseAt.value = evaluatedAtMs;
-    lastSuccessfulEvaluationId.value = evaluationId;
-    triggerBeatSuccess({
+    if (result.status === "success") {
+      lastPulseAt.value = evaluatedAtMs;
+      lastSuccessfulEvaluationId.value = evaluationId;
+    }
+    triggerBeatFeedback({
       evaluationId,
       flowId: "migration-act",
       flowStepId: profile,
       measureIndex: barIndex,
       beatIndex,
-      result: "passed",
+      result: result.status === "success" ? "passed" : "failed",
       pulseDurationMs: config.pulseDurationMs,
     });
   };

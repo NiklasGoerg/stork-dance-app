@@ -22,7 +22,6 @@ describe("Act 4 tutorial narration", () => {
         "story.acts.act4.narration.tutorial.intro.measureLength",
         "story.acts.act4.narration.tutorial.intro.watchThenMove",
         "story.acts.act4.narration.tutorial.winter.encoding",
-        "story.acts.act4.narration.tutorial.winter.example",
         "story.acts.act4.narration.tutorial.winter.maximum",
         "story.acts.act4.narration.tutorial.winter.minimum",
         "story.acts.act4.narration.tutorial.winter.complete",
@@ -49,7 +48,6 @@ describe("Act 4 tutorial narration", () => {
         target.movementValue,
       ]),
     ).toEqual([
-      ["winter", 20],
       ["winter", 100],
       ["winter", -10],
       ["spring", 100],
@@ -61,7 +59,7 @@ describe("Act 4 tutorial narration", () => {
     ]);
   });
 
-  it("prepends the global introduction before the first winter example", () => {
+  it("prepends the global introduction before the first winter maximum", () => {
     const target = buildAct4TutorialSequence()[0];
 
     expect(target).toBeDefined();
@@ -80,48 +78,32 @@ describe("Act 4 tutorial narration", () => {
       "act4.tutorial.intro.measureLength",
       "act4.tutorial.intro.watchThenMove",
       "act4.tutorial.winter.encoding",
-      "act4.tutorial.winter.example",
+      "act4.tutorial.winter.maximum",
     ]);
   });
 
-  it("explains German seasonal averages and the movement scale", () => {
-    const contextText = en.story.acts.act4.narration.tutorial.intro.context;
-    const encodingText = en.story.acts.act4.narration.tutorial.intro.encoding;
+  it("explains the temperature-difference scale before season encoding", () => {
     const scaleText = en.story.acts.act4.narration.tutorial.intro.scale;
-    const rangeText = en.story.acts.act4.narration.tutorial.intro.range;
 
-    expect(contextText).toContain("seasonal average temperatures in Germany");
-    expect(encodingText).toContain("winter, spring, summer, and autumn");
-    expect(encodingText).toContain("1995 to 1999 reference period");
-    expect(scaleText).toContain("Each season has its own dance movement");
-    expect(rangeText).toContain("Zero percent means no change");
-    expect(rangeText).toContain("2.33 degrees");
+    expect(scaleText).toContain("2.33 degrees");
+    expect(scaleText).toContain("100 percent");
+    expect(scaleText).toContain("50 percent");
+    expect(scaleText).toContain("1.17 degrees");
   });
 
   it("names each tutorial season inside the existing encoding cue", () => {
     expect(en.story.acts.act4.narration.tutorial.winter.encoding).toBe(
-      "First, winter. Watch a 20 percent example: open your arms on one, wrap them in on two, then let your body height show the value.",
+      "First, winter. Your body height carries the value. At 100 percent, you stay at full height; lower values bring your body lower.",
     );
     expect(en.story.acts.act4.narration.tutorial.spring.encoding).toBe(
-      "Next, spring. The movement opens like a plant growing upward. The height of your arm arc carries the value.",
+      "Next, spring. The arm arc carries the value. At 100 percent, complete the full arc above your head; at 50 percent, you would stop around shoulder height.",
     );
     expect(en.story.acts.act4.narration.tutorial.summer.encoding).toBe(
-      "Now, summer. The movement draws a sun-like circle. The size of the circle carries the value.",
+      "Now, summer. The circle size carries the value. Start with your hands at your chest: at 100 percent, reach fully up and trace the largest circle; smaller values create a smaller circle.",
     );
     expect(en.story.acts.act4.narration.tutorial.autumn.encoding).toBe(
-      "Finally, autumn. The movement sweeps sideways like wind moving leaves. The distance of the sweep carries the value.",
+      "Finally, autumn. The sweep distance carries the value. At 100 percent, move all the way from one side to the other; at 50 percent, you would stop in front of your chest.",
     );
-  });
-
-  it("explains the value-bearing body part and optional leg movement", () => {
-    const tutorial = en.story.acts.act4.narration.tutorial;
-
-    expect(tutorial.winter.maximum).toContain("stay upright on count three");
-    expect(tutorial.spring.maximum).toContain("knee; that is optional");
-    expect(tutorial.spring.minimum).toContain("arm height is what counts");
-    expect(tutorial.summer.maximum).toContain("circle size is the data");
-    expect(tutorial.autumn.maximum).toContain("leg shift can help");
-    expect(tutorial.autumn.maximum).toContain("optional");
   });
 
   it("resolves each target explanation cue without repeating the global intro", () => {
@@ -136,7 +118,6 @@ describe("Act 4 tutorial narration", () => {
           }).cues.map((cue) => cue.id),
         ),
     ).toEqual([
-      ["act4.tutorial.winter.maximum"],
       ["act4.tutorial.winter.minimum"],
       ["act4.tutorial.spring.encoding", "act4.tutorial.spring.maximum"],
       ["act4.tutorial.spring.minimum"],
@@ -168,8 +149,7 @@ describe("Act 4 tutorial narration", () => {
     const sequence = buildAct4TutorialSequence();
 
     expect(resolveAct4SeasonCompletionNarration(sequence[0]!)).toBeNull();
-    expect(resolveAct4SeasonCompletionNarration(sequence[1]!)).toBeNull();
-    expect(resolveAct4SeasonCompletionNarration(sequence[2]!)?.id).toBe(
+    expect(resolveAct4SeasonCompletionNarration(sequence[1]!)?.id).toBe(
       "act4.tutorial.winter.complete",
     );
   });

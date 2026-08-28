@@ -96,7 +96,8 @@ export const useMigrationActMovementSession = () => {
   let attemptBeat1TransportMs: number | null = null;
   let baselineCollectionStartMs: number | null = null;
   let baselineCollectionEndMs: number | null = null;
-  const publishedGestureBeats = new Set<number>();
+  const publishedCheckpointFeedbackIds = new Set<string>();
+  let publishedFailedCheckpointFeedback = false;
   const preloadGesture = async (id: StoryGestureId) => {
     if (recordings.has(id)) return;
     const startedAt = performance.now();
@@ -122,7 +123,8 @@ export const useMigrationActMovementSession = () => {
     baselineSamples = [];
     checkpointEvaluations = [];
     checkpointIndex = 0;
-    publishedGestureBeats.clear();
+    publishedCheckpointFeedbackIds.clear();
+    publishedFailedCheckpointFeedback = false;
     crouchReference = undefined;
     handsUpReference = undefined;
     armsOutReference = undefined;
@@ -184,6 +186,8 @@ export const useMigrationActMovementSession = () => {
     samples = [];
     checkpointEvaluations = [];
     checkpointIndex = 0;
+    publishedCheckpointFeedbackIds.clear();
+    publishedFailedCheckpointFeedback = false;
     crouchReference = undefined;
     handsUpReference = undefined;
     armsOutReference = undefined;
@@ -217,22 +221,29 @@ export const useMigrationActMovementSession = () => {
     if (count !== null) onCountdown?.(count);
   };
 
-  const publishCheckpointBeat = (evaluation: MigrationCheckpointEvaluation) => {
+  const publishCheckpointFeedback = (
+    evaluation: MigrationCheckpointEvaluation,
+  ) => {
     const beat = getMigrationGestureBeatForCheckpoint(evaluation.checkpointId);
-    if (
-      !beat ||
-      evaluation.status !== "success" ||
-      publishedGestureBeats.has(beat)
-    )
+    if (!beat || publishedCheckpointFeedbackIds.has(evaluation.checkpointId)) {
       return;
-    publishedGestureBeats.add(beat);
-    skeleton.triggerBeatSuccess({
-      evaluationId: `${gestureSessionId}:${store.activeGestureId}:${store.attemptCount}:beat:${beat}`,
+    }
+
+    publishedCheckpointFeedbackIds.add(evaluation.checkpointId);
+    if (evaluation.status === "not_evaluable") return;
+
+    const result = evaluation.status === "success" ? "passed" : "failed";
+    if (result === "failed") {
+      publishedFailedCheckpointFeedback = true;
+    }
+
+    skeleton.triggerBeatFeedback({
+      evaluationId: `${gestureSessionId}:${store.activeGestureId}:${store.attemptCount}:checkpoint:${evaluation.checkpointId}`,
       flowId: "migration-gesture",
       flowStepId: store.activeGestureId ?? "gesture",
       measureIndex: store.attemptCount,
       beatIndex: beat,
-      result: "passed",
+      result,
       pulseDurationMs: 300,
     });
   };
@@ -268,7 +279,7 @@ export const useMigrationActMovementSession = () => {
       });
       checkpointEvaluations.push(evaluation);
       rememberReferences(evaluation);
-      publishCheckpointBeat(evaluation);
+      publishCheckpointFeedback(evaluation);
       checkpointIndex++;
     }
   };
@@ -301,7 +312,7 @@ export const useMigrationActMovementSession = () => {
         result.status === "success" ? null : definition.feedbackBeats,
     });
     if (result.status === "success") {
-      skeleton.triggerBeatSuccess({
+      skeleton.triggerBeatFeedback({
         evaluationId: `${gestureSessionId}:${result.gestureId}:${result.attemptNumber}:beat:4`,
         flowId: "migration-gesture",
         flowStepId: result.gestureId,
@@ -311,7 +322,20 @@ export const useMigrationActMovementSession = () => {
         pulseDurationMs: 300,
       });
     } else {
+      const shouldPublishAttemptFailure =
+        result.status === "failed" && !publishedFailedCheckpointFeedback;
       resetAttemptData();
+      if (shouldPublishAttemptFailure) {
+        skeleton.triggerBeatFeedback({
+          evaluationId: `${gestureSessionId}:${result.gestureId}:${result.attemptNumber}:attempt`,
+          flowId: "migration-gesture",
+          flowStepId: result.gestureId,
+          measureIndex: result.attemptNumber,
+          beatIndex: 4,
+          result: "failed",
+          pulseDurationMs: 300,
+        });
+      }
       preparationBars = 0;
       onPreparationBar = null;
     }

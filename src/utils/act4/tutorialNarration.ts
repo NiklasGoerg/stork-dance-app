@@ -19,8 +19,7 @@ export type Act4TutorialNarrationCueId =
   | "act4.tutorial.intro.measureLength"
   | "act4.tutorial.intro.watchThenMove"
   | `act4.tutorial.${ClimateSeason}.encoding`
-  | "act4.tutorial.winter.example"
-  | `act4.tutorial.${ClimateSeason}.${Exclude<Act4TutorialTarget, "example">}`
+  | `act4.tutorial.${ClimateSeason}.${Act4TutorialTarget}`
   | `act4.tutorial.${ClimateSeason}.complete`
   | "act4.tutorial.complete";
 
@@ -90,11 +89,6 @@ export const act4TutorialNarrationCatalog = {
     "act4.tutorial.winter.encoding",
     "story.acts.act4.narration.tutorial.winter.encoding",
     { speak: true, priority: 55 },
-  ),
-  "act4.tutorial.winter.example": createCue(
-    "act4.tutorial.winter.example",
-    "story.acts.act4.narration.tutorial.winter.example",
-    { speak: true, priority: 60 },
   ),
   "act4.tutorial.winter.maximum": createCue(
     "act4.tutorial.winter.maximum",
@@ -212,10 +206,8 @@ const resolveEncodingCueId = (
 ): Act4TutorialNarrationCueId | null => {
   if (
     target.context !== "tutorial" ||
-    (target.target !== "example" &&
-      (target.target !== "maximum" ||
-        target.movementValue !== 100 ||
-        target.season === "winter"))
+    target.target !== "maximum" ||
+    target.movementValue !== 100
   ) {
     return null;
   }
@@ -238,7 +230,7 @@ const shouldPlayGlobalIntro = ({
   targetIndex === 0 &&
   target.context === "tutorial" &&
   target.season === "winter" &&
-  target.target === "example";
+  target.target === "maximum";
 
 export const resolveAct4TutorialNarration = ({
   target,

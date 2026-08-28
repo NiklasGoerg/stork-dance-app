@@ -40,7 +40,7 @@ export type MigrationActStoryTransitionCueKey =
   "2016_2017" | "2018_2019" | "2020_2021" | "2022_2023";
 
 export type MigrationActStoryCompletionCueKey =
-  "structure" | "pattern" | "qualification" | "climateTransition";
+  "structure" | "pattern" | "qualification" | "question" | "climateTransition";
 
 export type MigrationActStoryNarrationCue = {
   id: string;
@@ -328,6 +328,7 @@ export const migrationActStoryNarrationCatalog = {
   "act3.story.completed.structure": completionCue("structure"),
   "act3.story.completed.pattern": completionCue("pattern"),
   "act3.story.completed.qualification": completionCue("qualification"),
+  "act3.story.completed.question": completionCue("question"),
   "act3.story.completed.climateTransition": completionCue("climateTransition"),
 } as const satisfies Record<string, MigrationActStoryNarrationCue>;
 

@@ -60,7 +60,6 @@ export const climateChangeFlow = {
     cue("act4.tutorial.intro.watchThenMove"),
   ],
   tutorialTargets: [
-    { season: "winter", target: "example" },
     { season: "winter", target: "maximum" },
     { season: "winter", target: "minimum" },
     { season: "spring", target: "maximum" },
@@ -96,6 +95,7 @@ export const climateChangeFlow = {
     cue("act4.story.completed.embodied"),
     cue("act4.story.completed.seasons"),
     cue("act4.story.completed.maximum"),
+    cue("act4.story.completed.maximumContext"),
     cue("act4.story.completed.migration"),
   ],
 } as const satisfies ClimateChangeFlowDefinition;
@@ -165,7 +165,7 @@ export const getClimateChangeFlowTutorialCueIds = (
 ) => [
   ...flow.tutorialIntroCues.map((item) => item.cueId),
   ...flow.tutorialTargets.flatMap(({ season, target }) => [
-    ...(target === "example" || (target === "maximum" && season !== "winter")
+    ...(target === "maximum"
       ? [getClimateChangeFlowTutorialEncodingCueId(season)]
       : []),
     getClimateChangeFlowTutorialTargetCueId(season, target),

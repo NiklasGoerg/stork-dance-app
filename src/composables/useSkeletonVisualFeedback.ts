@@ -44,7 +44,10 @@ export const useSkeletonVisualFeedback = ({
   const pulseProgress = computed(() => {
     const state = skeletonFeedbackState.value;
 
-    if (state.mode !== "successPulse" || state.pulseStartedAt === undefined) {
+    if (
+      (state.mode !== "successPulse" && state.mode !== "missPulse") ||
+      state.pulseStartedAt === undefined
+    ) {
       return 1;
     }
 
@@ -58,7 +61,8 @@ export const useSkeletonVisualFeedback = ({
     nowMs.value = performance.now();
 
     if (
-      skeletonFeedbackState.value.mode !== "successPulse" ||
+      (skeletonFeedbackState.value.mode !== "successPulse" &&
+        skeletonFeedbackState.value.mode !== "missPulse") ||
       pulseProgress.value >= 1
     ) {
       setNeutral();
@@ -68,12 +72,12 @@ export const useSkeletonVisualFeedback = ({
     animationFrameId = requestAnimationFrame(tickPulse);
   };
 
-  const triggerBeatSuccess = (event: BeatSkeletonFeedbackEvent) => {
+  const triggerBeatFeedback = (event: BeatSkeletonFeedbackEvent) => {
     if (handledEvaluationIds.has(event.evaluationId)) return;
 
     handledEvaluationIds.add(event.evaluationId);
 
-    if (event.result !== "passed") return;
+    if (event.result === "notEvaluable") return;
 
     clearAnimationFrame();
     const startedAt = performance.now();
@@ -81,12 +85,19 @@ export const useSkeletonVisualFeedback = ({
 
     nowMs.value = startedAt;
     skeletonFeedbackState.value = {
-      mode: "successPulse",
+      mode: event.result === "passed" ? "successPulse" : "missPulse",
       pulseStartedAt: startedAt,
       pulseDurationMs,
       sourceEvaluationId: event.evaluationId,
     };
     animationFrameId = requestAnimationFrame(tickPulse);
+  };
+
+  const triggerBeatSuccess = (event: BeatSkeletonFeedbackEvent) => {
+    triggerBeatFeedback({
+      ...event,
+      result: event.result === "passed" ? "passed" : "notEvaluable",
+    });
   };
 
   const setTrackingLimited = (isLimited: boolean) => {
@@ -125,6 +136,7 @@ export const useSkeletonVisualFeedback = ({
   return {
     skeletonFeedbackState,
     pulseProgress,
+    triggerBeatFeedback,
     triggerBeatSuccess,
     setTrackingLimited,
     resetSkeletonFeedback,

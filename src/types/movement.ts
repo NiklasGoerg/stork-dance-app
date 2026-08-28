@@ -60,6 +60,7 @@ export type MovementBeatEvaluationLike<
   measureIndex?: number | null;
   score: number;
   passed: boolean;
+  negativeFeedbackEligible?: boolean;
   trackingUnavailable: boolean;
   criteria: MovementCriterionLike<TFeedback>[];
   timestamp: number;
