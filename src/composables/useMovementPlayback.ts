@@ -72,11 +72,7 @@ export const useMovementPlayback = () => {
     hasCompleted.value = false;
     isPlaying.value = true;
 
-    const firstFrameTime = recording.value.frames[0]?.time ?? 0;
-    const currentFrameTime =
-      recording.value.frames[frameIndex]?.time ?? firstFrameTime;
-
-    playbackStart = performance.now() - (currentFrameTime - firstFrameTime);
+    playbackStart = performance.now() - currentTimeMs.value;
 
     loop();
   };

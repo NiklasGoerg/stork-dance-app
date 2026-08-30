@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getPresenterActionForEvent,
   getPresenterActionForKey,
   isPresenterEditableTarget,
 } from "~/composables/usePresenterActions";
@@ -39,5 +40,28 @@ describe("usePresenterActions helpers", () => {
         tagName: "button",
       } as unknown as EventTarget),
     ).toBe(false);
+  });
+
+  it("ignores disabled, repeated, and editable presenter key events", () => {
+    const pageUp = {
+      key: "PageUp",
+      repeat: false,
+      target: { tagName: "button" } as unknown as EventTarget,
+    };
+
+    expect(getPresenterActionForEvent(pageUp, true)).toBe("pageUp");
+    expect(getPresenterActionForEvent(pageUp, false)).toBeNull();
+    expect(
+      getPresenterActionForEvent({ ...pageUp, repeat: true }, true),
+    ).toBeNull();
+    expect(
+      getPresenterActionForEvent(
+        {
+          ...pageUp,
+          target: { tagName: "input" } as unknown as EventTarget,
+        },
+        true,
+      ),
+    ).toBeNull();
   });
 });

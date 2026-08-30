@@ -119,9 +119,7 @@ const createModel = () =>
       playbackState: ref<SeasonalCyclePlaybackState>("playing"),
       repetitionIndex: ref(0),
       seasonElapsedMs: ref(0),
-      seasonPhase: ref<"preview" | "performance" | "transition">(
-        "performance",
-      ),
+      seasonPhase: ref<"preview" | "performance" | "transition">("performance"),
       isCountingDown: ref(false),
       isCompleted: ref(false),
       isTransition: ref(false),
@@ -163,7 +161,9 @@ describe("useAct4InfoCardModel", () => {
     const { model } = createModel();
 
     expect(model.value.mode).toBe("tutorial");
-    expect(model.value.periodLabel).toBe("story.acts.act4.tutorial.general.title");
+    expect(model.value.periodLabel).toBe(
+      "story.acts.act4.tutorial.general.title",
+    );
     expect(model.value.feedback).toBeUndefined();
     expect("instructions" in model.value).toBe(false);
   });
@@ -218,7 +218,9 @@ describe("useAct4InfoCardModel", () => {
 
     const transitionModel = createModel().model;
     expect(transitionModel.value.mode).toBe("periodTransition");
-    expect(transitionModel.value.periodTransition?.nextPeriod).toBe("2000-2004");
+    expect(transitionModel.value.periodTransition?.nextPeriod).toBe(
+      "2000-2004",
+    );
 
     store.completeFlow();
     const completedModel = createModel().model;

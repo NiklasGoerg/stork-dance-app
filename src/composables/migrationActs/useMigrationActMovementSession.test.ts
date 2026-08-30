@@ -54,10 +54,9 @@ vi.mock("~/story/gestureMovements", () => ({
 }));
 
 vi.mock("~/utils/migrationActs/migrationMovementEvaluation", async () => {
-  const actual =
-    await vi.importActual<
-      typeof import("~/utils/migrationActs/migrationMovementEvaluation")
-    >("~/utils/migrationActs/migrationMovementEvaluation");
+  const actual = await vi.importActual<
+    typeof import("~/utils/migrationActs/migrationMovementEvaluation")
+  >("~/utils/migrationActs/migrationMovementEvaluation");
 
   return {
     ...actual,
@@ -119,9 +118,7 @@ describe("useMigrationActMovementSession checkpoint feedback", () => {
       expect.objectContaining({
         beatIndex: 1,
         result: "passed",
-        evaluationId: expect.stringContaining(
-          "checkpoint:departure-crouch",
-        ),
+        evaluationId: expect.stringContaining("checkpoint:departure-crouch"),
       }),
     );
 
@@ -143,9 +140,7 @@ describe("useMigrationActMovementSession checkpoint feedback", () => {
       expect.objectContaining({
         beatIndex: 3,
         result: "failed",
-        evaluationId: expect.stringContaining(
-          "checkpoint:departure-arms-out",
-        ),
+        evaluationId: expect.stringContaining("checkpoint:departure-arms-out"),
       }),
     );
 
@@ -158,7 +153,9 @@ describe("useMigrationActMovementSession checkpoint feedback", () => {
 
   it("does not publish orange feedback for tracking-only checkpoints", async () => {
     mockedEvaluateMigrationCheckpoint
-      .mockReturnValueOnce(createEvaluation("departure-crouch", "not_evaluable"))
+      .mockReturnValueOnce(
+        createEvaluation("departure-crouch", "not_evaluable"),
+      )
       .mockReturnValueOnce(
         createEvaluation("departure-rise-hands", "not_evaluable"),
       )

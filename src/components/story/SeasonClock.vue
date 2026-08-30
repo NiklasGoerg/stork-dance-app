@@ -327,6 +327,7 @@ watch(currentDate, (date) => {
 .season-clock--fill-container .season-clock__svg {
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 
 .season-clock__base-disc {

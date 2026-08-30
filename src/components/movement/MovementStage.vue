@@ -4,12 +4,14 @@
 
     <div v-if="showDebug" class="movement-stage__debug">
       <span>{{ sourceMode }}</span>
-      <span>{{ landmarks?.length ?? 0 }} points</span>
-      <span>fixed frame</span>
+      <span>
+        {{ t("movementStage.debug.points", { count: landmarks?.length ?? 0 }) }}
+      </span>
+      <span>{{ t("movementStage.debug.fixedFrame") }}</span>
     </div>
 
     <div v-if="!landmarks?.length" class="movement-stage__empty">
-      Waiting for body tracking
+      {{ t("movementStage.empty") }}
     </div>
   </div>
 </template>
@@ -33,6 +35,9 @@ const props = withDefaults(
     showDebug?: boolean;
     sourceAspect?: number;
     fillFrame?: boolean;
+    fillBackground?: boolean;
+    frameScale?: number;
+    thicknessScale?: number;
   }>(),
   {
     landmarks: null,
@@ -41,10 +46,14 @@ const props = withDefaults(
     showDebug: false,
     sourceAspect: 4 / 3,
     fillFrame: false,
+    fillBackground: false,
+    frameScale: 1,
+    thicknessScale: 1,
   },
 );
 
 const canvas = ref<HTMLCanvasElement | null>(null);
+const { t } = useI18n();
 
 let ctx: CanvasRenderingContext2D | null = null;
 let resizeObserver: ResizeObserver | null = null;
@@ -70,23 +79,46 @@ const bodyConnections: Array<[number, number]> = [
   [30, 32],
 ];
 
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
 const validSourceAspect = computed(() =>
   Number.isFinite(props.sourceAspect) && props.sourceAspect > 0
     ? props.sourceAspect
     : 4 / 3,
 );
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
+const validFrameScale = computed(() =>
+  Number.isFinite(props.frameScale) ? clamp(props.frameScale, 0.5, 1.5) : 1,
+);
+
+const validThicknessScale = computed(() =>
+  Number.isFinite(props.thicknessScale)
+    ? clamp(props.thicknessScale, 0.75, 2)
+    : 1,
+);
+
+const scaleFrame = (frame: StageRect): StageRect => {
+  const scale = validFrameScale.value;
+  const scaledWidth = frame.width * scale;
+  const scaledHeight = frame.height * scale;
+
+  return {
+    x: frame.x + (frame.width - scaledWidth) / 2,
+    y: frame.y + (frame.height - scaledHeight) / 2,
+    width: scaledWidth,
+    height: scaledHeight,
+  };
+};
 
 const getCameraFrame = (): StageRect => {
   if (props.fillFrame) {
-    return {
+    return scaleFrame({
       x: 0,
       y: 0,
       width,
       height,
-    };
+    });
   }
 
   const paddingX = width * 0.035;
@@ -99,23 +131,36 @@ const getCameraFrame = (): StageRect => {
     const frameHeight = availableHeight;
     const frameWidth = frameHeight * validSourceAspect.value;
 
-    return {
+    return scaleFrame({
       x: (width - frameWidth) / 2,
       y: paddingY,
       width: frameWidth,
       height: frameHeight,
-    };
+    });
   }
 
   const frameWidth = availableWidth;
   const frameHeight = frameWidth / validSourceAspect.value;
 
-  return {
+  return scaleFrame({
     x: paddingX,
     y: (height - frameHeight) / 2,
     width: frameWidth,
     height: frameHeight,
-  };
+  });
+};
+
+const getBackgroundFrame = (): StageRect => {
+  if (props.fillBackground) {
+    return {
+      x: 0,
+      y: 0,
+      width,
+      height,
+    };
+  }
+
+  return getCameraFrame();
 };
 
 const isVisible = (
@@ -283,8 +328,17 @@ const drawPose = (
   landmarks: MovementStageLandmark[],
   frame: StageRect,
 ) => {
-  const lineWidth = clamp(Math.min(width, height) * 0.012, 4, 9);
-  const jointRadius = clamp(Math.min(width, height) * 0.008, 3.5, 7);
+  const thicknessScale = validThicknessScale.value;
+  const lineWidth = clamp(
+    Math.min(width, height) * 0.012 * thicknessScale,
+    4 * thicknessScale,
+    9 * thicknessScale,
+  );
+  const jointRadius = clamp(
+    Math.min(width, height) * 0.008 * thicknessScale,
+    3.5 * thicknessScale,
+    7 * thicknessScale,
+  );
 
   drawShadow(context, landmarks, frame);
 
@@ -365,10 +419,11 @@ const draw = () => {
   if (!ctx || !width || !height) return;
 
   const context = ctx;
+  const backgroundFrame = getBackgroundFrame();
   const frame = getCameraFrame();
 
   context.clearRect(0, 0, width, height);
-  drawRoom(context, frame);
+  drawRoom(context, backgroundFrame);
 
   if (props.landmarks?.length) {
     drawPose(context, props.landmarks, frame);
@@ -411,6 +466,9 @@ watch(
       props.sourceMode,
       props.sourceAspect,
       props.fillFrame,
+      props.fillBackground,
+      props.frameScale,
+      props.thicknessScale,
     ] as const,
   draw,
   { deep: true },

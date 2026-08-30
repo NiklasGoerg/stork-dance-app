@@ -164,7 +164,7 @@ export type MigrationActMovementRecognitionService = ReturnType<
 
 export type MigrationActNarrationService = Pick<
   ReturnType<typeof useNarration>,
-  "play" | "stop"
+  "isPaused" | "isSpeaking" | "pause" | "play" | "resume" | "stop"
 >;
 
 const browserRuntimeDriver: MigrationActRuntimeDriver = {
@@ -238,6 +238,7 @@ export const useMigrationActRuntime = ({
   let pendingStoryNarrationSequences: PendingStoryNarrationSequence[] = [];
   let finalResidenceSummaryPromise: Promise<void> | null = null;
   let resolveFinalResidenceSummary: (() => void) | null = null;
+  let narrationPausedByMigration = false;
   let pausedFromState: "initial_countdown" | "playing" | null = null;
   let phaseMovementScheduledStartTransportMs: number | null = null;
   let cycleTransitionStartedAtTransportMs: number | null = null;
@@ -1803,12 +1804,11 @@ export const useMigrationActRuntime = ({
     resultPromise: ReturnType<MigrationActGestureService["start"]>,
   ) => {
     const loadTiming = gestures.loadTimings.get(event.gestureId);
-    let completed = false;
 
     try {
       const result = await resultPromise;
       if (!isCurrentRun(currentRunId)) return;
-      completed = result === "completed";
+      const completed = result === "completed";
 
       store.setEventStatus(event.id, completed ? "completed" : "skipped");
       store.updateDiagnostic(event.id, {
@@ -1837,7 +1837,7 @@ export const useMigrationActRuntime = ({
         } else {
           store.setPlaybackState("playing");
           synchronizeSeasonForCurrentDate();
-          if (completed && event.gestureId === "arrival") {
+          if (event.gestureId === "arrival") {
             store.setMapCameraMode("residence");
             const cueIds = getMigrationChangeFlowArrivalCueIds(
               event.cycleId,
@@ -2301,6 +2301,11 @@ export const useMigrationActRuntime = ({
       store.playbackState === "gesture_lead_in" ||
       store.playbackState === "gesture_playing"
     ) {
+      if (hasBlockingPause(store.pauseReasons)) {
+        lastFrameAtMs = null;
+        return;
+      }
+
       // UX invariant:
       // Departure and Arrival gestures own avatar time only; Story-Time stays
       // pinned to the exact data event until the gesture handoff completes.
@@ -2377,6 +2382,7 @@ export const useMigrationActRuntime = ({
     cancelGuidedInterlude();
     gestures.cancel();
     pendingStoryNarrationSequences = [];
+    narrationPausedByMigration = false;
     resetFinalResidenceSummaryState();
     cycleTransitionStartedAtTransportMs = null;
     cycleTransitionTargetIndex = null;
@@ -2452,6 +2458,12 @@ export const useMigrationActRuntime = ({
   };
 
   const pause = () => {
+    narrationPausedByMigration =
+      narration.isSpeaking.value && !narration.isPaused.value;
+    if (narrationPausedByMigration) {
+      narration.pause();
+    }
+
     if (
       store.playbackState === "initial_countdown" ||
       store.playbackState === "playing"
@@ -2463,6 +2475,8 @@ export const useMigrationActRuntime = ({
       store.setPlaybackState("paused");
       cancelFrame();
       storyEngine.pauseStory();
+    } else if (store.isGestureActive) {
+      cancelFrame();
     } else if (store.playbackState === "cycle_transition") {
       cancelFrame();
     }
@@ -2473,6 +2487,13 @@ export const useMigrationActRuntime = ({
 
   const resume = async () => {
     store.removePauseReason("user");
+    const resumeNarration = () => {
+      if (!narrationPausedByMigration) return;
+
+      narration.resume();
+      narrationPausedByMigration = false;
+    };
+
     if (guidedInterludeActive.value) {
       if (hasBlockingPause(store.pauseReasons)) return;
 
@@ -2489,16 +2510,23 @@ export const useMigrationActRuntime = ({
       lastFrameAtMs = null;
       scheduleFrame();
       pausedFromState = null;
+      resumeNarration();
       return;
     }
     if (store.isGestureActive) {
       await synchronizeAudioForPauseReasons();
+      if (!hasBlockingPause(store.pauseReasons)) {
+        resumeNarration();
+        lastFrameAtMs = null;
+        scheduleFrame();
+      }
       return;
     }
     if (store.playbackState === "cycle_transition") {
       await synchronizeAudioForPauseReasons();
       lastFrameAtMs = null;
       scheduleFrame();
+      resumeNarration();
       return;
     }
     if (
@@ -2516,6 +2544,7 @@ export const useMigrationActRuntime = ({
       pausedFromState = null;
       lastFrameAtMs = null;
       scheduleFrame();
+      resumeNarration();
       return;
     }
 
@@ -2526,6 +2555,7 @@ export const useMigrationActRuntime = ({
       pausedFromState = null;
       lastFrameAtMs = null;
       scheduleFrame();
+      resumeNarration();
       return;
     }
 
@@ -2536,6 +2566,7 @@ export const useMigrationActRuntime = ({
     scheduleFrame();
     await synchronizeAudioForPauseReasons();
     pausedFromState = null;
+    resumeNarration();
   };
 
   const reset = async () => {
@@ -2544,6 +2575,7 @@ export const useMigrationActRuntime = ({
     cancelGuidedInterlude();
     gestures.cancel();
     pendingStoryNarrationSequences = [];
+    narrationPausedByMigration = false;
     resetFinalResidenceSummaryState();
     cycleTransitionStartedAtTransportMs = null;
     cycleTransitionTargetIndex = null;
@@ -2582,6 +2614,7 @@ export const useMigrationActRuntime = ({
     nextRunId();
     gestures.cancel();
     pendingStoryNarrationSequences = [];
+    narrationPausedByMigration = false;
     resetFinalResidenceSummaryState();
     cycleTransitionStartedAtTransportMs = null;
     cycleTransitionTargetIndex = null;
@@ -2638,6 +2671,24 @@ export const useMigrationActRuntime = ({
     store.removePauseReason("gesture");
     store.setPlaybackState(store.hasUserPause ? "paused" : "idle");
     await synchronizeAudioForPauseReasons();
+  };
+
+  const isBlockingGestureSkippable = () => {
+    const gestureId = gestures.store.activeGestureId;
+
+    return (
+      store.isGestureActive &&
+      (gestureId === "departure" || gestureId === "arrival") &&
+      (store.playbackState === "gesture_lead_in" ||
+        store.playbackState === "gesture_playing")
+    );
+  };
+
+  const skipCurrentBlockingInteraction = () => {
+    if (!isBlockingGestureSkippable()) return false;
+
+    gestures.store.continueGesture();
+    return true;
   };
 
   const handlePoseFrame = (landmarks: PoseLandmarkLike[] | null) => {
@@ -2732,6 +2783,7 @@ export const useMigrationActRuntime = ({
     cancelGuidedInterlude();
     gestures.cleanup();
     pendingStoryNarrationSequences = [];
+    narrationPausedByMigration = false;
     resetFinalResidenceSummaryState();
     cycleTransitionStartedAtTransportMs = null;
     cycleTransitionTargetIndex = null;
@@ -2788,6 +2840,7 @@ export const useMigrationActRuntime = ({
     seekToElapsedMs,
     selectCycle,
     startManualGesture,
+    skipCurrentBlockingInteraction,
     enterGuidedInterlude,
     leaveGuidedInterlude,
     cancelGuidedInterlude,

@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from "pinia";
-import { ref } from "vue";
+import { ref, type ComputedRef } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   useMigrationActRuntime,
@@ -201,6 +201,7 @@ const createFakeGestures = (
 ) => {
   let onHandoverStart: (() => void) | null = null;
   let handoverStarted = false;
+  let activeResolver: ((result: StoryGestureResult) => void) | null = null;
   const state = {
     state: "inactive",
     isActive: false,
@@ -208,10 +209,15 @@ const createFakeGestures = (
     currentSourceTimeMs: 0,
     movementLoaded: false,
     movementLoadError: null as string | null,
+    continueGesture: () => {
+      calls.continue++;
+      activeResolver?.("continued");
+    },
   };
   const calls = {
     preload: 0,
     cancel: 0,
+    continue: 0,
     cleanup: 0,
     tick: 0,
     starts: [] as Array<{
@@ -260,9 +266,14 @@ const createFakeGestures = (
       state.activeGestureId = id;
       state.movementLoaded = true;
       state.state = "waiting-for-lead-in";
-      const result = await start();
+      const result = await new Promise<StoryGestureResult>((resolve) => {
+        activeResolver = resolve;
+        void start().then(resolve);
+      });
+      activeResolver = null;
       state.isActive = false;
       state.activeGestureId = null;
+      state.state = "inactive";
       return result;
     },
     demonstrate: async () => undefined,
@@ -280,6 +291,8 @@ const createFakeGestures = (
       calls.cancel++;
       onHandoverStart = null;
       handoverStarted = false;
+      activeResolver?.("cancelled");
+      activeResolver = null;
       state.state = "idle";
       state.isActive = false;
       state.activeGestureId = null;
@@ -288,6 +301,8 @@ const createFakeGestures = (
       calls.cleanup++;
       onHandoverStart = null;
       handoverStarted = false;
+      activeResolver?.("cancelled");
+      activeResolver = null;
       state.state = "idle";
       state.isActive = false;
       state.activeGestureId = null;
@@ -308,12 +323,16 @@ const createCycleRuns = (count: number): MigrationActCycleRun[] =>
 const createFakeNarration = ({
   holdKeys = [],
 }: { holdKeys?: string[] } = {}) => {
+  const isSpeaking = ref(false);
+  const isPaused = ref(false);
   const calls = {
     play: [] as Array<{
       key: string;
       params?: Record<string, string | number>;
       behavior?: PlayNarrationOptions["behavior"];
     }>,
+    pause: 0,
+    resume: 0,
     held: [] as Array<{
       key: string;
       options: PlayNarrationOptions;
@@ -341,12 +360,24 @@ const createFakeNarration = ({
       options.onEnd?.({ status: "completed", rate: 1, voiceName: null });
       return { status: "completed" as const };
     },
+    pause: () => {
+      calls.pause++;
+      isPaused.value = true;
+    },
+    resume: () => {
+      calls.resume++;
+      isPaused.value = false;
+    },
     stop: () => {
       calls.stop++;
+      isSpeaking.value = false;
+      isPaused.value = false;
     },
+    isSpeaking: isSpeaking as ComputedRef<boolean>,
+    isPaused: isPaused as ComputedRef<boolean>,
   };
 
-  return { service, calls };
+  return { service, calls, isSpeaking, isPaused };
 };
 
 const createHarness = ({
@@ -663,6 +694,57 @@ describe("migration act runtime", () => {
     await flushPromises();
   });
 
+  it("keeps skip as a no-op during normal Act III playback", async () => {
+    const { controller, raf, gestures } = createHarness();
+
+    await controller.initialize();
+    await controller.startStory();
+    await finishInitialCountdown(raf);
+
+    expect(controller.store.playbackState).toBe("playing");
+    expect(controller.store.isGestureActive).toBe(false);
+
+    expect(controller.skipCurrentBlockingInteraction()).toBe(false);
+
+    expect(gestures.calls.continue).toBe(0);
+    expect(controller.store.playbackState).toBe("playing");
+    expect(controller.store.events[0]!.status).toBe("pending");
+  });
+
+  it("skips an active departure gesture without recognition success", async () => {
+    const gesture = createDeferred<StoryGestureResult>();
+    const { controller, raf, gestures, narration } = createHarness({
+      gestureStart: () => gesture.promise,
+    });
+
+    await controller.initialize();
+    await controller.startStory();
+    await finishInitialCountdown(raf);
+
+    const departure = controller.store.events[0]!;
+    raf.step(departure.boundaryTimeMs);
+    await flushPromises();
+
+    expect(controller.store.playbackState).toBe("gesture_lead_in");
+    expect(controller.store.activeEventId).toBe(departure.id);
+    expect(controller.store.pauseReasons).toContain("gesture");
+
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    await flushPromises();
+
+    expect(gestures.calls.continue).toBe(1);
+    expect(controller.store.events[0]!.status).toBe("skipped");
+    expect(controller.store.activeEventId).toBeNull();
+    expect(controller.store.pauseReasons).not.toContain("gesture");
+    expect(controller.store.playbackState).toBe("playing");
+    expect(controller.avatarPlaybackOwner.value).toBe("autumn-migration");
+    expect(
+      narration.calls.play.some((call) => call.key.includes(".success")),
+    ).toBe(false);
+
+    gesture.resolve("completed");
+  });
+
   it("runs migration to the arrival boundary before freezing for the arrival gesture", async () => {
     const gesture = createDeferred<StoryGestureResult>();
     const { controller, raf, audio, gestures, narration } = createHarness({
@@ -751,6 +833,66 @@ describe("migration act runtime", () => {
       }),
       behavior: "queue",
     });
+  });
+
+  it("skips an active arrival gesture without triggering arrival success flow", async () => {
+    const gesture = createDeferred<StoryGestureResult>();
+    const { controller, raf, gestures, narration } = createHarness({
+      gestureStart: () => gesture.promise,
+    });
+
+    await controller.initialize();
+    await controller.startStory();
+    await finishInitialCountdown(raf);
+    const arrival = controller.store.events.find(
+      (event) => event.eventType === "autumn_arrival",
+    )!;
+
+    await controller.seekToElapsedMs(arrival.boundaryTimeMs - 1);
+    await flushPromises();
+    raf.step(0);
+    raf.step(1);
+    await flushPromises();
+
+    expect(controller.store.playbackState).toBe("gesture_lead_in");
+    expect(controller.store.activeEventId).toBe(arrival.id);
+
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    await flushPromises();
+
+    expect(gestures.calls.continue).toBe(1);
+    expect(
+      controller.store.events.find((event) => event.id === arrival.id)?.status,
+    ).toBe("skipped");
+    expect(controller.store.activeEventId).toBeNull();
+    expect(controller.store.pauseReasons).not.toContain("gesture");
+    expect(controller.store.playbackState).toBe("playing");
+    expect(controller.avatarPlaybackOwner.value).toBe("winter");
+    expect(controller.store.latestNarrationEvent?.event).not.toBe(
+      "winterReflection",
+    );
+    expect(
+      narration.calls.play.some((call) => call.key.includes(".success")),
+    ).toBe(false);
+
+    raf.step(4_000);
+    await flushPromises();
+    expect(controller.store.latestNarrationEvent).toMatchObject({
+      event: "winterReflection",
+      cycleId: "individual_3031_2013_2014",
+      winterRegion: "Morocco",
+      cueId: "act3.story.2013_2014.winterReflection1",
+    });
+    expect(narration.calls.play).toContainEqual({
+      key: "story.acts.act3.narration.cycles.2013_2014.winterReflection1.text",
+      params: expect.objectContaining({
+        startYear: 2013,
+        endYear: 2014,
+      }),
+      behavior: "queue",
+    });
+
+    gesture.resolve("completed");
   });
 
   it("does not emit the 2018 Iberia narration before winter arrival succeeds", async () => {
@@ -1122,6 +1264,93 @@ describe("migration act runtime", () => {
     await controller.resume();
     expect(controller.store.playbackState).toBe("playing");
     expect(raf.pendingCount()).toBe(1);
+  });
+
+  it("pauses migration narration with user pause and resumes it only after blocking reasons clear", async () => {
+    const { controller, raf, narration } = createHarness();
+
+    await controller.initialize();
+    await controller.startStory();
+    await finishInitialCountdown(raf);
+    narration.isSpeaking.value = true;
+    controller.store.addPauseReason("system");
+    controller.pause();
+
+    expect(narration.calls.pause).toBe(1);
+    expect(narration.calls.resume).toBe(0);
+
+    await controller.resume();
+
+    expect(controller.store.pauseReasons).toEqual(["system"]);
+    expect(narration.calls.resume).toBe(0);
+
+    controller.store.removePauseReason("system");
+    await controller.resume();
+
+    expect(narration.calls.resume).toBe(1);
+  });
+
+  it("does not tick an active gesture while user-paused", async () => {
+    const gesture = createDeferred<StoryGestureResult>();
+    const { controller, raf, gestures } = createHarness({
+      gestureStart: () => gesture.promise,
+    });
+
+    await controller.initialize();
+    const gesturePromise = controller.startManualGesture("departure");
+    await flushPromises();
+
+    raf.step(0);
+    expect(gestures.calls.tick).toBe(1);
+    expect(controller.store.playbackState).toBe("gesture_playing");
+
+    controller.pause();
+    const pausedSourceTimeMs = gestures.state.currentSourceTimeMs;
+
+    expect(raf.pendingCount()).toBe(0);
+
+    raf.step(20_000);
+
+    expect(gestures.calls.tick).toBe(1);
+    expect(gestures.state.currentSourceTimeMs).toBe(pausedSourceTimeMs);
+
+    await controller.resume();
+    expect(raf.pendingCount()).toBe(1);
+
+    raf.step(1_000);
+    expect(gestures.calls.tick).toBe(2);
+
+    gesture.resolve("completed");
+    await gesturePromise;
+  });
+
+  it("skips a failed gesture retry state without starting a new attempt", async () => {
+    const gesture = createDeferred<StoryGestureResult>();
+    const { controller, raf, gestures } = createHarness({
+      gestureStart: () => gesture.promise,
+    });
+
+    await controller.initialize();
+    await controller.startStory();
+    await finishInitialCountdown(raf);
+
+    const departure = controller.store.events[0]!;
+    raf.step(departure.boundaryTimeMs);
+    await flushPromises();
+    gestures.state.state = "retry-scheduled";
+    const tickCount = gestures.calls.tick;
+    const startCount = gestures.calls.starts.length;
+
+    expect(controller.store.playbackState).toBe("gesture_lead_in");
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    await flushPromises();
+
+    expect(gestures.calls.continue).toBe(1);
+    expect(gestures.calls.tick).toBe(tickCount);
+    expect(gestures.calls.starts).toHaveLength(startCount);
+    expect(controller.store.playbackState).toBe("playing");
+
+    gesture.resolve("completed");
   });
 
   it("runs one covered bar for each normal cycle transition", async () => {

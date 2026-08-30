@@ -371,8 +371,7 @@ export const buildSummerBeatCriteria = (
     const loweredFromExpansion =
       averageHandY !== null &&
       context.expansionReference?.lowestHandHeightFromShoulders !== null &&
-      context.expansionReference?.lowestHandHeightFromShoulders !==
-        undefined
+      context.expansionReference?.lowestHandHeightFromShoulders !== undefined
         ? averageHandY >=
           context.expansionReference.lowestHandHeightFromShoulders + 0.08
         : averageHandY !== null;
@@ -409,8 +408,7 @@ export const buildSummerBeatCriteria = (
           context.expansionReference?.lowestHandHeightFromShoulders !==
             undefined
             ? `>= ${roundCriterionDebugValue(
-                context.expansionReference.lowestHandHeightFromShoulders +
-                  0.08,
+                context.expansionReference.lowestHandHeightFromShoulders + 0.08,
               )}`
             : "visible lower transition",
       }),

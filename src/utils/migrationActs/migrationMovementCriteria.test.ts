@@ -470,7 +470,9 @@ describe("migration movement metrics and criteria", () => {
         }),
     );
 
-    expect(evaluateMigrationMovementWindow("winter_rest", stillSamples)).toMatchObject({
+    expect(
+      evaluateMigrationMovementWindow("winter_rest", stillSamples),
+    ).toMatchObject({
       status: "failed",
     });
   });

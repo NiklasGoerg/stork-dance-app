@@ -96,9 +96,9 @@ describe("resolveAct4FeedbackNarrationCue", () => {
     expect(en.story.acts.act4.narration.feedback.autumn.startRight).toBe(
       "Start on the same side as the avatar.",
     );
-    expect(en.story.acts.act4.narration.feedback.autumn.wrongSweepDirection).toBe(
-      "Sweep toward the same side as the avatar.",
-    );
+    expect(
+      en.story.acts.act4.narration.feedback.autumn.wrongSweepDirection,
+    ).toBe("Sweep toward the same side as the avatar.");
     expect(en.story.acts.act4.autumnFeedback.START_LEFT).toBe(
       "Start on the same side as the avatar.",
     );

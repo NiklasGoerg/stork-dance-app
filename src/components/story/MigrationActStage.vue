@@ -149,55 +149,87 @@
     </template>
 
     <template #overlay>
-      <ActDebugDock
-        v-if="showMigrationDebugDock"
-        :open="store.debug.enabled"
-        :toggle-label="t('story.debug.toggle')"
-        :panel-label="t('story.debug.controls')"
-        @toggle="controller.toggleDebug"
-      >
-        <button
-          v-if="canShowStoryProgress"
-          type="button"
-          class="btn"
-          @click="handleStoryProgress"
+      <div class="migration-runtime-controls">
+        <ActDebugDock
+          v-if="showMigrationDebugDock"
+          :open="store.debug.enabled"
+          :toggle-label="t('story.debug.toggle')"
+          :panel-label="t('story.debug.controls')"
+          @toggle="controller.toggleDebug"
         >
-          {{ t("story.acts.act2.controls.storyProgress") }}
-        </button>
-        <template v-if="canShowCycleDebugControls">
           <button
-            v-for="cycle in cycleRuns"
-            :key="cycle.id"
+            v-if="canShowStoryProgress"
+            type="button"
             class="btn"
-            type="button"
-            @click="controller.startSingleCycle(cycle.id)"
+            @click="handleStoryProgress"
           >
-            {{ getMigrationCycleButtonLabel(cycle) }}
+            {{ t("story.acts.act2.controls.storyProgress") }}
           </button>
-          <button
-            class="migration-auto-toggle"
-            type="button"
-            :class="{
-              'migration-auto-toggle--active': store.debug.autoProgressEnabled,
-            }"
-            :aria-pressed="store.debug.autoProgressEnabled"
-            @click="controller.toggleAutoProgress"
-          >
-            <span class="migration-auto-toggle__track" aria-hidden="true">
-              <span class="migration-auto-toggle__thumb" />
-            </span>
-            <span>
-              {{
-                t("story.debug.autoProgress", {
-                  state: store.debug.autoProgressEnabled
-                    ? t("common.on")
-                    : t("common.off"),
-                })
-              }}
-            </span>
-          </button>
-        </template>
-      </ActDebugDock>
+          <template v-if="canShowCycleDebugControls">
+            <button
+              v-for="cycle in cycleRuns"
+              :key="cycle.id"
+              class="btn"
+              type="button"
+              @click="controller.startSingleCycle(cycle.id)"
+            >
+              {{ getMigrationCycleButtonLabel(cycle) }}
+            </button>
+            <button
+              class="migration-auto-toggle"
+              type="button"
+              :class="{
+                'migration-auto-toggle--active':
+                  store.debug.autoProgressEnabled,
+              }"
+              :aria-pressed="store.debug.autoProgressEnabled"
+              @click="controller.toggleAutoProgress"
+            >
+              <span class="migration-auto-toggle__track" aria-hidden="true">
+                <span class="migration-auto-toggle__thumb" />
+              </span>
+              <span>
+                {{
+                  t("story.debug.autoProgress", {
+                    state: store.debug.autoProgressEnabled
+                      ? t("common.on")
+                      : t("common.off"),
+                  })
+                }}
+              </span>
+            </button>
+          </template>
+        </ActDebugDock>
+        <button
+          v-if="showPauseButton"
+          class="migration-pause-button"
+          type="button"
+          :aria-pressed="isUserPaused"
+          @click="handlePauseButton"
+        >
+          {{ pauseButtonLabel }}
+        </button>
+        <button
+          v-if="showSkipMovementButton"
+          class="migration-skip-button"
+          type="button"
+          @click="handleSkipMovement"
+        >
+          {{ t("story.acts.act3.controls.skipMovement") }}
+        </button>
+      </div>
+
+      <PauseOverlay
+        v-if="isUserPaused"
+        :title="t('common.pauseOverlay.title')"
+        :text="t('common.pauseOverlay.text')"
+        :back-label="t('common.backToStart')"
+        :resume-label="t('common.resume')"
+        title-id="migration-pause-overlay-title"
+        description-id="migration-pause-overlay-description"
+        @back="handleBackToStart"
+        @resume="handleResume"
+      />
     </template>
   </MigrationStoryLayout>
 </template>
@@ -214,6 +246,7 @@ import MigrationActControls from "~/components/story/MigrationActControls.vue";
 import MigrationActInfoPanel from "~/components/story/MigrationActInfoPanel.vue";
 import MigrationGestureCountdown from "~/components/story/MigrationGestureCountdown.vue";
 import MigrationStoryLayout from "~/components/story/MigrationStoryLayout.vue";
+import PauseOverlay from "~/components/story/PauseOverlay.vue";
 import SeasonClock from "~/components/story/SeasonClock.vue";
 import StoryProgressSidebar from "~/components/story/StoryProgressSidebar.vue";
 import { useMigrationActInfoPanelModel } from "~/composables/migrationActs/useMigrationActInfoPanelModel";
@@ -267,6 +300,7 @@ const infoPanel = useMigrationActInfoPanelModel({
 });
 
 type MigrationStageMode = "entry" | "starting" | "running";
+type MigrationPresenterContext = "running" | "paused";
 
 const isGuidedAct = computed(() => props.act.id === "act-2");
 const isGatedMigrationAct = computed(
@@ -275,6 +309,7 @@ const isGatedMigrationAct = computed(
 const stageMode = ref<MigrationStageMode>(
   isGatedMigrationAct.value ? "entry" : "running",
 );
+const isNavigatingHome = ref(false);
 const isEntryVisible = computed(
   () => isGatedMigrationAct.value && stageMode.value !== "running",
 );
@@ -366,10 +401,49 @@ const canShowCycleDebugControls = computed(
 const showMigrationDebugDock = computed(
   () => isGatedMigrationAct.value && stageMode.value === "running",
 );
+const isUserPaused = computed(() => store.hasUserPause);
+const showPauseButton = computed(
+  () =>
+    isGatedMigrationAct.value &&
+    stageMode.value === "running" &&
+    !runtimeStore.showContinueGate,
+);
+const showSkipMovementButton = computed(() => {
+  const gestureId = gestureStore.activeGestureId;
+
+  return (
+    props.act.id === "act-3" &&
+    stageMode.value === "running" &&
+    !isUserPaused.value &&
+    store.isGestureActive &&
+    (gestureId === "departure" || gestureId === "arrival") &&
+    (store.playbackState === "gesture_lead_in" ||
+      store.playbackState === "gesture_playing")
+  );
+});
+const pauseButtonLabel = computed(() =>
+  isUserPaused.value ? t("common.resume") : t("common.pause"),
+);
+const isActivePresenterEnabled = computed(
+  () => isGatedMigrationAct.value && stageMode.value === "running",
+);
+const activePresenterContext = computed<MigrationPresenterContext | null>(
+  () => {
+    if (!isActivePresenterEnabled.value) return null;
+    return isUserPaused.value ? "paused" : "running";
+  },
+);
 const continueToNextAct = async () => {
   const nextActId = runtimeStore.currentAct?.nextActId;
   storyEngine.continueFromGate();
   if (nextActId) await navigateTo(`/story/${nextActId}`);
+};
+
+const handleBackToStart = async () => {
+  if (isNavigatingHome.value) return;
+
+  isNavigatingHome.value = true;
+  await navigateTo("/");
 };
 
 const handleStoryProgress = () => {
@@ -425,21 +499,44 @@ const handleEntryContinue = () => {
   void startMigrationStage();
 };
 
-const handleActivePresenterPageDown = () => {
-  if (runtimeStore.showContinueGate) {
-    void continueToNextAct();
-    return;
-  }
-
-  if (isGuidedAct.value) handleStoryProgress();
-};
-
 const handleStartStory = () => controller.startStory();
 const handlePause = () => guidedController.pause();
 const handleResume = () => void guidedController.resume();
+const handlePauseButton = () => {
+  if (isUserPaused.value) {
+    handleResume();
+    return;
+  }
+
+  handlePause();
+};
+const handleSkipMovement = () => {
+  if (!showSkipMovementButton.value) return;
+
+  controller.skipCurrentBlockingInteraction();
+};
 const handleReset = () => {
   if (guidedController.enabled) void guidedController.resetAct();
   else void controller.reset();
+};
+const handleActivePresenterPageUp = () => {
+  if (activePresenterContext.value === "paused") {
+    void handleBackToStart();
+    return;
+  }
+
+  if (activePresenterContext.value === "running" && showPauseButton.value) {
+    handlePause();
+  }
+};
+
+const handleActivePresenterPageDown = () => {
+  if (activePresenterContext.value === "paused") {
+    handleResume();
+    return;
+  }
+
+  if (showSkipMovementButton.value) handleSkipMovement();
 };
 
 onMounted(async () => {
@@ -471,7 +568,8 @@ onBeforeUnmount(() => {
 });
 
 usePresenterActions({
-  enabled: computed(() => showMigrationDebugDock.value),
+  enabled: isActivePresenterEnabled,
+  onPageUp: handleActivePresenterPageUp,
   onPageDown: handleActivePresenterPageDown,
 });
 </script>
@@ -558,10 +656,64 @@ usePresenterActions({
 .migration-clock {
   display: grid;
   place-items: center;
+  container-type: size;
+  padding: clamp(18px, 1.4vw, 28px);
+}
+
+.migration-clock :deep(.season-clock--fill-container) {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .migration-clock__date {
   font-weight: 700;
+}
+
+.migration-runtime-controls {
+  position: fixed;
+  z-index: 850;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.migration-runtime-controls :deep(.act-debug-dock) {
+  position: static;
+}
+
+.migration-pause-button,
+.migration-skip-button {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid rgb(31 49 39 / 0.18);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.72);
+  color: rgb(31 49 39 / 0.7);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.migration-pause-button[aria-pressed="true"] {
+  border-color: rgb(31 49 39 / 0.36);
+  background: rgb(31 49 39 / 0.92);
+  color: #ffffff;
+}
+
+.migration-skip-button {
+  border-color: rgb(31 49 39 / 0.24);
+  background: rgb(255 255 255 / 0.82);
+  color: rgb(31 49 39 / 0.78);
 }
 
 .migration-auto-toggle {

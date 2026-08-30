@@ -268,11 +268,7 @@ export type Act4InfoTone =
   "instruction" | "neutral" | "excellent" | "success" | "error" | "warning";
 
 export type Act4InfoCardMode =
-  | "narration"
-  | "tutorial"
-  | "story"
-  | "periodTransition"
-  | "completed";
+  "narration" | "tutorial" | "story" | "periodTransition" | "completed";
 
 export type Act4InfoCardModel = {
   mode: Act4InfoCardMode;

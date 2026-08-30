@@ -1,8 +1,5 @@
 export type SkeletonVisualMode =
-  | "neutral"
-  | "successPulse"
-  | "missPulse"
-  | "trackingLimited";
+  "neutral" | "successPulse" | "missPulse" | "trackingLimited";
 
 export type BeatSkeletonFeedbackResult = "passed" | "failed" | "notEvaluable";
 

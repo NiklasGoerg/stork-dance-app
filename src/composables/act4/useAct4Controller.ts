@@ -93,6 +93,7 @@ type Act4CycleService = {
     seasonIndex: number,
     withCountdown?: boolean,
   ) => Promise<void>;
+  waitForNextBarBoundary: () => Promise<void>;
   queueSeasonIndexRestart: (
     seasonIndex: number,
     withCountdown?: boolean,
@@ -109,6 +110,7 @@ type Act4CycleService = {
     seasonIndex: number,
     onSeasonEnd: () => void,
   ) => void;
+  cancelQueuedSeasonRestart: () => void;
 };
 
 type Act4NarrationService = {
@@ -196,6 +198,7 @@ export const useAct4Controller = ({
   let activeNarrationPromise: Promise<NarrationResult> | null = null;
   let narrationPausedByAct4 = false;
   let activeStoryTargetNarrationEventId: string | null = null;
+  let manualSkipInProgress = false;
   const handledNarrationEventIds = new Set<string>();
   const handledTutorialNarrationEventIds = new Set<string>();
   const handledStoryNarrationEventIds = new Set<string>();
@@ -213,6 +216,15 @@ export const useAct4Controller = ({
       store.sequenceStatus === "storyReferencePreview" ||
       store.sequenceStatus === "storyReferenceComplete" ||
       store.isCompleted,
+  );
+  const canSkipCurrentBlockingInteraction = computed(
+    () =>
+      store.lifecycleStatus === "running" &&
+      store.isFlowActive &&
+      !manualSkipInProgress &&
+      (store.sequenceStatus === "performing" ||
+        store.sequenceStatus === "retryInterlude") &&
+      Boolean(store.currentTarget),
   );
 
   const nextRunId = () => {
@@ -1327,10 +1339,175 @@ export const useAct4Controller = ({
     );
   };
 
+  const stopActiveTargetWithoutFeedback = () => {
+    activeNarrationPromise = null;
+    activeStoryTargetNarrationEventId = null;
+    narrationPausedByAct4 = false;
+    narration.stop();
+    recognition.resetAll();
+    store.setRetryPreviewFeedbackText("");
+    store.clearFeedback();
+    store.setFeedbackDiagnostics({
+      feedbackSelection: null,
+      feedbackSignals: [],
+    });
+  };
+
+  const completeCurrentTargetAfterManualSkip = async ({
+    currentTargetIndex,
+    currentRunId,
+  }: {
+    currentTargetIndex: number;
+    currentRunId: number;
+  }) => {
+    const completedTarget = store.targets[currentTargetIndex] ?? null;
+    const transition = getAct4EvaluationTransition({
+      targets: store.targets,
+      currentTargetIndex,
+      passed: true,
+    });
+
+    store.markCurrentTargetCompleted();
+
+    if (transition.type === "complete") {
+      if (completedTarget?.context === "tutorial") {
+        store.setSequenceStatus("tutorialCompleted");
+        resolveAct4TutorialCompleteNarration();
+      }
+
+      if (completedTarget?.context === "climateStory") {
+        await runClimateCompletionOutro(currentRunId);
+      }
+
+      if (!isCurrentRun(currentRunId)) return;
+
+      await complete();
+      return;
+    }
+
+    await cycle.waitForNextBarBoundary();
+
+    if (!isCurrentRun(currentRunId)) return;
+
+    if (transition.type === "periodTransition") {
+      const currentTarget =
+        store.targets[transition.currentTargetIndex] ?? null;
+      const nextTarget = store.targets[transition.nextTargetIndex] ?? null;
+
+      if (
+        isReferenceStoryTarget(currentTarget) &&
+        !isReferenceStoryTarget(nextTarget)
+      ) {
+        await playReferenceCompleteInterlude({
+          targetIndex: transition.nextTargetIndex,
+          currentRunId,
+        });
+
+        if (!isCurrentRun(currentRunId)) return;
+
+        await startStoryTarget({
+          targetIndex: transition.nextTargetIndex,
+          keepCalibration: true,
+          startPlayback: true,
+        });
+        return;
+      }
+
+      store.enterPeriodTransition(transition.transition);
+      await cycle.startExplanationPreview(transition.nextTargetIndex);
+      playPeriodTransitionNarration({
+        completedPeriod: transition.transition.previousPeriod,
+        currentRunId,
+      });
+
+      if (!isCurrentRun(currentRunId)) return;
+
+      await cycle.waitForExplanationPreviewBars(
+        ACT4_PERIOD_TRANSITION_BAR_COUNT,
+      );
+
+      if (!isCurrentRun(currentRunId)) return;
+
+      await startStoryTarget({
+        targetIndex: transition.nextTargetIndex,
+        keepCalibration: true,
+        startPlayback: true,
+      });
+      return;
+    }
+
+    if (transition.type === "retry") return;
+
+    const nextTarget = store.targets[transition.nextTargetIndex] ?? null;
+
+    if (nextTarget?.context === "tutorial") {
+      await startTutorialTargetWithExplanation({
+        targetIndex: transition.nextTargetIndex,
+        keepCalibration: true,
+        includeGlobalIntro: false,
+        startPlayback: true,
+        currentRunId,
+      });
+      return;
+    }
+
+    if (completedTarget?.context === "tutorial") {
+      store.setSequenceStatus("tutorialCompleted");
+      resolveAct4TutorialCompleteNarration();
+      await startClimateStoryIntro({
+        targetIndex: transition.nextTargetIndex,
+        keepCalibration: true,
+        startPlayback: true,
+        currentRunId,
+      });
+      return;
+    }
+
+    if (nextTarget?.context === "climateStory") {
+      await startStoryTarget({
+        targetIndex: transition.nextTargetIndex,
+        keepCalibration: true,
+        startPlayback: true,
+      });
+    }
+  };
+
+  const skipCurrentBlockingInteraction = () => {
+    if (!canSkipCurrentBlockingInteraction.value) return false;
+
+    const currentTargetIndex = store.currentTargetIndex;
+    const target = store.currentTarget;
+
+    if (!target) return false;
+
+    manualSkipInProgress = true;
+    const currentRunId = nextRunId();
+
+    cycle.cancelQueuedSeasonRestart();
+    stopActiveTargetWithoutFeedback();
+    store.setSequenceStatus("evaluating");
+    store.setHandledEvaluationKey(
+      [target.id, store.attempt.attemptNumber, "manual-skip"].join("-"),
+    );
+
+    void completeCurrentTargetAfterManualSkip({
+      currentTargetIndex,
+      currentRunId,
+    }).finally(() => {
+      if (isCurrentRun(currentRunId)) {
+        manualSkipInProgress = false;
+      }
+    });
+
+    return true;
+  };
+
   const handleRecognitionResult = (
     target: Act4SequenceTarget,
     evaluation: Act4RecognitionSequenceEvaluation,
   ) => {
+    if (manualSkipInProgress) return;
+    if (store.lifecycleStatus !== "running") return;
     if (!store.isFlowActive || store.sequenceStatus !== "performing") return;
     if (store.currentTarget?.id !== target.id) return;
 
@@ -1550,6 +1727,7 @@ export const useAct4Controller = ({
 
   const reset = async () => {
     nextRunId();
+    manualSkipInProgress = false;
     stopNarration();
     lastPoseLandmarks = null;
     store.resetFlowState();
@@ -1578,6 +1756,7 @@ export const useAct4Controller = ({
   const dispose = () => {
     disposed = true;
     nextRunId();
+    manualSkipInProgress = false;
     stopNarration();
     lastPoseLandmarks = null;
     store.resetFlowState();
@@ -1660,6 +1839,7 @@ export const useAct4Controller = ({
     store,
     activeTarget,
     isRecognitionSuppressed,
+    canSkipCurrentBlockingInteraction,
     isCurrentRun,
     initialize,
     startFullFlow,
@@ -1672,6 +1852,7 @@ export const useAct4Controller = ({
     toggleAutoProgress,
     handlePoseFrame,
     handleRecognitionResult,
+    skipCurrentBlockingInteraction,
     pause,
     resume,
     reset,

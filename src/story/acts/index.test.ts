@@ -162,9 +162,7 @@ describe("story acts registry", () => {
     expect(migrationActInfoPanelSource).not.toContain(
       "migration-info-panel__movement-state",
     );
-    expect(migrationActInfoPanelSource).not.toContain(
-      "getMovementStateLabel",
-    );
+    expect(migrationActInfoPanelSource).not.toContain("getMovementStateLabel");
     expect(migrationActInfoPanelSource).not.toContain(
       "migration-info-panel__status",
     );

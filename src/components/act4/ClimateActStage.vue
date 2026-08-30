@@ -80,6 +80,37 @@
       {{ t("story.debug.toggle") }}
     </button>
 
+    <button
+      v-if="showPauseButton"
+      class="climate-act-pause-button"
+      type="button"
+      :aria-pressed="isUserPaused"
+      @click="handlePauseButton"
+    >
+      {{ pauseButtonLabel }}
+    </button>
+
+    <button
+      v-if="showSkipMovementButton"
+      class="climate-act-skip-button"
+      type="button"
+      @click="handleSkipMovement"
+    >
+      {{ t("story.acts.act4.controls.skipMovement") }}
+    </button>
+
+    <PauseOverlay
+      v-if="isUserPaused"
+      :title="t('common.pauseOverlay.title')"
+      :text="t('common.pauseOverlay.text')"
+      :back-label="t('common.backToStart')"
+      :resume-label="t('common.resume')"
+      title-id="climate-pause-overlay-title"
+      description-id="climate-pause-overlay-description"
+      @back="handleBackToStart"
+      @resume="handleResume"
+    />
+
     <section
       v-if="isDebugMode"
       class="climate-act-bottom-bar"
@@ -186,6 +217,7 @@ import MovementStage from "~/components/movement/MovementStage.vue";
 import Act4ClimateProgressChart from "~/components/act4/ClimateProgressChart.vue";
 import Act4InfoCard from "~/components/act4/InfoCard.vue";
 import ActEntryScreen from "~/components/story/ActEntryScreen.vue";
+import PauseOverlay from "~/components/story/PauseOverlay.vue";
 import StoryProgressSidebar from "~/components/story/StoryProgressSidebar.vue";
 import { useAct4Controller } from "~/composables/act4/useAct4Controller";
 import { useAct4ChartModel } from "~/composables/act4/useAct4ChartModel";
@@ -197,6 +229,7 @@ import { useClimateSeasonData } from "~/composables/useClimateSeasonData";
 import { useSeasonalLearningCycle } from "~/composables/useSeasonalLearningCycle";
 import { useStoryAutoAdvance } from "~/composables/useStoryAutoAdvance";
 import { useStoryEngine } from "~/composables/useStoryEngine";
+import { usePresenterActions } from "~/composables/usePresenterActions";
 import { useAct4Store } from "~/store/act4";
 import { useStoryRuntimeStore } from "~/store/storyRuntimeStore";
 import { act4IntroCycleConfig } from "~/story/act4IntroCycle";
@@ -250,11 +283,27 @@ const {
 
 const routeDebugEnabled = computed(() => route.query.debug === "true");
 type ClimateStageMode = "entry" | "starting" | "running";
+type ClimatePresenterContext = "running" | "paused";
 
 const climateStageMode = ref<ClimateStageMode>("entry");
+const isNavigatingHome = ref(false);
 const isClimateEntryVisible = computed(
   () => climateStageMode.value !== "running",
 );
+const isUserPaused = computed(() => act4Store.lifecycleStatus === "paused");
+const showPauseButton = computed(
+  () =>
+    climateStageMode.value === "running" &&
+    !act4Store.isCompleted &&
+    !runtimeStore.showContinueGate,
+);
+const pauseButtonLabel = computed(() =>
+  isUserPaused.value ? t("common.resume") : t("common.pause"),
+);
+const activePresenterContext = computed<ClimatePresenterContext | null>(() => {
+  if (climateStageMode.value !== "running") return null;
+  return isUserPaused.value ? "paused" : "running";
+});
 let forwardRecognitionResult: (
   target: Act4SequenceTarget,
   evaluation: Act4RecognitionSequenceEvaluation,
@@ -264,6 +313,7 @@ const recognition = useAct4Recognition({
   activeTarget: computed(() => act4Store.currentTarget),
   isRecognitionSuppressed: computed(
     () =>
+      act4Store.lifecycleStatus !== "running" ||
       act4Store.sequenceStatus === "periodTransition" ||
       act4Store.sequenceStatus === "retryInterlude" ||
       act4Store.sequenceStatus === "tutorialExplanation" ||
@@ -298,8 +348,10 @@ const controller = useAct4Controller({
     startExplanationPreview: cycle.startExplanationPreview,
     waitForExplanationPreviewBars: cycle.waitForExplanationPreviewBars,
     startPreparedCycleFromIndex: cycle.startPreparedCycleFromIndex,
+    waitForNextBarBoundary: cycle.waitForNextBarBoundary,
     queueSeasonIndexRestart: cycle.queueSeasonIndexRestart,
     queueSeasonIndexEndAction: cycle.queueSeasonIndexEndAction,
+    cancelQueuedSeasonRestart: cycle.cancelQueuedSeasonRestart,
   },
   recognition,
   actId: props.act.id,
@@ -308,6 +360,14 @@ const controller = useAct4Controller({
     infoCardModel.getFeedbackText(target, feedbackCode),
 });
 forwardRecognitionResult = controller.handleRecognitionResult;
+const showSkipMovementButton = computed(
+  () =>
+    climateStageMode.value === "running" &&
+    !isUserPaused.value &&
+    !act4Store.isCompleted &&
+    !runtimeStore.showContinueGate &&
+    controller.canSkipCurrentBlockingInteraction.value,
+);
 
 const chartRows = computed(() => climateData.dataset.value?.rows ?? []);
 const chartModel = useAct4ChartModel({ rows: chartRows, recognition });
@@ -385,6 +445,40 @@ const togglePlayback = async () => {
   await controller.resume();
 };
 
+const handlePause = () => {
+  if (!showPauseButton.value || isUserPaused.value) return;
+
+  controller.pause();
+};
+
+const handleResume = () => {
+  if (!isUserPaused.value) return;
+
+  void controller.resume();
+};
+
+const handlePauseButton = () => {
+  if (isUserPaused.value) {
+    handleResume();
+    return;
+  }
+
+  handlePause();
+};
+
+const handleSkipMovement = () => {
+  if (!showSkipMovementButton.value) return;
+
+  controller.skipCurrentBlockingInteraction();
+};
+
+const handleBackToStart = async () => {
+  if (isNavigatingHome.value) return;
+
+  isNavigatingHome.value = true;
+  await navigateTo("/");
+};
+
 const continueToNextAct = async () => {
   const nextActId = runtimeStore.currentAct?.nextActId;
 
@@ -428,6 +522,31 @@ onBeforeUnmount(() => {
   disposeSkeletonFeedback();
   controller.dispose();
 });
+
+usePresenterActions({
+  enabled: computed(() => climateStageMode.value === "running"),
+  onPageUp: () => {
+    if (activePresenterContext.value === "paused") {
+      void handleBackToStart();
+      return;
+    }
+
+    if (activePresenterContext.value === "running") handlePause();
+  },
+  onPageDown: () => {
+    if (activePresenterContext.value === "paused") {
+      handleResume();
+      return;
+    }
+
+    if (
+      activePresenterContext.value === "running" &&
+      showSkipMovementButton.value
+    ) {
+      handleSkipMovement();
+    }
+  },
+});
 </script>
 
 <style scoped>
@@ -470,7 +589,10 @@ onBeforeUnmount(() => {
     linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.24));
 }
 
-.climate-act-page > :not(.story-progress):not(.climate-act-debug-button) {
+.climate-act-page
+  > :not(.story-progress):not(.climate-act-debug-button):not(
+    .climate-act-pause-button
+  ):not(.climate-act-skip-button):not(.pause-overlay) {
   position: relative;
   z-index: 1;
 }
@@ -584,6 +706,48 @@ onBeforeUnmount(() => {
 
 .climate-act-page--debug-open .climate-act-debug-button {
   bottom: calc(var(--climate-act-bottom-bar-height) + 12px);
+}
+
+.climate-act-pause-button,
+.climate-act-skip-button {
+  position: absolute;
+  bottom: 14px;
+  z-index: 30;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid rgba(31, 49, 39, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(31, 49, 39, 0.7);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.climate-act-pause-button {
+  left: 82px;
+}
+
+.climate-act-skip-button {
+  left: 148px;
+  border-color: rgb(31 49 39 / 0.24);
+  background: rgb(255 255 255 / 0.82);
+  color: rgb(31 49 39 / 0.78);
+}
+
+.climate-act-page--debug-open .climate-act-pause-button,
+.climate-act-page--debug-open .climate-act-skip-button {
+  bottom: calc(var(--climate-act-bottom-bar-height) + 12px);
+}
+
+.climate-act-pause-button[aria-pressed="true"] {
+  border-color: rgba(31, 49, 39, 0.36);
+  background: rgba(31, 49, 39, 0.92);
+  color: #ffffff;
 }
 
 .climate-act-debug-button--active {

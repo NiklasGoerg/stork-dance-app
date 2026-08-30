@@ -47,10 +47,10 @@ export const useAct4SkeletonFeedback = ({
             ? "notEvaluable"
             : evaluation.negativeFeedbackEligible === false &&
                 !evaluation.passed
-            ? "notEvaluable"
-            : evaluation.passed
-              ? "passed"
-              : "failed",
+              ? "notEvaluable"
+              : evaluation.passed
+                ? "passed"
+                : "failed",
         });
       });
     }),

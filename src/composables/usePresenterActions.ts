@@ -30,6 +30,16 @@ export const isPresenterEditableTarget = (target: EventTarget | null) => {
   return tagName === "input" || tagName === "textarea" || tagName === "select";
 };
 
+export const getPresenterActionForEvent = (
+  event: Pick<KeyboardEvent, "key" | "repeat" | "target">,
+  enabled: boolean,
+) => {
+  if (!enabled || event.repeat) return null;
+  if (isPresenterEditableTarget(event.target)) return null;
+
+  return getPresenterActionForKey(event.key);
+};
+
 export const usePresenterActions = ({
   enabled,
   onPageUp,
@@ -38,10 +48,7 @@ export const usePresenterActions = ({
   if (typeof window === "undefined") return;
 
   const handleKeydown = (event: KeyboardEvent) => {
-    if (!toValue(enabled) || event.repeat) return;
-    if (isPresenterEditableTarget(event.target)) return;
-
-    const action = getPresenterActionForKey(event.key);
+    const action = getPresenterActionForEvent(event, toValue(enabled));
     if (!action) return;
 
     event.preventDefault();

@@ -16,6 +16,9 @@
       <ClientOnly>
         <NarrationVoiceSelector class="home-nav__narration" />
       </ClientOnly>
+      <NuxtLink class="home-nav__credits" to="/credits">
+        {{ t("home.nav.credits") }}
+      </NuxtLink>
     </nav>
 
     <section class="home-hero" aria-labelledby="home-title">
@@ -81,7 +84,7 @@ const { t } = useI18n();
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1250px, calc(100vw - 32px));
   padding: 8px;
   border: 1px solid rgba(30, 48, 38, 0.14);
   border-radius: 8px;
@@ -93,6 +96,10 @@ const { t } = useI18n();
 .home-nav__narration {
   flex: 1 1 420px;
   justify-content: center;
+}
+
+.home-nav__credits {
+  margin-left: auto;
 }
 
 .home-nav a {
@@ -180,6 +187,10 @@ const { t } = useI18n();
 
   .home-nav__narration {
     flex-basis: 100%;
+  }
+
+  .home-nav__credits {
+    margin-left: 0;
   }
 }
 </style>

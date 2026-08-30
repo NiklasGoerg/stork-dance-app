@@ -25,6 +25,20 @@ import type {
   SeasonalCycleSeasonConfig,
 } from "~/utils/seasonalCycle";
 
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+};
+
+const createDeferred = <T>(): Deferred<T> => {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return { promise, resolve };
+};
+
 const mockClimateRows = vi.hoisted<ClimateSeasonDataRow[]>(() => {
   const createRow = ({
     intervalOrder,
@@ -387,6 +401,7 @@ const createHarness = (
         }
       },
     ),
+    waitForNextBarBoundary: vi.fn(async () => undefined),
     queueSeasonIndexRestart: vi.fn(
       (
         _seasonIndex: number,
@@ -402,6 +417,9 @@ const createHarness = (
         queuedEndActions.push(onSeasonEnd);
       },
     ),
+    cancelQueuedSeasonRestart: vi.fn(() => {
+      queuedRestarts.splice(0, queuedRestarts.length);
+    }),
   };
   const recognition = createRecognition();
   const controller = useAct4Controller({
@@ -619,6 +637,208 @@ describe("useAct4Controller narration", () => {
     expect(narration.resume).toHaveBeenCalledTimes(1);
     expect(cycle.pause).toHaveBeenCalledTimes(1);
     expect(cycle.play).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores delayed recognition results while paused", () => {
+    const { controller, cycle, target, queuedRestarts } = createHarness();
+
+    controller.pause();
+    controller.handleRecognitionResult(target, fail("OPEN_ARMS_HIGHER"));
+
+    expect(controller.store.lifecycleStatus).toBe("paused");
+    expect(controller.store.sequenceStatus).toBe("performing");
+    expect(controller.store.attempt.handledEvaluationKey).toBe("");
+    expect(queuedRestarts).toHaveLength(0);
+    expect(cycle.queueSeasonIndexRestart).not.toHaveBeenCalled();
+  });
+
+  it("manually skips a running climate target without emitting success feedback", async () => {
+    const { controller, cycle, narration, recognition, target } =
+      createHarness();
+    const nextTarget = createTarget({
+      id: "summer-target",
+      season: "summer",
+      movementValue: 60,
+    });
+
+    controller.store.startFlow("act4Story", [target, nextTarget]);
+    controller.store.startTarget(0);
+    vi.mocked(recognition.startTarget).mockClear();
+
+    expect(controller.canSkipCurrentBlockingInteraction.value).toBe(true);
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    await vi.waitFor(() => {
+      expect(controller.store.currentTargetIndex).toBe(1);
+    });
+
+    expect(controller.store.completedStepIds).toEqual([target.id]);
+    expect(controller.store.sequenceStatus).toBe("performing");
+    expect(recognition.resetAll).toHaveBeenCalledTimes(1);
+    expect(recognition.startTarget).toHaveBeenCalledWith(nextTarget, {
+      keepCalibration: true,
+      manual: false,
+    });
+    expect(cycle.cancelQueuedSeasonRestart).toHaveBeenCalledTimes(1);
+    expect(cycle.queueSeasonIndexRestart).not.toHaveBeenCalled();
+    expect(controller.store.debug.feedbackSelection).toBeNull();
+    expect(controller.store.debug.feedbackSignals).toEqual([]);
+    expect(controller.store.feedback.visibleFeedbackCode).toBeNull();
+    expect(narration.play).not.toHaveBeenCalledWith(
+      expect.stringContaining("feedback"),
+      expect.anything(),
+    );
+  });
+
+  it("waits for the next master bar before starting the target after skip", async () => {
+    const boundary = createDeferred<undefined>();
+    const { controller, cycle, recognition, target } = createHarness();
+    const nextTarget = createTarget({
+      id: "winter-target",
+      season: "winter",
+      movementValue: 80,
+    });
+
+    vi.mocked(cycle.waitForNextBarBoundary).mockImplementationOnce(
+      () => boundary.promise,
+    );
+    controller.store.startFlow("act4Story", [target, nextTarget]);
+    controller.store.startTarget(0);
+    vi.mocked(recognition.startTarget).mockClear();
+
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    await Promise.resolve();
+
+    expect(controller.store.sequenceStatus).toBe("evaluating");
+    expect(controller.store.currentTargetIndex).toBe(0);
+    expect(recognition.startTarget).not.toHaveBeenCalled();
+
+    boundary.resolve(undefined);
+    await vi.waitFor(() => {
+      expect(controller.store.currentTargetIndex).toBe(1);
+    });
+
+    expect(cycle.waitForNextBarBoundary).toHaveBeenCalledTimes(1);
+    expect(recognition.startTarget).toHaveBeenCalledWith(nextTarget, {
+      keepCalibration: true,
+      manual: false,
+    });
+  });
+
+  it("manually skips a tutorial target to the next tutorial movement", async () => {
+    const { controller, narration, recognition } = createHarness();
+    const tutorialTarget = createTutorialAutumnMinimumTarget();
+    const nextTutorialTarget = createTarget({
+      id: "tutorial-summer-75",
+      context: "tutorial",
+      season: "summer",
+      movementValue: 75,
+      target: "maximum",
+      interval: undefined,
+      climateData: undefined,
+    });
+
+    controller.store.startFlow("act4Full", [
+      tutorialTarget,
+      nextTutorialTarget,
+    ]);
+    controller.store.startTarget(0);
+    vi.mocked(narration.play).mockClear();
+    vi.mocked(recognition.startTarget).mockClear();
+
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    await vi.waitFor(() => {
+      expect(controller.store.currentTargetIndex).toBe(1);
+    });
+
+    expect(controller.store.completedStepIds).toEqual([tutorialTarget.id]);
+    expect(recognition.startTarget).toHaveBeenCalledWith(nextTutorialTarget, {
+      keepCalibration: true,
+      manual: false,
+    });
+    expect(
+      narration.play.mock.calls.some(([cueKey]) =>
+        String(cueKey).includes("complete"),
+      ),
+    ).toBe(false);
+  });
+
+  it("cancels retry interlude restart when manually skipping the target", async () => {
+    const { controller, cycle, recognition, queuedRestarts, target } =
+      createHarness();
+    const nextTarget = createTarget({
+      id: "winter-target",
+      season: "winter",
+      movementValue: 80,
+    });
+
+    controller.store.startFlow("act4Story", [target, nextTarget]);
+    controller.store.startTarget(0);
+    controller.handleRecognitionResult(target, fail("OPEN_ARMS_HIGHER"));
+
+    expect(controller.store.sequenceStatus).toBe("retryInterlude");
+    expect(queuedRestarts).toHaveLength(1);
+    expect(controller.canSkipCurrentBlockingInteraction.value).toBe(true);
+
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    expect(queuedRestarts).toHaveLength(0);
+    await vi.waitFor(() => {
+      expect(controller.store.currentTargetIndex).toBe(1);
+    });
+
+    expect(cycle.cancelQueuedSeasonRestart).toHaveBeenCalledTimes(1);
+    expect(recognition.resetAll).toHaveBeenCalledTimes(1);
+    expect(controller.store.attempt.retryPreviewFeedbackText).toBe("");
+    expect(controller.store.completedStepIds).toEqual([target.id]);
+    expect(controller.store.attempt.attemptNumber).toBe(2);
+  });
+
+  it("ignores non-skippable climate states and delayed results after skip", async () => {
+    const { controller, cycle, target } = createHarness();
+    const nextTarget = createTarget({
+      id: "summer-target",
+      season: "summer",
+      movementValue: 60,
+    });
+
+    controller.pause();
+    expect(controller.skipCurrentBlockingInteraction()).toBe(false);
+    await controller.resume();
+    controller.store.enterStoryNarration({
+      phase: "story-intro",
+      status: "storyIntro",
+      targetIndex: 0,
+      cueId: "act4.story.intro.chart",
+      textKey: "story.acts.act4.narration.story.intro.chart",
+    });
+    expect(controller.skipCurrentBlockingInteraction()).toBe(false);
+
+    controller.store.startFlow("act4Story", [target, nextTarget]);
+    controller.store.startTarget(0);
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    expect(controller.skipCurrentBlockingInteraction()).toBe(false);
+    controller.handleRecognitionResult(target, fail("OPEN_ARMS_HIGHER"));
+    await vi.waitFor(() => {
+      expect(controller.store.currentTargetIndex).toBe(1);
+    });
+
+    expect(cycle.queueSeasonIndexRestart).not.toHaveBeenCalled();
+  });
+
+  it("completes the final climate story target after a manual skip", async () => {
+    const { controller, cycle, target } = createHarness();
+
+    controller.store.startFlow("act4Story", [target]);
+    controller.store.startTarget(0);
+
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    await vi.waitFor(() => {
+      expect(controller.store.lifecycleStatus).toBe("completed");
+    });
+
+    expect(controller.store.sequenceStatus).toBe("completed");
+    expect(controller.store.completedStepIds).toEqual([target.id]);
+    expect(cycle.queueSeasonIndexEndAction).not.toHaveBeenCalled();
+    expect(cycle.complete).toHaveBeenCalledTimes(1);
   });
 
   it("plays the full tutorial introduction before the first tutorial target", async () => {

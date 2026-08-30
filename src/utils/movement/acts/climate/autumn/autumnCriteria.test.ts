@@ -146,8 +146,8 @@ describe("autumn criteria", () => {
     expect(
       getCriterion(criteria, "inner-forearm-oriented-endpoint")?.feedbackCode,
     ).toBe(undefined);
-    expect(getCriterion(criteria, "outer-wrist-endpoint-side")?.importance).toBe(
-      "supporting",
-    );
+    expect(
+      getCriterion(criteria, "outer-wrist-endpoint-side")?.importance,
+    ).toBe("supporting");
   });
 });

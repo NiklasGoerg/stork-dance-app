@@ -8,10 +8,7 @@
     :aria-label="t('story.migrationPanel.ariaLabel')"
   >
     <div class="migration-info-panel__content">
-      <p
-        v-if="visibleNarrationText"
-        class="migration-info-panel__narration"
-      >
+      <p v-if="visibleNarrationText" class="migration-info-panel__narration">
         {{ visibleNarrationText }}
       </p>
     </div>

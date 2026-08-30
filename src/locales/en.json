@@ -2,7 +2,10 @@
   "common": {
     "dataDance": "Data Dance",
     "start": "Start",
+    "pause": "Pause",
+    "resume": "Resume",
     "continue": "Continue",
+    "backToStart": "Back to Start",
     "cancel": "Cancel",
     "repeat": "Repeat",
     "loading": "Loading",
@@ -21,6 +24,10 @@
       "playing": "Playing",
       "paused": "Paused",
       "stopped": "Stopped"
+    },
+    "pauseOverlay": {
+      "title": "Paused",
+      "text": "Continue when you're ready."
     }
   },
   "home": {
@@ -36,7 +43,8 @@
       "epilogue": "Epilogue",
       "storyStageTest": "Story Stage Test",
       "record": "Record",
-      "movementCameraTest": "Movement Camera Test"
+      "movementCameraTest": "Movement Camera Test",
+      "credits": "Credits"
     }
   },
   "narration": {
@@ -69,6 +77,12 @@
       "recordWebcam": "Record Webcam",
       "recordVideo": "Record Video",
       "playback": "Playback"
+    },
+    "panel": {
+      "collapse": "Collapse controls",
+      "expand": "Expand controls",
+      "collapseTitle": "Collapse control panel",
+      "expandTitle": "Expand control panel"
     },
     "webcam": {
       "iconTitle": "Record",
@@ -105,11 +119,21 @@
       "analysisFailed": "Video analysis failed."
     }
   },
+  "movementStage": {
+    "empty": "Waiting for body tracking",
+    "debug": {
+      "points": "{count} points",
+      "fixedFrame": "Fixed frame"
+    }
+  },
   "playback": {
     "iconTitle": "Playback",
     "title": "Playback Movement",
+    "movementAsset": "Movement Library",
+    "selectAsset": "Select a movement...",
     "movementJson": "Movement JSON",
     "stopTitle": "Stop playback",
+    "resetTitle": "Reset playback",
     "pause": "Pause",
     "start": "Start",
     "note": {
@@ -396,6 +420,9 @@
         "transition": {
           "label": "Next Cycle"
         },
+        "controls": {
+          "skipMovement": "Skip Movement"
+        },
         "narration": {
           "intro": {
             "part1": {
@@ -635,7 +662,8 @@
           "startAct4WithoutTutorial": "Start without tutorial",
           "play": "Play",
           "pause": "Pause",
-          "reset": "Reset"
+          "reset": "Reset",
+          "skipMovement": "Skip Movement"
         },
         "instructions": {
           "learn": "Learn the {season} movement",
