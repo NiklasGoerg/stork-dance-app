@@ -101,12 +101,30 @@ describe("buildMigrationActInfoPanelModel", () => {
     });
 
     expect(model).toMatchObject({
-      mode: "movementFeedback",
+      mode: "storyNarration",
       title: "Southbound route",
-      instruction: "story.migrationPanel.instructions.summerRest",
+      instruction: "The route leads through the eastern flyway.",
       feedbackText: "story.acts.act4.movementText.good",
       feedbackPrimary: true,
       tone: "success",
     });
+  });
+
+  it("returns to contextual movement instruction after narration ends", () => {
+    const model = buildMigrationActInfoPanelModel({
+      ...baseArgs,
+      currentPhase: "winter_rest",
+      movementFeedbackVisible: false,
+      storyNarrationTitle: "",
+      storyNarrationText: "",
+    });
+
+    expect(model).toMatchObject({
+      mode: "phaseInstruction",
+      title: "story.migrationPanel.movements.winterRest",
+      instruction: "story.migrationPanel.instructions.winterRest",
+      tone: "neutral",
+    });
+    expect(model.feedbackText).toBeUndefined();
   });
 });

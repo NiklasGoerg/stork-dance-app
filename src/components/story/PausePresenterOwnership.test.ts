@@ -88,8 +88,15 @@ describe("pause presenter ownership", () => {
     expect(climateStageSource).toContain("handleSkipMovement();");
   });
 
-  it("exposes Skip Movement only for active Act III blocking gestures", () => {
+  it("exposes Skip Movement for Act II guided gates and Act III blocking gestures", () => {
     expect(migrationStageSource).toContain("showSkipMovementButton");
+    expect(migrationStageSource).toContain('props.act.id === "act-2"');
+    expect(migrationStageSource).toContain(
+      "guidedController.canSkipCurrentBlockingInteraction.value",
+    );
+    expect(migrationStageSource).toContain(
+      "guidedController.skipCurrentBlockingInteraction();",
+    );
     expect(migrationStageSource).toContain('props.act.id === "act-3"');
     expect(migrationStageSource).toContain("!isUserPaused.value");
     expect(migrationStageSource).toContain("store.isGestureActive");

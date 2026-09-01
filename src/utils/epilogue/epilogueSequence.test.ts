@@ -25,7 +25,7 @@ describe("epilogue sequence", () => {
       otherInfluences:
         "Food provided by humans, changed habitats, age, and migration experience may also shape the journey.",
       finalReflection:
-        "Climate is one part of the changing environment, not the whole explanation. What will the stork's journey look like next?",
+        "Climate is one part of the changing environment, not the whole explanation. What will the stork's journey look like in the future?",
     });
   });
 

@@ -599,6 +599,20 @@ export const useMigrationActMovementSession = () => {
     return true;
   };
 
+  const shiftTransportAnchors = (deltaMs: number) => {
+    if (!Number.isFinite(deltaMs) || deltaMs === 0) return;
+
+    if (segmentStartTransportMs !== null) segmentStartTransportMs += deltaMs;
+    if (demonstrationStartTransportMs !== null) {
+      demonstrationStartTransportMs += deltaMs;
+    }
+    if (attemptBeat1TransportMs !== null) attemptBeat1TransportMs += deltaMs;
+    if (baselineCollectionStartMs !== null) {
+      baselineCollectionStartMs += deltaMs;
+    }
+    if (baselineCollectionEndMs !== null) baselineCollectionEndMs += deltaMs;
+  };
+
   const cancel = () => {
     store.cancelGesture();
     demonstrationActive.value = false;
@@ -633,6 +647,7 @@ export const useMigrationActMovementSession = () => {
     tick,
     handlePoseFrame,
     forceComplete,
+    shiftTransportAnchors,
     setNarrationEnabled: gestureNarration.setEnabled,
     cancel,
     cleanup,

@@ -33,13 +33,13 @@ runtime behavior.
 
 The final participant experience uses a five-act structure:
 
-| Act | Route | Description |
-| --- | --- | --- |
-| Act I - Prologue | `/story/prologue` | Introduces white stork migration and the scientific/data context. |
-| Act II - Guided Migration | `/story/act-2` | Introduces one complete reference migration cycle and teaches the recurring movement vocabulary. |
-| Act III - Migration Change over Time | `/story/act-3` | Reuses familiar movement representations across selected migration cycles and communicates differences in timing, duration, and route/wintering context. |
-| Act IV - Seasonal Temperature Change | `/story/act-4` | Introduces four seasonal movements and varies them quantitatively according to seasonal temperature data. |
-| Act V - Epilogue | `/story/epilogue` | Returns to narration/visualization and contextualizes ecological complexity and uncertainty. |
+| Act                                  | Route             | Description                                                                                                                                              |
+| ------------------------------------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Act I - Prologue                     | `/story/prologue` | Introduces white stork migration and the scientific/data context.                                                                                        |
+| Act II - Guided Migration            | `/story/act-2`    | Introduces one complete reference migration cycle and teaches the recurring movement vocabulary.                                                         |
+| Act III - Migration Change over Time | `/story/act-3`    | Reuses familiar movement representations across selected migration cycles and communicates differences in timing, duration, and route/wintering context. |
+| Act IV - Seasonal Temperature Change | `/story/act-4`    | Introduces four seasonal movements and varies them quantitatively according to seasonal temperature data.                                                |
+| Act V - Epilogue                     | `/story/epilogue` | Returns to narration/visualization and contextualizes ecological complexity and uncertainty.                                                             |
 
 Historical `/story/act-5` and `/story/act5` routes are retained as compatibility
 redirects to the current Act IV climate experience. They are not separate final
@@ -64,19 +64,19 @@ story acts.
 
 ## Technology Stack
 
-| Technology | Purpose |
-| --- | --- |
-| Nuxt 4 / Vue 3 | Application framework and routing |
-| TypeScript | Application and domain logic |
-| Pinia | Serializable runtime state |
-| MediaPipe Tasks Vision | Pose and hand tracking |
-| Leaflet | Migration map visualization |
-| D3 / SVG | Climate chart rendering |
-| Web Audio API | Rhythm, transport timing, and seasonal music |
-| Web Speech API | Browser-native narration |
-| Sass / SCSS | Global and component styling |
-| Vitest | Unit and integration-style tests |
-| ESLint / Prettier | Code quality and formatting |
+| Technology             | Purpose                                      |
+| ---------------------- | -------------------------------------------- |
+| Nuxt 4 / Vue 3         | Application framework and routing            |
+| TypeScript             | Application and domain logic                 |
+| Pinia                  | Serializable runtime state                   |
+| MediaPipe Tasks Vision | Pose and hand tracking                       |
+| Leaflet                | Migration map visualization                  |
+| D3 / SVG               | Climate chart rendering                      |
+| Web Audio API          | Rhythm, transport timing, and seasonal music |
+| Web Speech API         | Browser-native narration                     |
+| Sass / SCSS            | Global and component styling                 |
+| Vitest                 | Unit and integration-style tests             |
+| ESLint / Prettier      | Code quality and formatting                  |
 
 ## Requirements
 
@@ -109,18 +109,18 @@ Nuxt normally serves the app at `http://localhost:3000` in development.
 
 Available project commands:
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start the local Nuxt development server. |
-| `npm run dev:host` | Start Nuxt on the local network with host binding and HTTPS. |
-| `npm run build` | Build the production application. |
-| `npm run preview` | Preview the production build locally. |
-| `npm run generate` | Generate a static Nuxt output. |
-| `npm run test` | Run the Vitest test suite. |
-| `npm run typecheck` | Run Nuxt/Vue TypeScript checks. |
-| `npm run lint:check` | Run ESLint without applying fixes. |
-| `npm run lint` | Run ESLint with fixes. |
-| `npm run prettier` | Format files with Prettier. |
+| Command                             | Purpose                                                             |
+| ----------------------------------- | ------------------------------------------------------------------- |
+| `npm run dev`                       | Start the local Nuxt development server.                            |
+| `npm run dev:host`                  | Start Nuxt on the local network with host binding and HTTPS.        |
+| `npm run build`                     | Build the production application.                                   |
+| `npm run preview`                   | Preview the production build locally.                               |
+| `npm run generate`                  | Generate a static Nuxt output.                                      |
+| `npm run test`                      | Run the Vitest test suite.                                          |
+| `npm run typecheck`                 | Run Nuxt/Vue TypeScript checks.                                     |
+| `npm run lint:check`                | Run ESLint without applying fixes.                                  |
+| `npm run lint`                      | Run ESLint with fixes.                                              |
+| `npm run prettier`                  | Format files with Prettier.                                         |
 | `npm run data:preprocess:migration` | Regenerate the curated migration story CSV from the raw stork data. |
 
 ## Interaction and Presenter Controls
@@ -129,24 +129,24 @@ The prototype can be controlled with visible buttons and with presenter keys.
 
 Entry screens:
 
-| Key | Action |
-| --- | --- |
-| Page Up | Back |
+| Key       | Action   |
+| --------- | -------- |
+| Page Up   | Back     |
 | Page Down | Continue |
 
 Active movement acts:
 
-| Key | Action |
-| --- | --- |
-| Page Up | Pause |
+| Key       | Action                                                                            |
+| --------- | --------------------------------------------------------------------------------- |
+| Page Up   | Pause                                                                             |
 | Page Down | Skip Movement, only when the currently blocking movement supports manual fallback |
 
 Pause screen:
 
-| Key | Action |
-| --- | --- |
-| Page Up | Back to Start |
-| Page Down | Resume |
+| Key       | Action        |
+| --------- | ------------- |
+| Page Up   | Back to Start |
+| Page Down | Resume        |
 
 Page Down is not a general fast-forward command. It only skips the currently
 blocking movement when manual fallback is available. Mouse-visible Pause,

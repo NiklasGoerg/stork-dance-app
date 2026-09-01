@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getPresenterActionForEvent,
+  getPresenterActionForCode,
   getPresenterActionForKey,
   isPresenterEditableTarget,
 } from "~/composables/usePresenterActions";
@@ -9,8 +10,16 @@ describe("usePresenterActions helpers", () => {
   it("maps presenter keys and ignores arrow keys", () => {
     expect(getPresenterActionForKey("PageUp")).toBe("pageUp");
     expect(getPresenterActionForKey("PageDown")).toBe("pageDown");
+    expect(getPresenterActionForKey("Prior")).toBe("pageUp");
+    expect(getPresenterActionForKey("Next")).toBe("pageDown");
     expect(getPresenterActionForKey("ArrowUp")).toBeNull();
     expect(getPresenterActionForKey("ArrowDown")).toBeNull();
+  });
+
+  it("maps presenter page codes when key names are browser or device specific", () => {
+    expect(getPresenterActionForCode("PageUp")).toBe("pageUp");
+    expect(getPresenterActionForCode("PageDown")).toBe("pageDown");
+    expect(getPresenterActionForCode("ArrowUp")).toBeNull();
   });
 
   it("detects editable targets", () => {
@@ -51,6 +60,17 @@ describe("usePresenterActions helpers", () => {
 
     expect(getPresenterActionForEvent(pageUp, true)).toBe("pageUp");
     expect(getPresenterActionForEvent(pageUp, false)).toBeNull();
+    expect(
+      getPresenterActionForEvent(
+        {
+          key: "Unidentified",
+          code: "PageDown",
+          repeat: false,
+          target: { tagName: "button" } as unknown as EventTarget,
+        },
+        true,
+      ),
+    ).toBe("pageDown");
     expect(
       getPresenterActionForEvent({ ...pageUp, repeat: true }, true),
     ).toBeNull();

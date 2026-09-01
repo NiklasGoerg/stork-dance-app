@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import movementCameraSource from "~/components/movement/MovementCamera.vue?raw";
 import { useMigrationActMovementRecognition } from "~/composables/migrationActs/useMigrationActMovementRecognition";
 import type { PoseLandmarkLike } from "~/types/pose";
 import { POSE_LANDMARK } from "~/utils/pose/poseLandmarks";
@@ -178,50 +179,50 @@ const summerSamples: MigrationMovementRecognitionSample[] = [
 const winterSamples: MigrationMovementRecognitionSample[] = [
   createSample({
     barElapsedMs: 0,
-    ankleX: 0.4,
-    rightAnkleX: 0.6,
+    ankleX: 0.6,
+    rightAnkleX: 0.4,
     stanceWidth: 1,
   }),
   createSample({
     barElapsedMs: 700,
-    ankleX: 0.4,
-    rightAnkleX: 0.64,
+    ankleX: 0.6,
+    rightAnkleX: 0.36,
     stanceWidth: 1.2,
   }),
   createSample({
     barElapsedMs: 1_000,
-    ankleX: 0.4,
-    rightAnkleX: 0.64,
+    ankleX: 0.6,
+    rightAnkleX: 0.36,
     stanceWidth: 1.2,
   }),
   createSample({
     barElapsedMs: 1_700,
-    ankleX: 0.625,
-    rightAnkleX: 0.64,
+    ankleX: 0.375,
+    rightAnkleX: 0.36,
     stanceWidth: 0.075,
   }),
   createSample({
     barElapsedMs: 2_000,
-    ankleX: 0.625,
-    rightAnkleX: 0.64,
+    ankleX: 0.375,
+    rightAnkleX: 0.36,
     stanceWidth: 0.075,
   }),
   createSample({
     barElapsedMs: 2_700,
-    ankleX: 0.35,
-    rightAnkleX: 0.64,
+    ankleX: 0.65,
+    rightAnkleX: 0.36,
     stanceWidth: 1.45,
   }),
   createSample({
     barElapsedMs: 3_000,
-    ankleX: 0.35,
-    rightAnkleX: 0.64,
+    ankleX: 0.65,
+    rightAnkleX: 0.36,
     stanceWidth: 1.45,
   }),
   createSample({
     barElapsedMs: 3_700,
-    ankleX: 0.35,
-    rightAnkleX: 0.365,
+    ankleX: 0.65,
+    rightAnkleX: 0.635,
     stanceWidth: 0.075,
   }),
 ];
@@ -420,6 +421,74 @@ describe("migration movement metrics and criteria", () => {
     expect(evaluateDelta(0.637)).toBe("failed");
     expect(evaluateDelta(0.636)).toBe("success");
     expect(evaluateDelta(0.63)).toBe("success");
+  });
+
+  it("recognizes Winter count 1 as anatomical right stepping toward lower raw x", () => {
+    const evaluateRightStep = (rightAnkleX: number) =>
+      evaluateMigrationMovementBeat({
+        profile: "winter_rest",
+        beatIndex: 1,
+        samples: [
+          createSample({
+            barElapsedMs: 0,
+            ankleX: 0.6,
+            rightAnkleX: 0.4,
+            stanceWidth: 1,
+          }),
+          createSample({
+            barElapsedMs: 700,
+            ankleX: 0.6,
+            rightAnkleX,
+            stanceWidth: 1.2,
+          }),
+        ],
+      });
+
+    expect(evaluateRightStep(0.36)).toMatchObject({
+      status: "success",
+      detectedSide: "right",
+      metrics: { activeFootDelta: expect.any(Number) },
+    });
+    expect(evaluateRightStep(0.4).status).toBe("failed");
+    expect(evaluateRightStep(0.44).status).toBe("failed");
+  });
+
+  it("recognizes Winter count 3 as the symmetric anatomical left step", () => {
+    const result = evaluateMigrationMovementBeat({
+      profile: "winter_rest",
+      beatIndex: 3,
+      samples: [
+        createSample({
+          barElapsedMs: 2_000,
+          ankleX: 0.375,
+          rightAnkleX: 0.36,
+          stanceWidth: 0.075,
+        }),
+        createSample({
+          barElapsedMs: 2_700,
+          ankleX: 0.65,
+          rightAnkleX: 0.36,
+          stanceWidth: 1.45,
+        }),
+      ],
+    });
+
+    expect(result).toMatchObject({
+      status: "success",
+      detectedSide: "left",
+      metrics: { activeSide: "left" },
+    });
+  });
+
+  it("keeps mirrored camera rendering separate from recognition landmarks", () => {
+    expect(movementCameraSource).toContain(
+      'emit("poseLandmarks", smoothedPoseLandmarks);',
+    );
+    expect(movementCameraSource.indexOf('emit("poseLandmarks"')).toBeLessThan(
+      movementCameraSource.indexOf("drawBody(smoothedPoseLandmarks);"),
+    );
+    expect(movementCameraSource).toContain("context.scale(-1, 1);");
+    expect(movementCameraSource).toContain("transform: scaleX(-1)");
   });
 
   it("accepts winter step activity without requiring bounce", () => {
@@ -853,7 +922,7 @@ describe("migration movement metrics and criteria", () => {
     ).toBe("failed");
   });
 
-  it("requires both arms down and closed feet for a guided return", () => {
+  it("requires lowered evaluable arms and closed feet for a guided return", () => {
     const evaluate = (
       stanceWidth: number,
       wingState: MigrationMovementRecognitionSample["wingState"],
@@ -872,8 +941,10 @@ describe("migration movement metrics and criteria", () => {
       }).status;
 
     expect(evaluate(1.4, "down")).toBe("success");
+    expect(evaluate(1.4, "neutral")).toBe("success");
     expect(evaluate(1.7, "down")).toBe("failed");
     expect(evaluate(1.4, "up")).toBe("failed");
+    expect(evaluate(1.4, "not_evaluable")).toBe("failed");
   });
 
   it("marks missing required landmarks as not evaluable", () => {
@@ -1101,17 +1172,30 @@ describe("migration movement metrics and criteria", () => {
       movementId: "autumn-migration-medium",
     });
 
+    const pulseIds: string[] = [];
+
     [
       { time: 0, leftAnkleX: 0.4, rightAnkleX: 0.6, elbowY: 0.4 },
       { time: 700, leftAnkleX: 0.35, rightAnkleX: 0.6, elbowY: 0.3 },
       { time: 1_000, leftAnkleX: 0.35, rightAnkleX: 0.6, elbowY: 0.3 },
-      { time: 2_080, leftAnkleX: 0.377, rightAnkleX: 0.6, elbowY: 0.4 },
+      {
+        time: 2_080,
+        leftAnkleX: 0.377,
+        rightAnkleX: 0.6,
+        elbowY: 0.42,
+        leftWristX: 0.46,
+        rightWristX: 0.54,
+        wristY: 0.5,
+      },
     ].forEach((frame) => {
       recognition.handlePoseFrame({
         landmarks: createLandmarks(frame),
         transportTimeMs: frame.time,
         timestampMs: frame.time,
       });
+      const pulseId =
+        recognition.skeletonFeedbackState.value.sourceEvaluationId;
+      if (pulseId && !pulseIds.includes(pulseId)) pulseIds.push(pulseId);
     });
 
     expect(recognition.lastBeatEvaluation.value).toMatchObject({
@@ -1124,6 +1208,12 @@ describe("migration movement metrics and criteria", () => {
       },
     });
     expect(recognition.lastSuccessfulEvaluationId.value).toContain("-2");
+    expect(pulseIds.some((id) => id.endsWith("-1"))).toBe(true);
+    expect(pulseIds.some((id) => id.endsWith("-2"))).toBe(true);
+    expect(recognition.skeletonFeedbackState.value).toMatchObject({
+      mode: "successPulse",
+      sourceEvaluationId: expect.stringContaining("-2"),
+    });
     recognition.cleanup();
   });
 
@@ -1293,14 +1383,14 @@ describe("migration movement metrics and criteria", () => {
       profile: "winter_rest" as const,
       movementId: "winter-step",
       frames: [
-        { time: 0, leftAnkleX: 0.4, rightAnkleX: 0.6, elbowY: 0.4 },
-        { time: 700, leftAnkleX: 0.4, rightAnkleX: 0.64, elbowY: 0.4 },
-        { time: 1_000, leftAnkleX: 0.4, rightAnkleX: 0.64, elbowY: 0.4 },
-        { time: 1_700, leftAnkleX: 0.625, rightAnkleX: 0.64, elbowY: 0.4 },
-        { time: 2_000, leftAnkleX: 0.625, rightAnkleX: 0.64, elbowY: 0.4 },
-        { time: 2_700, leftAnkleX: 0.35, rightAnkleX: 0.64, elbowY: 0.4 },
-        { time: 3_000, leftAnkleX: 0.35, rightAnkleX: 0.64, elbowY: 0.4 },
-        { time: 3_700, leftAnkleX: 0.35, rightAnkleX: 0.365, elbowY: 0.4 },
+        { time: 0, leftAnkleX: 0.6, rightAnkleX: 0.4, elbowY: 0.4 },
+        { time: 700, leftAnkleX: 0.6, rightAnkleX: 0.36, elbowY: 0.4 },
+        { time: 1_000, leftAnkleX: 0.6, rightAnkleX: 0.36, elbowY: 0.4 },
+        { time: 1_700, leftAnkleX: 0.375, rightAnkleX: 0.36, elbowY: 0.4 },
+        { time: 2_000, leftAnkleX: 0.375, rightAnkleX: 0.36, elbowY: 0.4 },
+        { time: 2_700, leftAnkleX: 0.65, rightAnkleX: 0.36, elbowY: 0.4 },
+        { time: 3_000, leftAnkleX: 0.65, rightAnkleX: 0.36, elbowY: 0.4 },
+        { time: 3_700, leftAnkleX: 0.65, rightAnkleX: 0.635, elbowY: 0.4 },
       ],
     },
     {

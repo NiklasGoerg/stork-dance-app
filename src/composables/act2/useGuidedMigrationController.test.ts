@@ -1,12 +1,16 @@
 import { createPinia, setActivePinia } from "pinia";
 import { nextTick, reactive, shallowRef } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useGuidedMigrationController } from "~/composables/act2/useGuidedMigrationController";
+import {
+  isGuidedBlockingInteractionPhase,
+  useGuidedMigrationController,
+} from "~/composables/act2/useGuidedMigrationController";
 import { GUIDED_ACT2_NARRATION_RATE } from "~/composables/act2/useGuidedAct2Narration";
 import type { MigrationActRuntimeService } from "~/composables/migrationActs/useMigrationActRuntime";
 import { useMigrationActStore } from "~/store/migrationActs/migrationAct";
 import type {
   MigrationActEvent,
+  GuidedMigrationPhase,
   MigrationGestureEvaluationResult,
   MigrationMovementBarEvaluation,
   MigrationMovementPhraseEvaluation,
@@ -906,6 +910,68 @@ describe("guided migration controller", () => {
       "summer-practice",
     );
     expect(runtime.forceCompleteGuidedRecognition).toHaveBeenCalledOnce();
+  });
+
+  it("identifies only participant-blocking guided phases as skippable phases", () => {
+    const expectedSkippable: GuidedMigrationPhase[] = [
+      "summer-practice",
+      "autumn-departure-practice",
+      "autumn-migration-practice",
+      "autumn-arrival-practice",
+      "winter-practice",
+      "spring-departure-practice",
+      "spring-migration-practice",
+      "spring-arrival-practice",
+    ];
+    const passive: GuidedMigrationPhase[] = [
+      "idle",
+      "journey-introduction",
+      "summer-demonstration",
+      "summer-practice-prompt",
+      "summer-success",
+      "summer-story-transition",
+      "autumn-migration-story",
+      "cycle-complete",
+    ];
+
+    expectedSkippable.forEach((phase) => {
+      expect(isGuidedBlockingInteractionPhase(phase)).toBe(true);
+    });
+    passive.forEach((phase) => {
+      expect(isGuidedBlockingInteractionPhase(phase)).toBe(false);
+    });
+  });
+
+  it("exposes guided skip only while the flow waits on participant performance", async () => {
+    const { controller, runtime, store, gestureStore } = createHarness();
+
+    controller.startGuidedJourney();
+    await flushFlow();
+    expect(store.guided.phase).toBe("summer-practice");
+    expect(controller.canSkipCurrentBlockingInteraction.value).toBe(true);
+
+    expect(controller.skipCurrentBlockingInteraction()).toBe(true);
+    await flushFlow();
+    expect(runtime.forceCompleteGuidedRecognition).toHaveBeenCalledOnce();
+    expect(store.guided.facilitatorCompletedPhases).toContain(
+      "summer-practice",
+    );
+
+    store.setGuidedState({
+      phase: "summer-story-transition",
+      status: "transition",
+    });
+    expect(controller.canSkipCurrentBlockingInteraction.value).toBe(false);
+    expect(controller.skipCurrentBlockingInteraction()).toBe(false);
+
+    store.setGuidedState({
+      phase: "autumn-departure-practice",
+      status: "practicing",
+    });
+    gestureStore.isActive = true;
+    expect(controller.canSkipCurrentBlockingInteraction.value).toBe(true);
+
+    controller.dispose();
   });
 
   it("does not advance after unmounting during a demonstration", async () => {

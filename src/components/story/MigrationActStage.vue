@@ -411,6 +411,13 @@ const showPauseButton = computed(
 const showSkipMovementButton = computed(() => {
   const gestureId = gestureStore.activeGestureId;
 
+  if (
+    props.act.id === "act-2" &&
+    guidedController.canSkipCurrentBlockingInteraction.value
+  ) {
+    return stageMode.value === "running" && !isUserPaused.value;
+  }
+
   return (
     props.act.id === "act-3" &&
     stageMode.value === "running" &&
@@ -512,6 +519,11 @@ const handlePauseButton = () => {
 };
 const handleSkipMovement = () => {
   if (!showSkipMovementButton.value) return;
+
+  if (props.act.id === "act-2") {
+    guidedController.skipCurrentBlockingInteraction();
+    return;
+  }
 
   controller.skipCurrentBlockingInteraction();
 };

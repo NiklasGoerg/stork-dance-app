@@ -68,6 +68,11 @@ const mockedEvaluateMigrationCheckpoint = vi.mocked(
   evaluateMigrationCheckpoint,
 );
 
+const flushPromises = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
 const createEvaluation = (
   checkpointId: string,
   status: MigrationCheckpointEvaluation["status"],
@@ -171,5 +176,27 @@ describe("useMigrationActMovementSession checkpoint feedback", () => {
     expect(mockTriggerBeatFeedback).not.toHaveBeenCalledWith(
       expect.objectContaining({ result: "failed" }),
     );
+  });
+
+  it("keeps active gesture source time stable after a transport anchor shift", async () => {
+    setActivePinia(createPinia());
+    mockAudioTransport.value = 10_000;
+    const session = useMigrationActMovementSession();
+    void session.start("departure", { countdownStartTransportMs: 10_000 });
+    await flushPromises();
+
+    mockAudioTransport.value = 12_000;
+    session.tick();
+    const sourceTimeBeforeShift = session.store.currentSourceTimeMs;
+    const countdownBeforeShift = session.store.countdownNumber;
+
+    session.shiftTransportAnchors(5_000);
+    mockAudioTransport.value = 17_000;
+    session.tick();
+
+    expect(session.store.currentSourceTimeMs).toBe(sourceTimeBeforeShift);
+    expect(session.store.countdownNumber).toBe(countdownBeforeShift);
+
+    session.cancel();
   });
 });

@@ -283,6 +283,7 @@ export const useMigrationActRuntime = ({
   const ownerSwitchTrace = ref<GuidedOwnerSwitchTrace[]>([]);
   let scheduledOwnerResolver: ((switched: boolean) => void) | null = null;
   let handledRecognitionBarEvaluationId: string | null = null;
+  let guidedUserPauseTransportMs: number | null = null;
 
   const activeEvent = computed(
     () =>
@@ -455,6 +456,45 @@ export const useMigrationActRuntime = ({
     scheduledOwnerSwitchMs.value = null;
     scheduledOwnerResolver?.(false);
     scheduledOwnerResolver = null;
+  };
+
+  const shiftGuidedTransportAnchors = (deltaMs: number) => {
+    if (!Number.isFinite(deltaMs) || deltaMs === 0) return;
+
+    if (tutorialPlaybackStartTransportMs !== null) {
+      tutorialPlaybackStartTransportMs += deltaMs;
+    }
+    if (scheduledOwnerSwitchMs.value !== null) {
+      scheduledOwnerSwitchMs.value += deltaMs;
+    }
+    if (guidedStoryTransitionActive.value || guidedTransitionResolver) {
+      guidedTransitionStartTransportMs += deltaMs;
+    }
+    if (guidedBarWaits.length > 0) {
+      guidedBarWaits = guidedBarWaits.map((wait) => ({
+        ...wait,
+        targetTransportMs: wait.targetTransportMs + deltaMs,
+      }));
+    }
+    gestures.shiftTransportAnchors?.(deltaMs);
+  };
+
+  const captureGuidedUserPauseTransport = () => {
+    if (!guidedInterludeActive.value || guidedUserPauseTransportMs !== null) {
+      return;
+    }
+
+    guidedUserPauseTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+  };
+
+  const restoreGuidedUserPauseTransport = () => {
+    if (guidedUserPauseTransportMs === null) return;
+
+    const resumedTransportMs = audioStore.getBaseRhythmTransportTimeMs();
+    shiftGuidedTransportAnchors(
+      resumedTransportMs - guidedUserPauseTransportMs,
+    );
+    guidedUserPauseTransportMs = null;
   };
 
   const nextRunId = () => {
@@ -1399,6 +1439,7 @@ export const useMigrationActRuntime = ({
     initialMovementOrPreroll: ResolvedMigrationMovement | number | null = null,
   ) => {
     if (guidedInterludeActive.value) return;
+    guidedUserPauseTransportMs = null;
     gestures.setNarrationEnabled?.(false);
     const initialMovement =
       initialMovementOrPreroll && typeof initialMovementOrPreroll !== "number"
@@ -1730,6 +1771,7 @@ export const useMigrationActRuntime = ({
   const leaveGuidedInterlude = async () => {
     if (!guidedInterludeActive.value) return;
 
+    guidedUserPauseTransportMs = null;
     guidedInterludeRevision++;
     cancelGuidedStoryTransition();
     cancelGuidedBarWaits();
@@ -1752,6 +1794,7 @@ export const useMigrationActRuntime = ({
   };
 
   const cancelGuidedInterlude = () => {
+    guidedUserPauseTransportMs = null;
     guidedInterludeRevision++;
     cancelScheduledOwnerSwitch();
     cancelGuidedStoryTransition();
@@ -2470,6 +2513,7 @@ export const useMigrationActRuntime = ({
     ) {
       pausedFromState = store.playbackState;
     }
+    captureGuidedUserPauseTransport();
     store.addPauseReason("user");
     if (!store.isGestureActive && store.playbackState !== "cycle_transition") {
       store.setPlaybackState("paused");
@@ -2499,7 +2543,10 @@ export const useMigrationActRuntime = ({
 
       store.setPlaybackState("playing");
       await synchronizeAudioForPauseReasons();
-      movement.resume(movement.movementSourceTimeMs.value);
+      restoreGuidedUserPauseTransport();
+      if (!usesGestureOwner.value) {
+        movement.resume(movement.movementSourceTimeMs.value);
+      }
       if (tutorialPlaybackMode.value && tutorialMovement) {
         startGuidedMovementRecognition(
           tutorialPlaybackMode.value === "practice"

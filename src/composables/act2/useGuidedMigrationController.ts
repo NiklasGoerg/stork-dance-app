@@ -53,6 +53,19 @@ type ContinuousPractice = {
 const PASSIVE_POSITIVE_FEEDBACK_MIN_BARS = 2;
 const PASSIVE_POSITIVE_FEEDBACK_COOLDOWN_MS = 6_000;
 const PASSIVE_POSITIVE_FEEDBACK_DURATION_MS = 1_250;
+const GUIDED_BLOCKING_INTERACTION_PHASES = new Set<GuidedMigrationPhase>([
+  "summer-practice",
+  "autumn-departure-practice",
+  "autumn-migration-practice",
+  "autumn-arrival-practice",
+  "winter-practice",
+  "spring-departure-practice",
+  "spring-migration-practice",
+  "spring-arrival-practice",
+]);
+
+export const isGuidedBlockingInteractionPhase = (phase: GuidedMigrationPhase) =>
+  GUIDED_BLOCKING_INTERACTION_PHASES.has(phase);
 
 export type GuidedMigrationController = ReturnType<
   typeof useGuidedMigrationController
@@ -391,6 +404,22 @@ export const useGuidedMigrationController = ({
         gestureId: runtime.gestures.store.activeGestureId,
       });
     }
+  };
+
+  const canSkipCurrentBlockingInteraction = computed(
+    () =>
+      enabled &&
+      !disposed &&
+      store.guided.status === "practicing" &&
+      isGuidedBlockingInteractionPhase(store.guided.phase) &&
+      Boolean(activePractice || runtime.gestures.store.isActive),
+  );
+
+  const skipCurrentBlockingInteraction = () => {
+    if (!canSkipCurrentBlockingInteraction.value) return false;
+
+    forceCompleteGuidedStep();
+    return true;
   };
 
   const runGestureTutorial = async ({
@@ -1012,6 +1041,8 @@ export const useGuidedMigrationController = ({
     startGuidedJourney,
     resetAct,
     handleAction,
+    canSkipCurrentBlockingInteraction,
+    skipCurrentBlockingInteraction,
     pause: runtime.pause,
     resume: runtime.resume,
     initialize,

@@ -153,7 +153,7 @@ const getAnatomicalFootAction = (
   const movement = getFootXMovement(samples, side);
   if (movement === null) return null;
 
-  return side === "right" ? movement : -movement;
+  return side === "right" ? -movement : movement;
 };
 
 const getAnatomicalFootClose = (
@@ -163,7 +163,7 @@ const getAnatomicalFootClose = (
   const movement = getFootXMovement(samples, side);
   if (movement === null) return null;
 
-  return side === "right" ? -movement : movement;
+  return side === "right" ? movement : -movement;
 };
 
 const getReturnMetrics = (
@@ -443,7 +443,8 @@ export const evaluateMigrationMovementBeat = ({
   );
   const guidedReturnPassed = validSamples.some(
     (sample) =>
-      sample.wingState === "down" &&
+      sample.wingState !== "not_evaluable" &&
+      sample.wingState !== "up" &&
       sample.stanceWidth !== null &&
       sample.stanceWidth <=
         MIGRATION_RECOGNITION_THRESHOLDS.migrationGuidedClosedStanceWidth *
@@ -468,13 +469,19 @@ export const evaluateMigrationMovementBeat = ({
     stanceChange >= MIGRATION_RECOGNITION_THRESHOLDS.migrationStanceChange;
   const armsUp = hasWingState(validSamples, "up");
   const armsDown = hasWingState(validSamples, "down");
+  const armsLoweredForReturn = validSamples.some(
+    (sample) =>
+      sample.wingState !== "not_evaluable" && sample.wingState !== "up",
+  );
+  const returnArmsPassed =
+    profile === "migration-guided" ? true : armsLoweredForReturn;
   const passed = isActionBeat
     ? profile === "migration-guided"
       ? guidedActionPassed
       : footPassed && armsUp
     : profile === "migration-guided"
       ? guidedReturnPassed
-      : returnPassed && armsDown;
+      : returnPassed && returnArmsPassed;
   const directionRequired =
     MIGRATION_RECOGNITION_THRESHOLDS.migrationDirectionIsRequired;
   return {
@@ -499,7 +506,7 @@ export const evaluateMigrationMovementBeat = ({
       ),
       armsDown: getStatus(
         validSamples.some((sample) => sample.wingState !== "not_evaluable"),
-        armsDown,
+        isActionBeat ? armsDown : armsLoweredForReturn,
       ),
       direction: directionStatus,
     },

@@ -12,8 +12,16 @@ export const getPresenterActionForKey = (
   key: string,
 ): PresenterAction | null => {
   // Presenter invariant: PageUp activates Back/Previous, PageDown activates Continue/Next.
-  if (key === "PageUp") return "pageUp";
-  if (key === "PageDown") return "pageDown";
+  if (key === "PageUp" || key === "Prior") return "pageUp";
+  if (key === "PageDown" || key === "Next") return "pageDown";
+  return null;
+};
+
+export const getPresenterActionForCode = (
+  code: string | undefined,
+): PresenterAction | null => {
+  if (code === "PageUp") return "pageUp";
+  if (code === "PageDown") return "pageDown";
   return null;
 };
 
@@ -31,13 +39,16 @@ export const isPresenterEditableTarget = (target: EventTarget | null) => {
 };
 
 export const getPresenterActionForEvent = (
-  event: Pick<KeyboardEvent, "key" | "repeat" | "target">,
+  event: Pick<KeyboardEvent, "key" | "repeat" | "target"> &
+    Partial<Pick<KeyboardEvent, "code">>,
   enabled: boolean,
 ) => {
   if (!enabled || event.repeat) return null;
   if (isPresenterEditableTarget(event.target)) return null;
 
-  return getPresenterActionForKey(event.key);
+  return (
+    getPresenterActionForKey(event.key) ?? getPresenterActionForCode(event.code)
+  );
 };
 
 export const usePresenterActions = ({

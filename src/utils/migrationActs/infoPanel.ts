@@ -352,25 +352,29 @@ export const buildMigrationActInfoPanelModel = ({
   const metadata = currentPhase
     ? phaseMetadata[currentPhase]
     : phaseMetadata.summer_rest;
-  if (movementFeedbackVisible) {
-    return {
-      mode: "movementFeedback",
-      title: storyNarrationTitle ?? translate(metadata.labelKey),
-      instruction: translate(metadata.instructionKey),
-      feedbackText: translate("story.acts.act4.movementText.good"),
-      feedbackPrimary: true,
-      tone: "success",
-      movements,
-      actions: [],
-    };
-  }
-
   if (storyNarrationTitle || storyNarrationText) {
     return {
       mode: "storyNarration",
       title: storyNarrationTitle ?? translate(metadata.labelKey),
       instruction: storyNarrationText,
-      tone: "neutral",
+      feedbackText: movementFeedbackVisible
+        ? translate("story.acts.act4.movementText.good")
+        : undefined,
+      feedbackPrimary: movementFeedbackVisible,
+      tone: movementFeedbackVisible ? "success" : "neutral",
+      movements,
+      actions: [],
+    };
+  }
+
+  if (movementFeedbackVisible) {
+    return {
+      mode: "movementFeedback",
+      title: translate(metadata.labelKey),
+      instruction: translate(metadata.instructionKey),
+      feedbackText: translate("story.acts.act4.movementText.good"),
+      feedbackPrimary: true,
+      tone: "success",
       movements,
       actions: [],
     };

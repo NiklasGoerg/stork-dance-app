@@ -1,6 +1,6 @@
 {
   "common": {
-    "dataDance": "Data Dance",
+    "dataDance": "Migration in Motion",
     "start": "Start",
     "pause": "Pause",
     "resume": "Resume",
@@ -34,7 +34,7 @@
     "aria": {
       "prototypeNavigation": "Prototype navigation"
     },
-    "title": "Data Storytelling with Embodiment and Emotions",
+    "title": "An Embodied Data Story of White Stork Migration and Seasonal Temperature Change",
     "nav": {
       "prologue": "Prologue",
       "act2": "Act 2",
@@ -246,7 +246,7 @@
       },
       "instructions": {
         "summerRest": "Step gently from side to side.",
-        "winterRest": "Keep stepping with a soft bounce.",
+        "winterRest": "Step right, close, step left, close.",
         "autumnMigration": "Move diagonally backward.",
         "springMigration": "Move diagonally forward.",
         "followRhythm": "Follow the rhythm.",
@@ -1259,11 +1259,11 @@
           "climateContext": "Over recent decades, seasonal temperatures in Germany have changed as well.",
           "causalLimitation": "But these data cannot show that climate alone caused any one stork to change its journey.",
           "otherInfluences": "Food provided by humans, changed habitats, age, and migration experience may also shape the journey.",
-          "finalReflection": "Climate is one part of the changing environment, not the whole explanation. What will the stork's journey look like next?"
+          "finalReflection": "Climate is one part of the changing environment, not the whole explanation. What will the stork's journey look like in the future?"
         },
         "completion": {
           "ariaLabel": "Epilogue completion screen",
-          "title": "Thank you for experiencing Data Dance.",
+          "title": "Thank you for experiencing Migration in Motion.",
           "subtitle": "You have reached the end of the story.",
           "returnHome": "Return Home"
         },
