@@ -31,6 +31,7 @@ import {
   SKELETON_VISUAL_CONFIG,
   type SkeletonVisualMode,
 } from "~/utils/movement/skeletonVisualFeedback";
+import { getCoverGeometry } from "~/utils/movement/cameraOverlayGeometry";
 
 const props = withDefaults(
   defineProps<{
@@ -65,9 +66,38 @@ let running = false;
 let animationFrameId = 0;
 let mediaStream: MediaStream | null = null;
 
-// 👉 kleinere interne Auflösung (Performance!)
-const WIDTH = 480;
-const HEIGHT = 360;
+const REQUESTED_WIDTH = 480;
+const REQUESTED_HEIGHT = 360;
+let viewportWidth = 0;
+let viewportHeight = 0;
+let videoFrame = { x: 0, y: 0, width: 0, height: 0 };
+
+const syncOverlayGeometry = () => {
+  if (!video.value || !canvas.value) return;
+
+  const width = video.value.videoWidth;
+  const height = video.value.videoHeight;
+  if (!width || !height) return;
+
+  const rect = canvas.value.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  const pixelRatio = window.devicePixelRatio || 1;
+  const canvasWidth = Math.round(rect.width * pixelRatio);
+  const canvasHeight = Math.round(rect.height * pixelRatio);
+  if (
+    canvas.value.width !== canvasWidth ||
+    canvas.value.height !== canvasHeight
+  ) {
+    canvas.value.width = canvasWidth;
+    canvas.value.height = canvasHeight;
+    ctx?.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  }
+
+  viewportWidth = rect.width;
+  viewportHeight = rect.height;
+  videoFrame = getCoverGeometry(width, height, rect.width, rect.height);
+};
 
 // 👉 Hand throttling
 let lastHandDetection = 0;
@@ -98,8 +128,8 @@ const bodyJointIndices = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
 onMounted(async () => {
   if (!canvas.value || !video.value) return;
 
-  canvas.value.width = WIDTH;
-  canvas.value.height = HEIGHT;
+  canvas.value.width = REQUESTED_WIDTH;
+  canvas.value.height = REQUESTED_HEIGHT;
 
   ctx = canvas.value.getContext("2d");
 
@@ -108,8 +138,8 @@ onMounted(async () => {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        width: WIDTH,
-        height: HEIGHT,
+        width: REQUESTED_WIDTH,
+        height: REQUESTED_HEIGHT,
       },
     });
   } catch (error) {
@@ -122,9 +152,11 @@ onMounted(async () => {
   video.value.srcObject = stream;
 
   video.value.onloadeddata = async () => {
+    syncOverlayGeometry();
     pose = await usePose();
     hands = await useHands();
 
+    if (!mediaStream) return;
     resetLandmarkSmoothing();
     running = true;
     detectFrame();
@@ -141,6 +173,7 @@ const detectFrame = () => {
 
   if (!video.value || !ctx || !pose) return;
 
+  syncOverlayGeometry();
   const now = performance.now();
 
   const poseResult = pose.detectForVideo(video.value, now);
@@ -151,7 +184,7 @@ const detectFrame = () => {
     lastHandDetection = now;
   }
 
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  ctx.clearRect(0, 0, viewportWidth, viewportHeight);
 
   const smoothedPoseLandmarks = smoothLandmarks(
     poseResult?.landmarks?.[0] as NormalizedLandmark[] | undefined,
@@ -201,8 +234,8 @@ onBeforeUnmount(stopCamera);
 // ==============================
 
 const getPoint = (landmarks: NormalizedLandmark[], i: number) => ({
-  x: (landmarks[i]?.x ?? 0) * WIDTH,
-  y: (landmarks[i]?.y ?? 0) * HEIGHT,
+  x: videoFrame.x + (landmarks[i]?.x ?? 0) * videoFrame.width,
+  y: videoFrame.y + (landmarks[i]?.y ?? 0) * videoFrame.height,
 });
 
 const clamp = (value: number, min: number, max: number) =>
@@ -282,7 +315,7 @@ const drawBody = (landmarks: NormalizedLandmark[]) => {
 
   context.save();
   context.scale(-1, 1);
-  context.translate(-WIDTH, 0);
+  context.translate(-viewportWidth, 0);
 
   const isSkeleton = props.mode === "skeleton" || props.mode === "camera";
   const isSilhouette = props.mode === "silhouette";
@@ -363,7 +396,7 @@ const drawHead = (landmarks: NormalizedLandmark[]) => {
 
   context.save();
   context.scale(-1, 1);
-  context.translate(-WIDTH, 0);
+  context.translate(-viewportWidth, 0);
 
   const nose = getPoint(landmarks, 0);
   const leftEar = getPoint(landmarks, 7);
@@ -442,7 +475,7 @@ const drawHands = (handsLandmarks: NormalizedLandmark[][]) => {
 
   context.save();
   context.scale(-1, 1);
-  context.translate(-WIDTH, 0);
+  context.translate(-viewportWidth, 0);
 
   const isSilhouette = props.mode === "silhouette";
 
@@ -475,8 +508,8 @@ const drawHands = (handsLandmarks: NormalizedLandmark[][]) => {
 
   handsLandmarks.forEach((hand) => {
     const point = (i: number) => ({
-      x: (hand[i]?.x ?? 0) * WIDTH,
-      y: (hand[i]?.y ?? 0) * HEIGHT,
+      x: videoFrame.x + (hand[i]?.x ?? 0) * videoFrame.width,
+      y: videoFrame.y + (hand[i]?.y ?? 0) * videoFrame.height,
     });
 
     connections.forEach(([a, b]) => {
@@ -508,12 +541,14 @@ const drawHands = (handsLandmarks: NormalizedLandmark[][]) => {
 .video,
 .canvas {
   position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .video {
+  object-fit: cover;
   transform: scaleX(-1);
 }
 </style>
