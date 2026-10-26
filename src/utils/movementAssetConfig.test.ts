@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACT4_EARLY_COUNT_ONE_TIMING,
   ACT4_MOVEMENT_TIMING_DEFAULTS,
   act4SeasonMovementConfig,
 } from "~/story/act4IntroCycle";
@@ -85,12 +86,11 @@ describe("movement asset configuration", () => {
       expect(recording.name).toBe(movementId);
       expect(recording.fps).toBe(30);
       expect(config.usingFallbackMovement).toBe(false);
-      expect(config.movementTiming).toEqual({
-        sourceFps: 30,
-        prerollMs: 1_000,
-        loopStartMs: 1_000,
-        loopEndMs: 9_000,
-      });
+      expect(config.movementTiming).toEqual(
+        config.id === "winter" || config.id === "summer"
+          ? ACT4_EARLY_COUNT_ONE_TIMING
+          : ACT4_MOVEMENT_TIMING_DEFAULTS,
+      );
       expect(config.movementLoopDurationMs).toBe(8_000);
     });
   });
@@ -124,7 +124,11 @@ describe("movement asset configuration", () => {
 
       expect(Number.isFinite(firstFrameTime)).toBe(true);
       expect(Number.isFinite(lastFrameTime)).toBe(true);
-      expect(config.movementTiming).toEqual(ACT4_MOVEMENT_TIMING_DEFAULTS);
+      expect(config.movementTiming).toEqual(
+        config.id === "winter" || config.id === "summer"
+          ? ACT4_EARLY_COUNT_ONE_TIMING
+          : ACT4_MOVEMENT_TIMING_DEFAULTS,
+      );
       expect(config.movementPrerollMs).toBe(1_000);
       expect(config.movementLoopDurationMs).toBe(8_000);
       expect(getMovementRecordingDurationMs(recording)).toBeGreaterThan(8_500);

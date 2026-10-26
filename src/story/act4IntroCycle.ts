@@ -7,12 +7,21 @@ import type {
 import { SEASON_THEME_CONFIG } from "~/utils/seasonAudio/config";
 
 // Every complete seasonal take has one lead-in beat, two movement bars and an
-// optional export tail. Only the two movement bars are repeated.
+// optional export tail. The default loop repeats only the two movement bars;
+// Winter and Summer reuse half a lead-in beat before the next Count 1.
 export const ACT4_MOVEMENT_TIMING_DEFAULTS: MovementPlaybackTiming = {
   sourceFps: 30,
   prerollMs: 1_000,
   loopStartMs: 1_000,
   loopEndMs: 9_000,
+};
+
+// Winter and Summer begin preparing the next Count 1 in the final half-beat.
+// Their recordings all contain the 8.5 s cut frame and the 0.5–1 s lead-in.
+// 1–8.5 s plus 0.5–1 s still makes an exact 8 s two-bar loop.
+export const ACT4_EARLY_COUNT_ONE_TIMING: MovementPlaybackTiming = {
+  ...ACT4_MOVEMENT_TIMING_DEFAULTS,
+  loopTransition: { cutAtMs: 8_500, resumeAtMs: 500 },
 };
 
 const seasonMetadata: Record<
@@ -57,7 +66,10 @@ const createMovementConfig = (
   configuredMovementId,
   movementIntensity,
   usingFallbackMovement: false,
-  movementTiming: ACT4_MOVEMENT_TIMING_DEFAULTS,
+  movementTiming:
+    season === "winter" || season === "summer"
+      ? ACT4_EARLY_COUNT_ONE_TIMING
+      : ACT4_MOVEMENT_TIMING_DEFAULTS,
   movementLoopDurationMs: 8_000,
   movementPrerollMs: ACT4_MOVEMENT_TIMING_DEFAULTS.prerollMs,
 });

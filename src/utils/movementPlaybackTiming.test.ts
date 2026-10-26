@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { ACT4_MOVEMENT_TIMING_DEFAULTS } from "~/story/act4IntroCycle";
-import type { MovementPlaybackTiming } from "~/types/movement";
-import { resolveMovementPlaybackPosition } from "~/utils/movementPlaybackTiming";
+import {
+  ACT4_MOVEMENT_TIMING_DEFAULTS,
+  act4SeasonMovementConfig,
+} from "~/story/act4IntroCycle";
+import type { MovementPlaybackTiming, MovementRecording } from "~/types/movement";
+import { getInterpolatedMovementFrame } from "~/utils/movementFrames";
+import {
+  getMovementRecordingDurationMs,
+  resolveMovementPlaybackPosition,
+} from "~/utils/movementPlaybackTiming";
+
+const seasonRecordings = import.meta.glob<MovementRecording>(
+  "../assets/movement_library/seasons/*.json",
+  { eager: true, import: "default" },
+);
 
 const timing: MovementPlaybackTiming = {
   sourceFps: 30,
@@ -46,5 +58,66 @@ describe("movement playback timing", () => {
     expect(secondPlayback.sourceTimeMs).toBe(1_000);
     expect(secondPlayback.loopCount).toBe(1);
     expect(secondPlayback.isPreroll).toBe(false);
+  });
+
+  it("keeps every Act 4 variation on four-count phrase boundaries", () => {
+    for (const config of Object.values(act4SeasonMovementConfig).flatMap(
+      Object.values,
+    )) {
+      const recording =
+        seasonRecordings[
+          `../assets/movement_library/seasons/${config.configuredMovementId}.json`
+        ];
+      expect(recording).toBeDefined();
+      const durationMs = getMovementRecordingDurationMs(recording!);
+      const isEarlyLeadIn = config.id === "winter" || config.id === "summer";
+
+      if (isEarlyLeadIn) {
+        expect(durationMs).toBeGreaterThan(8_500);
+      }
+
+      for (const seasonElapsedMs of [0, 4_000, 8_000, 12_000]) {
+        const position = resolveMovementPlaybackPosition({
+          elapsedMs: seasonElapsedMs + config.movementTiming.prerollMs,
+          sourceDurationMs: durationMs,
+          timing: config.movementTiming,
+        });
+
+        expect(position.sourceTimeMs).toBe(
+          config.movementTiming.loopStartMs + (seasonElapsedMs % 8_000),
+        );
+        expect(position.loopCount).toBe(Math.floor(seasonElapsedMs / 8_000));
+      }
+
+      if (isEarlyLeadIn) {
+        const sourceAt = (seasonElapsedMs: number) =>
+          resolveMovementPlaybackPosition({
+            elapsedMs: seasonElapsedMs + config.movementTiming.prerollMs,
+            sourceDurationMs: durationMs,
+            timing: config.movementTiming,
+          }).sourceTimeMs;
+
+        expect(sourceAt(7_499)).toBe(8_499);
+        expect(sourceAt(7_500)).toBe(500);
+        expect(sourceAt(7_750)).toBe(750);
+        expect(sourceAt(7_999)).toBe(999);
+        expect(sourceAt(8_000)).toBe(1_000);
+      } else {
+        const finalFrameHold = resolveMovementPlaybackPosition({
+          elapsedMs: 8_750,
+          sourceDurationMs: durationMs,
+          timing: config.movementTiming,
+        });
+        expect(finalFrameHold.sourceTimeMs).toBe(8_750);
+        if (durationMs < 8_750) {
+          expect(
+            getInterpolatedMovementFrame(
+              recording!,
+              finalFrameHold.sourceTimeMs,
+            )?.landmarks,
+          ).toEqual(recording!.frames.at(-1)?.landmarks);
+        }
+      }
+    }
   });
 });

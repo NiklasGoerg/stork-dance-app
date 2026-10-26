@@ -11,9 +11,7 @@
       autoplay
       playsinline
       class="video"
-      :style="{
-        opacity: mode === 'camera' ? 1 : 0,
-      }"
+      :style="{ opacity: mode === 'camera' ? 1 : 0 }"
     />
     <canvas ref="canvas" class="canvas" />
   </div>
@@ -185,6 +183,22 @@ const detectFrame = () => {
   }
 
   ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+
+  if (props.mode === "camera") {
+    // Draw the camera and pose in the same coordinate system. In particular,
+    // Chromium can composite a CSS-covered video differently from a canvas.
+    ctx.save();
+    ctx.translate(viewportWidth, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(
+      video.value,
+      videoFrame.x,
+      videoFrame.y,
+      videoFrame.width,
+      videoFrame.height,
+    );
+    ctx.restore();
+  }
 
   const smoothedPoseLandmarks = smoothLandmarks(
     poseResult?.landmarks?.[0] as NormalizedLandmark[] | undefined,
@@ -550,5 +564,6 @@ const drawHands = (handsLandmarks: NormalizedLandmark[][]) => {
 .video {
   object-fit: cover;
   transform: scaleX(-1);
+  pointer-events: none;
 }
 </style>

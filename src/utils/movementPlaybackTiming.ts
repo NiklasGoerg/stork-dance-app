@@ -62,10 +62,9 @@ export const resolveMovementPlaybackPosition = ({
     Math.max(timing.loopStartMs, prerollMs),
     durationMs,
   );
-  const loopEndMs = Math.min(
-    Math.max(timing.loopEndMs, loopStartMs + 1),
-    durationMs,
-  );
+  // Keep the configured phrase length even when a recording ends a little
+  // early. The frame sampler holds its last pose until the next bar boundary.
+  const loopEndMs = Math.max(timing.loopEndMs, loopStartMs + 1);
   const loopDurationMs = Math.max(loopEndMs - loopStartMs, 1);
   const normalizedElapsedMs = Math.max(elapsedMs, 0);
 

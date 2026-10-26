@@ -301,15 +301,13 @@ export const useSeasonalLearningCycle = (config: SeasonalCycleConfig) => {
       getSeasonMovementPrerollMs(season, movementPrerollMs.value);
     movementLoopStartMs.value =
       season.movementTiming?.loopStartMs ?? movementPrerollMsDebug.value;
-    movementLoopEndMs.value = Math.min(
+    movementLoopEndMs.value =
       season.movementTiming?.loopEndMs ??
-        movementLoopStartMs.value +
-          getSeasonMovementLoopDurationMs(
-            season,
-            activeConfig.value.barDurationMs,
-          ),
-      movement.durationMs,
-    );
+      movementLoopStartMs.value +
+        getSeasonMovementLoopDurationMs(
+          season,
+          activeConfig.value.barDurationMs,
+        );
     movementLoaded.value = true;
     configuredMovementId.value = season.configuredMovementId ?? null;
     movementIntensity.value = season.movementIntensity ?? null;
